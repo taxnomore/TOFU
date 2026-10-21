@@ -13,10 +13,11 @@ Les tests automatiques ont tourné dans Chromium, avec un rendu 3D logiciel (san
 
 ## Priorité 2 : confort de jeu
 
-1. Remappage des boutons de **manette** (le clavier se remappe déjà).
-2. Choix de la **taille du texte** et d'un mode **couleurs contrastées** pour l'interface.
-3. Option pour **désactiver les astuces** dès le premier lancement (elles se réactivent déjà dans les réglages).
-4. Dans le salon réseau, navigation complète à la **manette** (le prénom se tape aujourd'hui au clavier ou au doigt).
+Le remappage de la manette, la taille du texte, les couleurs contrastées, l'arrêt des secousses et des astuces existent depuis la troisième amélioration. Il reste :
+
+1. Couleurs contrastées aussi dans le **décor 3D** : contour des objets à prendre et des désordres.
+2. Une disposition de manette **par joueur** (aujourd'hui, toutes les manettes partagent la même).
+3. Un écran qui affiche le bouton pressé, pour les **manettes non standard** (certaines manettes Bluetooth sous Linux nomment leurs boutons autrement).
 
 ## Priorité 3 : contenu
 

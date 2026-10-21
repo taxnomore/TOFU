@@ -9,8 +9,8 @@ import type { Character, GameEvent, GameState } from '../../shared/sim/types';
 import { ITEM_TYPES, MESS_TYPES } from '../../shared/world/itemTypes';
 import { BUILDINGS, DOORS, PROPS, STATIONS, WALLS, ZONES, WORLD_BOUNDS, zoneAt } from '../../shared/world/map';
 import { Variant, presentIn } from '../../shared/world/variants';
-import type { InputDevice } from '../input/devices';
-import { KEYMAPS, keyLabel } from '../input/devices';
+import type { InputDevice, PadAction } from '../input/devices';
+import { KEYMAPS, PADMAP, keyLabel, padButtonLabel } from '../input/devices';
 import { HUMAN_LOOKS } from '../render/characters';
 import type { LocalPlayer } from '../runtime/session';
 import { wallThickness } from '../../shared/world/colliders';
@@ -38,14 +38,16 @@ export function glyph(dev: InputDevice | undefined, button: number): string {
   if (!dev) return '';
   const kind = (dev as { activeKind?: InputDevice['kind'] }).activeKind ?? dev.kind;
   if (kind === 'gamepad') {
-    return ({ [BTN_INTERACT]: 'A', [BTN_SPRINT]: 'RT', [BTN_SPECIAL]: 'X', [BTN_BARK]: 'B', [BTN_SIT]: 'Y' } as Record<number, string>)[button] ?? '?';
+    const a = ({ [BTN_INTERACT]: 'interact', [BTN_SPRINT]: 'sprint', [BTN_SPECIAL]: 'special', [BTN_BARK]: 'bark', [BTN_SIT]: 'sit' } as Record<number, PadAction>)[button];
+    const b = a ? PADMAP[a][0] : undefined;
+    return b === undefined ? '—' : padButtonLabel(b);
   }
   if (kind === 'touch') {
     return ({ [BTN_INTERACT]: '✋', [BTN_SPRINT]: '💨', [BTN_SPECIAL]: '★', [BTN_BARK]: '🗯️', [BTN_SIT]: '🐾' } as Record<number, string>)[button] ?? '?';
   }
   const map = dev.id.includes('right') ? KEYMAPS.right : dev.id.includes('left') ? KEYMAPS.left : KEYMAPS.full;
   const codes = button === BTN_INTERACT ? map.interact : button === BTN_SPRINT ? map.sprint : button === BTN_SPECIAL ? map.special : button === BTN_BARK ? map.bark : map.sit;
-  return keyLabel(codes[0]);
+  return codes.length ? keyLabel(codes[0]) : '—';
 }
 
 // ---------------------------------------------------------------------------
@@ -151,11 +153,11 @@ export class TopBar {
     this.timer.classList.toggle('hurry', remaining < 30 && S.phase === 'play');
     const cp = Math.min(1, S.chaos / S.chaosGoal);
     this.chaosFill.style.width = `${cp * 100}%`;
-    this.chaosText.textContent = `Bêtises ${Math.floor(S.chaos)} / ${S.chaosGoal}`;
+    this.chaosText.innerHTML = `<i>Bêtises</i>${Math.floor(S.chaos)} / ${S.chaosGoal}`;
     this.chaos.classList.toggle('danger', cp > 0.8);
     this.cleanFill.style.width = `${S.cleanliness}%`;
     this.cleanGoal.style.left = `${S.cleanGoal}%`;
-    this.cleanText.textContent = `Propreté ${Math.round(S.cleanliness)} %`;
+    this.cleanText.innerHTML = `<i>Propreté</i>${Math.round(S.cleanliness)} %`;
     this.clean.classList.toggle('low', S.cleanliness < S.cleanGoal);
     this.guests.style.display = S.guestsT > 0 ? '' : 'none';
     if (S.guestsT > 0) this.guests.textContent = `🔔 Les invités arrivent dans ${Math.ceil(S.guestsT)} s !`;
@@ -384,6 +386,8 @@ export class PlayerHud {
   private tipQueue: string[] = [];
   private tipT = 0;
   private shownTips: Set<string>;
+  /** Tips can be turned off in the settings. */
+  static tipsOn = true;
 
   constructor(parent: HTMLElement, readonly lp: LocalPlayer) {
     this.prompt.append(this.ring, this.promptKey, this.promptText);
@@ -430,14 +434,22 @@ export class PlayerHud {
   }
 
   tipOnce(id: string, text: string) {
-    if (this.shownTips.has(id)) return;
+    if (!PlayerHud.tipsOn || this.shownTips.has(id)) return;
     this.shownTips.add(id);
     try {
-      localStorage.setItem('tofu.tips', JSON.stringify([...this.shownTips]));
+      // Split screen: every view adds its own tips to the saved list.
+      const saved = new Set(JSON.parse(localStorage.getItem('tofu.tips') ?? '[]') as string[]);
+      saved.add(id);
+      localStorage.setItem('tofu.tips', JSON.stringify([...saved]));
     } catch {
       /* ignore */
     }
     this.tipQueue.push(text);
+  }
+
+  /** Shows every tip again (settings). */
+  resetTips() {
+    this.shownTips.clear();
   }
 
   update(dt: number, g: Game, S: GameState, cam: THREE.PerspectiveCamera, headPos: (id: number, out: THREE.Vector3) => THREE.Vector3) {

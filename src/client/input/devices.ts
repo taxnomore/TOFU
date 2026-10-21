@@ -253,6 +253,64 @@ export class KeyboardDevice implements InputDevice {
 // Gamepads (standard mapping)
 // ---------------------------------------------------------------------------
 
+export type PadAction = 'interact' | 'sprint' | 'special' | 'bark' | 'sit' | 'camLeft' | 'camRight' | 'tactical' | 'pause';
+
+/** Button numbers of the standard mapping; the d-pad (12-15) always moves. */
+const PAD_DEFAULT: Record<PadAction, number[]> = {
+  interact: [0], bark: [1], special: [2], sit: [3], camLeft: [4], camRight: [5], sprint: [7, 6, 10], tactical: [8], pause: [9],
+};
+export const PADMAP: Record<PadAction, number[]> = JSON.parse(JSON.stringify(PAD_DEFAULT));
+export const DPAD = [12, 13, 14, 15];
+
+const PAD_NAMES = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'Select', 'Start', 'L3', 'R3', '↑', '↓', '←', '→', 'Home'];
+
+/** Name of a gamepad button (Xbox style, the most common layout). */
+export function padButtonLabel(i: number): string {
+  return PAD_NAMES[i] ?? `B${i}`;
+}
+
+function savePadmap() {
+  try {
+    localStorage.setItem('tofu.padmap', JSON.stringify(PADMAP));
+  } catch {
+    /* private mode */
+  }
+}
+
+/** Loads saved gamepad buttons over the defaults (unknown or malformed entries are ignored). */
+export function loadPadmap() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('tofu.padmap') ?? '{}') as Record<string, unknown>;
+    for (const k of Object.keys(PADMAP) as PadAction[]) {
+      const v = saved[k];
+      if (Array.isArray(v) && v.every((b) => Number.isInteger(b) && b >= 0 && b < 32 && !DPAD.includes(b))) PADMAP[k] = (v as number[]).slice(0, 3);
+    }
+  } catch {
+    /* keep defaults */
+  }
+}
+
+/** Binds a button to an action as its main button; other actions lose it. */
+export function bindPad(action: PadAction, button: number) {
+  if (DPAD.includes(button)) return;
+  for (const k of Object.keys(PADMAP) as PadAction[]) {
+    if (k !== action) PADMAP[k] = PADMAP[k].filter((b) => b !== button);
+  }
+  PADMAP[action] = [button, ...PADMAP[action].slice(1).filter((b) => b !== button)].slice(0, 3);
+  savePadmap();
+}
+
+export function resetPadmap() {
+  for (const k of Object.keys(PADMAP) as PadAction[]) PADMAP[k] = [...PAD_DEFAULT[k]];
+  savePadmap();
+}
+
+/** Is this button held (analog triggers count past half way)? */
+export function padHeld(p: Gamepad, i: number): boolean {
+  const b = p.buttons[i];
+  return !!b && (b.pressed || b.value > 0.5);
+}
+
 function dead(x: number, y: number, dz = 0.2): [number, number] {
   const l = Math.hypot(x, y);
   if (l < dz) return [0, 0];
@@ -290,8 +348,9 @@ export class GamepadDevice implements InputDevice {
     const r = emptyRaw();
     const p = this.pad();
     if (!p) return r;
-    const b = (i: number) => !!p.buttons[i] && (p.buttons[i].pressed || p.buttons[i].value > 0.5);
-    const once = (i: number) => b(i) && !this.prev[i];
+    const b = (i: number) => padHeld(p, i);
+    const on = (a: PadAction) => PADMAP[a].some(b);
+    const once = (a: PadAction) => PADMAP[a].some((i) => b(i) && !this.prev[i]);
     let [mx, my] = dead(p.axes[0] ?? 0, p.axes[1] ?? 0);
     if (b(14)) mx = -1;
     if (b(15)) mx = 1;
@@ -300,15 +359,15 @@ export class GamepadDevice implements InputDevice {
     r.mx = mx;
     r.my = -my;
     const [lx, ly] = dead(p.axes[2] ?? 0, p.axes[3] ?? 0, 0.22);
-    r.yaw = -lx * 2.6 * dt + ((b(4) ? 1 : 0) - (b(5) ? 1 : 0)) * 2.2 * dt;
+    r.yaw = -lx * 2.6 * dt + ((on('camLeft') ? 1 : 0) - (on('camRight') ? 1 : 0)) * 2.2 * dt;
     r.pitch = ly * 1.4 * dt;
-    if (b(0)) r.buttons |= BTN_INTERACT;
-    if (b(6) || b(7) || b(10)) r.buttons |= BTN_SPRINT;
-    if (b(2)) r.buttons |= BTN_SPECIAL;
-    if (b(1)) r.buttons |= BTN_BARK;
-    if (b(3)) r.buttons |= BTN_SIT;
-    r.pause = once(9);
-    r.tactical = once(8);
+    if (on('interact')) r.buttons |= BTN_INTERACT;
+    if (on('sprint')) r.buttons |= BTN_SPRINT;
+    if (on('special')) r.buttons |= BTN_SPECIAL;
+    if (on('bark')) r.buttons |= BTN_BARK;
+    if (on('sit')) r.buttons |= BTN_SIT;
+    r.pause = once('pause');
+    r.tactical = once('tactical');
     this.prev = p.buttons.map((_, i) => b(i));
     return r;
   }

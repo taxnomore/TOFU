@@ -148,6 +148,11 @@ button small { display: block; font-weight: 500; font-size: 0.85rem; opacity: 0.
 .choice:focus-visible { outline: 4px solid #2e86de; }
 .opts { display: grid; grid-template-columns: auto 1fr; gap: 0.5rem 1rem; align-items: center; margin: 0.8rem 0; }
 .opts .vdesc { grid-column: 2; margin-top: -0.25rem; opacity: 0.8; font-size: 0.85em; }
+.opts h3 { grid-column: 1 / -1; margin: 0.5rem 0 0; font-size: 1.05rem; border-bottom: 2px solid rgba(59, 42, 30, 0.15); padding-bottom: 0.15rem; }
+.opts h3:first-child { margin-top: 0; }
+.namerow { display: flex; gap: 0.4rem; align-items: center; }
+.namerow input { flex: 1; min-width: 0; }
+button.mini.dice { font-size: 1.15rem; padding: 0.2rem 0.5rem; }
 .seg { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .seg button {
   font: 600 1rem var(--font);
@@ -214,6 +219,8 @@ input[type='text'] { -webkit-user-select: text; user-select: text; touch-action:
 .lobby-player small { opacity: 0.7; }
 button.mini { font: 600 0.85rem var(--font); padding: 0.15rem 0.5rem; border-radius: 0.6rem; border: 2px solid var(--ink); background: #fff; color: var(--ink); cursor: pointer; }
 button.mini:hover, button.mini:focus-visible { background: var(--sun); }
+/* Menus are also driven by keyboard and gamepad: the focus must show. */
+.seg button:focus-visible, button.mini:focus-visible, input:focus-visible { outline: 3px solid #2e86de; outline-offset: 2px; }
 .seg button:disabled { cursor: default; opacity: 0.55; }
 .seg button.sel:disabled { opacity: 0.9; }
 button.big:disabled { opacity: 0.5; cursor: default; transform: none; }
@@ -339,6 +346,7 @@ body.lan-host .guest-only { display: none !important; }
   border-radius: 1rem;
   overflow: hidden;
   box-shadow: 0 4px 0 var(--ink);
+  container-type: inline-size;
 }
 .meter .fill { position: absolute; left: 0; top: 0; bottom: 0; transition: width 0.3s; }
 .meter.chaos .fill { background: linear-gradient(90deg, #ffb347, #ff5e3a); }
@@ -346,7 +354,10 @@ body.lan-host .guest-only { display: none !important; }
 .meter.clean .fill { background: linear-gradient(90deg, #7be3a0, #2ecc71); }
 .meter.clean.low .fill { background: linear-gradient(90deg, #ffd166, #f4a261); }
 .meter .goal { position: absolute; top: -2px; bottom: -2px; width: 3px; background: var(--ink); opacity: 0.6; }
-.meter span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 700 0.85rem var(--font); text-shadow: 0 1px 0 #fff; }
+.meter span { position: absolute; inset: 0 0 0 1.3rem; display: flex; align-items: center; justify-content: center; gap: 0.3em; font: 700 0.85rem var(--font); text-shadow: 0 1px 0 #fff; white-space: nowrap; }
+.meter span i { font-style: normal; }
+/* Narrow screen or large text: the icon alone names the meter. */
+@container (max-width: 9rem) { .meter span i { display: none; } }
 .meter b { position: absolute; left: 6px; top: 50%; transform: translateY(-50%); z-index: 1; font-size: 1rem; }
 .tb-guests {
   position: absolute;
@@ -619,3 +630,30 @@ body.lan-host .guest-only { display: none !important; }
 @keyframes rot { 50% { transform: rotate(90deg); } }
 @media (orientation: portrait) and (max-width: 900px) { body.touch.ingame .rotate-hint { display: flex; } }
 .fps { position: absolute; right: 6px; top: 6px; color: #fff; font: 600 12px monospace; text-shadow: 0 1px 2px #000; pointer-events: none; z-index: 9; }
+
+/* ----------------------------------------------------------------- Comfort */
+/* "Secousses : non" also stops the wobbling of the interface. */
+body.calm .tb-timer.hurry, body.calm .meter.chaos.danger, body.calm .end-banner, body.calm .logo img, body.calm .tb-guests, body.calm .bar.zoom.ready, body.calm .tbtn.ready { animation: none; }
+/* High contrast: dark text on plain light boxes, thick borders, strong focus. */
+body.contrast { --ink: #000; --panel: #fffdf5; }
+body.contrast .screen.dim { background: rgba(0, 0, 0, 0.72); }
+body.contrast .panel { border: 3px solid #000; }
+body.contrast .small, body.contrast button small, body.contrast .opts .vdesc, body.contrast .vp-list h4, body.contrast .lobby-player small, body.contrast .hint { opacity: 1; }
+body.contrast .hint { text-shadow: 0 0 3px #000, 0 2px 3px #000; }
+body.contrast .seg button { border-width: 3px; }
+body.contrast .seg button.sel { background: #ffd400; text-decoration: underline; text-underline-offset: 3px; }
+body.contrast :focus-visible { outline: 4px solid #0047ff !important; outline-offset: 2px; }
+body.contrast .vp-list { background: #fff; border: 3px solid #000; }
+body.contrast .vp-list .done { opacity: 0.7; }
+body.contrast .vp-list em { color: #0047b3; }
+body.contrast .vp-status { background: #000; }
+body.contrast .vp-tip { background: #000; border-color: #ffd400; }
+body.contrast .toast.good { background: #b9f6c9; }
+body.contrast .toast.bad { background: #ffc9bd; }
+body.contrast .meter.chaos .fill { background: #ff5a00; }
+body.contrast .meter.clean .fill { background: #12b04c; }
+body.contrast .meter.clean.low .fill { background: #ffb000; }
+body.contrast .meter .goal { opacity: 1; width: 4px; }
+body.contrast .bar, body.contrast .treats { background: #fff; }
+body.contrast .float.chaos { color: #ffb000; -webkit-text-stroke: 1.5px #000; text-shadow: 0 0 3px #000; }
+body.contrast .float.good { color: #3df08a; -webkit-text-stroke: 1.5px #000; text-shadow: 0 0 3px #000; }

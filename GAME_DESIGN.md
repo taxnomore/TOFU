@@ -216,6 +216,15 @@ Tous les modèles sont construits en code (formes simples assemblées, couleurs 
 - **Humains** : se répartissent les tâches (réservations partagées), nettoient, reprennent les objets volés, protègent les tâches faites, lancent des friandises, ferment les portes, interceptent Tofu pendant le compte des invités. Ils éteignent l'aspirateur quand Tofu l'a allumé ou qu'il fonce vers un objet fragile, l'allument pour aspirer un sol couvert d'empreintes, essuient les pattes de Tofu à la porte avant qu'il entre, laissent sécher les traces d'eau et rendent la marchandise volée au bon étal.
 - **Coéquipier** : un humain joué par l'ordinateur laisse au joueur le désordre ou l'objet dont celui-ci s'occupe déjà (joueur à moins de 3 m et plus proche que lui).
 
+## 13 bis. Confort
+
+- **Commandes** : le clavier (trois dispositions) et la manette se remappent dans les réglages. Un bouton fait une seule action ; la croix directionnelle sert toujours à bouger ; dans les menus, A valide et B revient. Toutes les manettes partagent la même disposition. Les bulles d'aide et l'écran « Comment jouer » affichent les boutons choisis.
+- **Taille du texte** : 100, 115 ou 130 %. Toute l'interface suit la taille de police de la page ; les jauges du haut gardent leur seule icône quand la place manque.
+- **Couleurs contrastées** : texte noir sur fond clair, bordures épaisses, sélection soulignée, focus très visible (interface seulement, pas le décor 3D).
+- **Secousses** : « Non » coupe les secousses de caméra et les éléments d'interface qui tremblent. Le réglage part sur « Non » si le système demande moins d'animations (`prefers-reduced-motion`).
+- **Astuces** : coupables ; « Revoir depuis le début » les remet toutes.
+- **Salon réseau** : le bouton 🎲 donne un prénom au hasard, pour qui joue à la manette sans clavier.
+
 ## 14. Architecture technique
 
 ```

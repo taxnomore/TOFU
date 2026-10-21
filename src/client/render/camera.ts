@@ -15,6 +15,8 @@ export class CameraRig {
   readonly focus = new THREE.Vector3();
   private initialized = false;
   private shake = 0;
+  /** Screen shake on big crashes (can be turned off in the settings). */
+  static shakeOn = true;
 
   /** Unit forward vector on the ground plane (x,z). */
   forward(): { x: number; z: number } {
@@ -29,6 +31,7 @@ export class CameraRig {
   }
 
   addShake(a: number) {
+    if (!CameraRig.shakeOn) return;
     this.shake = Math.min(0.4, this.shake + a);
   }
 

@@ -75,7 +75,7 @@ Ouvrez la première dans le navigateur du PC. Gardez le terminal ouvert pendant 
 - Autre port : `PORT=8081 npm run start`
 - Mode développement, avec rechargement automatique quand le code change : `npm run dev`
 
-Au premier lancement, passez par « Comment jouer » : l'écran résume les règles et toutes les touches. Des astuces apparaissent aussi pendant les premières parties.
+Au premier lancement, passez par « Comment jouer » : l'écran résume les règles et toutes les touches. Des astuces apparaissent aussi pendant les premières parties ; on les coupe dans les **Réglages**.
 
 ## 3. Jouer seul
 
@@ -108,7 +108,7 @@ Chaque ambiance apporte aussi un défi secret pour Tofu. Le choix se fait dans l
    - **Entrée** : clavier droit (flèches) ;
    - **A** : une manette (une par joueur).
 4. Chaque joueur choisit son rôle avec **gauche / droite** et son personnage avec **haut / bas**. La souris marche aussi.
-5. Lancez avec le bouton **Jouer**, ou la touche pause d'un joueur (**Échap**, **⌫** ou **Start**).
+5. Lancez avec le bouton **Jouer**, ou la touche pause d'un joueur (**Échap**, **⌫** ou **Start** à l'origine).
 
 L'écran se partage en 2 ou 3 vues. Chaque joueur a sa propre caméra et peut explorer une autre partie du quartier. À 3 joueurs, le quatrième quart de l'écran montre une vue d'ensemble.
 
@@ -118,7 +118,7 @@ Si un seul joueur rejoint, l'ordinateur joue les rôles manquants (réglage « R
 
 1. **Sur le PC** : lancez `npm run start`, ouvrez `http://localhost:8080/` et cliquez sur **Réseau local**. Le PC devient l'hôte 👑. Le salon affiche un QR code et l'adresse du jeu.
 2. **Sur chaque téléphone** : connectez-vous au même Wi-Fi que le PC. Scannez le QR code avec l'appareil photo, ou tapez l'adresse affichée (par exemple `http://192.168.1.42:8080/`). Touchez **Rejoindre la partie**.
-3. Chacun écrit son prénom, choisit **Tofu**, **Humain** ou **Peu importe**, puis touche **Je suis prêt !**
+3. Chacun écrit son prénom (ou touche 🎲 pour un prénom au hasard, pratique à la manette), choisit **Tofu**, **Humain** ou **Peu importe**, puis touche **Je suis prêt !**
 4. L'hôte règle la durée et la difficulté. Il peut désigner Tofu avec **En faire Tofu**. Il lance ensuite la partie.
 5. Tournez les téléphones en mode paysage.
 
@@ -141,7 +141,7 @@ Bon à savoir :
 
 ## 6. Commandes
 
-Les touches se changent dans **Réglages → Changer les touches**. Les tableaux suivants montrent les touches d'origine.
+Les touches du clavier se changent dans **Réglages → Changer les touches**, les boutons de la manette dans **Réglages → Changer les boutons**. Les tableaux suivants montrent les réglages d'origine.
 
 ### Clavier, un seul joueur
 
@@ -188,6 +188,8 @@ Certaines actions demandent de **maintenir** le bouton (nettoyer, faire le lit, 
 | Vue du dessus | Select (Share) |
 | Pause | Start (Options) |
 
+Pour changer un bouton, choisissez **Changer** en face de l'action, puis appuyez sur le nouveau bouton. Un bouton ne fait qu'une seule action. La croix directionnelle sert toujours à bouger. Dans les menus, A valide et B revient en arrière, quels que soient vos réglages.
+
 ### Téléphone ou tablette
 
 - **Se déplacer** : posez le pouce gauche n'importe où sur la moitié gauche de l'écran ; un joystick apparaît.
@@ -195,6 +197,20 @@ Certaines actions demandent de **maintenir** le bouton (nettoyer, faire le lit, 
 - **Boutons** en bas à droite : ✋ **Action** (le plus gros), 💨 **Courir**, 🌀 **Zoomies** ou 🦴 **Friandise**, 🗯️ **Wouf** ou 📣 **Appeler**, 🐾 **Assis** (Tofu).
 - **⏸** en haut à droite : pause.
 - Jouez en mode paysage ; le jeu le rappelle si le téléphone est en portrait.
+
+### Réglages de confort
+
+Le menu **Réglages** propose aussi :
+
+| Réglage | Effet |
+|---|---|
+| Taille du texte | Normale, Grande ou Très grande : tous les textes des menus et de l'écran de jeu grandissent. |
+| Couleurs contrastées | Texte noir sur fond clair, bordures épaisses, sélection bien visible. |
+| Secousses de l'écran | « Non » arrête les secousses de la caméra et les éléments qui tremblent. Si l'ordinateur demande moins d'animations, le jeu part sur « Non ». |
+| Astuces en jeu | « Oui » ou « Non » ; « Revoir depuis le début » les fait toutes revenir. |
+| Caméra auto | La caméra se replace derrière le personnage quand il avance. |
+
+Le navigateur garde ces choix pour les parties suivantes.
 
 ## 7. Règles en bref
 

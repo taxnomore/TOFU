@@ -14,6 +14,8 @@ import { el } from './hud';
 import { LazyPad, MultiDevice, Screens, isTouch, savePrefs } from './screens';
 
 const NAMES = ['Léa', 'Hugo', 'Chloé', 'Lucas', 'Emma', 'Nathan', 'Jade', 'Louis', 'Inès', 'Tom', 'Zoé', 'Noé'];
+/** Names for the 🎲 button (handy with a gamepad, which cannot type). */
+const FUN_NAMES = [...NAMES, 'Mamie', 'Papi', 'Tonton', 'Tata', 'Mila', 'Jules', 'Rose', 'Arthur', 'Lina', 'Gabriel', 'Capitaine', 'Doudou'];
 const SEAT_CONTROLS = ['Clavier gauche (ZQSD/WASD) ou manette 1', 'Clavier droit (flèches) ou manette 2', 'Manette 3'];
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -345,7 +347,7 @@ class Lan {
     box.innerHTML = mine.map((p) => `<div class="lan-seat">
       ${multi ? `<h4>Joueur ${p.seat + 1} · <small>${SEAT_CONTROLS[p.seat]}</small>${p.seat > 0 ? ` <button class="mini" data-remove="${p.seat}">Retirer</button>` : ''}</h4>` : ''}
       <div class="opts">
-        <span>Prénom</span><input type="text" maxlength="16" data-name="${p.seat}" value="${esc(p.name)}" autocomplete="off" enterkeyhint="done">
+        <span>Prénom</span><div class="namerow"><input type="text" maxlength="16" data-name="${p.seat}" value="${esc(p.name)}" autocomplete="off" enterkeyhint="done" aria-label="Prénom"><button class="mini dice" data-dice="${p.seat}" title="Un prénom au hasard">🎲</button></div>
         <span>Je veux jouer</span><div class="seg" data-k="pref" data-seat="${p.seat}">${prefs.map(([v, n]) => `<button class="${p.pref === v ? 'sel' : ''}" data-v="${v}">${n}</button>`).join('')}</div>
         <span>Si je suis humain</span><div class="seg" data-k="avatar" data-seat="${p.seat}">${HUMAN_LOOKS.slice(0, 4).map((l, i) => `<button class="${p.avatar === i ? 'sel' : ''}" data-v="${i}">${l.name}</button>`).join('')}</div>
       </div></div>`).join('')
@@ -388,6 +390,16 @@ class Lan {
       net.send({ t: 'add_seat', seat });
       return;
     }
+    if (b.dataset.dice) {
+      const i = Number(b.dataset.dice);
+      const used = new Set(net.lobby?.players.map((p) => p.name));
+      const free = FUN_NAMES.filter((n) => !used.has(n));
+      const name = free[Math.floor(Math.random() * free.length)] ?? 'Joueur';
+      const inp = this.scr?.querySelector(`input[data-name="${i}"]`) as HTMLInputElement | null;
+      if (inp) inp.value = name;
+      this.setName(i, name);
+      return;
+    }
     if (b.dataset.remove) {
       const i = Number(b.dataset.remove);
       net.seats.splice(i, 1);
@@ -420,8 +432,13 @@ class Lan {
     const net = this.net;
     const t = e.target as HTMLInputElement;
     if (!net || t.dataset.name === undefined) return;
-    const i = Number(t.dataset.name);
-    const name = t.value.replace(/[<>&"'`]/g, '').trim().slice(0, 16) || 'Joueur';
+    this.setName(Number(t.dataset.name), t.value);
+  }
+
+  private setName(i: number, value: string) {
+    const net = this.net;
+    if (!net) return;
+    const name = value.replace(/[<>&"'`]/g, '').trim().slice(0, 16) || 'Joueur';
     if (net.seats[i]) net.seats[i].name = name;
     net.send({ t: 'seat', seat: i, name });
     if (i === 0) {

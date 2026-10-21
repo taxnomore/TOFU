@@ -572,6 +572,11 @@ export class App {
     }
   }
 
+  /** Shows the tips again from the start (settings). */
+  resetTips() {
+    for (const h of this.huds) h.resetTips();
+  }
+
   hudFor(slot: number): PlayerHud | undefined {
     return this.huds[slot];
   }

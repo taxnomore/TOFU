@@ -10,10 +10,10 @@ import { LocalSession } from '../runtime/localSession';
 import type { NetSession } from '../runtime/netSession';
 import type { LocalPlayer } from '../runtime/session';
 import {
-  GamepadDevice, InputDevice, KEYMAPS, KeyMap, KeyboardDevice, KeymapName, TouchDevice, bindKey, keyLabel, listGamepads,
-  resetKeymaps,
+  DPAD, GamepadDevice, InputDevice, KEYMAPS, KeyMap, KeyboardDevice, KeymapName, PADMAP, PadAction, TouchDevice, bindKey, bindPad,
+  keyLabel, listGamepads, padButtonLabel, padHeld, resetKeymaps, resetPadmap,
 } from '../input/devices';
-import { el, fmtTime, glyph } from './hud';
+import { PlayerHud, el, fmtTime, glyph } from './hud';
 import { BTN_BARK, BTN_INTERACT, BTN_SIT, BTN_SPECIAL, BTN_SPRINT } from '../../shared/constants';
 import { VARIANTS, Variant, isVariant, variantDef } from '../../shared/world/variants';
 
@@ -26,17 +26,39 @@ interface Prefs {
   name: string;
   autoCam: boolean;
   variant: Variant;
+  /** 0 normal, 1 large, 2 very large. */
+  textSize: number;
+  contrast: boolean;
+  tips: boolean;
+  shake: boolean;
 }
 
 export function loadPrefs(): Prefs {
-  const d: Prefs = { duration: DEFAULT_DURATION, difficulty: 1, avatar: 0, name: '', autoCam: false, variant: 'ete' };
+  const calm = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const d: Prefs = {
+    duration: DEFAULT_DURATION, difficulty: 1, avatar: 0, name: '', autoCam: false, variant: 'ete',
+    textSize: 0, contrast: false, tips: true, shake: !calm,
+  };
   try {
     const p = { ...d, ...JSON.parse(localStorage.getItem('tofu.prefs') ?? '{}') } as Prefs;
     if (!isVariant(p.variant)) p.variant = 'ete';
+    if (![0, 1, 2].includes(p.textSize)) p.textSize = 0;
+    for (const k of ['contrast', 'tips', 'shake'] as const) if (typeof p[k] !== 'boolean') p[k] = d[k];
     return p;
   } catch {
     return d;
   }
+}
+
+const TEXT_SIZES = [100, 115, 130];
+
+/** Text size, contrast, tips and screen shake from the settings. */
+export function applyComfort(p: Prefs) {
+  document.documentElement.style.fontSize = `${TEXT_SIZES[p.textSize] ?? 100}%`;
+  document.body.classList.toggle('contrast', p.contrast);
+  document.body.classList.toggle('calm', !p.shake);
+  PlayerHud.tipsOn = p.tips;
+  CameraRig.shakeOn = p.shake;
 }
 
 /** "Ambiance" selector (season or market day) for the setup screens. */
@@ -126,6 +148,7 @@ export class Screens {
   lan: { open(): void; leave(): void; rematch(rotate: boolean): void; toLobby(): void; isActive(): boolean; isHost(): boolean } | null = null;
 
   constructor(readonly app: App) {
+    applyComfort(this.prefs);
     new MenuNav(app.uiRoot);
     app.hooks.onEnd = (S) => this.showEnd(S);
     app.hooks.onPauseRequest = () => this.togglePause();
@@ -370,7 +393,7 @@ export class Screens {
         <div class="opts"><span>Rôles manquants</span><div class="seg" data-k="fill"><button class="${fillAI ? 'sel' : ''}" data-v="1">Complétés par l'ordinateur</button><button class="${!fillAI ? 'sel' : ''}" data-v="0">Non</button></div>
         <span>Durée</span><div class="seg" data-k="dur">${[240, 360, 480].map((d) => `<button class="${this.prefs.duration === d ? 'sel' : ''}" data-v="${d}">${d / 60} min</button>`).join('')}</div>
         ${variantRow(this.prefs.variant)}</div>
-        <p class="small">Pour lancer : bouton « Jouer », ou la touche pause d'un joueur (${keyLabel('Escape')} · ⌫ · Start).</p>
+        <p class="small">Pour lancer : bouton « Jouer », ou la touche pause d'un joueur (${keyLabel(KEYMAPS.left.pause[0] ?? 'Escape')} · ${keyLabel(KEYMAPS.right.pause[0] ?? 'Backspace')} · ${padButtonLabel(PADMAP.pause[0] ?? 9)}).</p>
         <div class="foot"><button class="big" data-back>⬅ Retour</button><button class="big primary" data-go ${joined.length < 1 || tofus > 1 ? 'disabled' : ''}>Jouer ▶</button></div></div>`;
     };
     render();
@@ -791,6 +814,8 @@ export class Screens {
     /** First key of an action (the keyboard can be remapped in the settings). */
     const ks = (codes: string[]) => (codes.length ? k(codes[0]) : 'aucune');
     const move = (m: KeyMap) => [m.up, m.left, m.down, m.right].map(ks).join('');
+    /** Gamepad buttons of an action (they can be remapped too). */
+    const pb = (a: PadAction) => (PADMAP[a].length ? PADMAP[a].map(padButtonLabel).join(' / ') : 'aucun');
     s.innerHTML = `<div class="panel">
       <h2>❓ Comment jouer</h2>
       <div class="cols">
@@ -812,14 +837,14 @@ export class Screens {
       <table class="keys">
         <tr><td></td><td><b>Clavier</b></td><td><b>Clavier droit</b></td><td><b>Manette</b></td></tr>
         <tr><td>Bouger</td><td>${move(f)}${f.up.includes('ArrowUp') ? ' ou flèches' : ''}</td><td>${move(r)}</td><td>Stick gauche</td></tr>
-        <tr><td>Caméra</td><td>Souris (glisser), ${ks(f.camLeft)} ${ks(f.camRight)}, molette</td><td>${ks(r.camLeft)} ${ks(r.camRight)}</td><td>Stick droit, LB/RB</td></tr>
-        <tr><td>Action</td><td>${ks(f.interact)}</td><td>${ks(r.interact)}</td><td>A</td></tr>
-        <tr><td>Courir</td><td>${ks(f.sprint)}</td><td>${ks(r.sprint)}</td><td>RT / LT</td></tr>
-        <tr><td>Zoomies / Friandise</td><td>${ks(f.special)}</td><td>${ks(r.special)}</td><td>X</td></tr>
-        <tr><td>Aboyer / Appeler</td><td>${ks(f.bark)}</td><td>${ks(r.bark)}</td><td>B</td></tr>
-        <tr><td>S'asseoir (Tofu)</td><td>${ks(f.sit)}</td><td>${ks(r.sit)}</td><td>Y</td></tr>
-        <tr><td>Vue du dessus</td><td>${ks(f.tactical)}</td><td>${ks(r.tactical)}</td><td>Select</td></tr>
-        <tr><td>Pause</td><td>${ks(f.pause)}</td><td>${ks(r.pause)}</td><td>Start</td></tr>
+        <tr><td>Caméra</td><td>Souris (glisser), ${ks(f.camLeft)} ${ks(f.camRight)}, molette</td><td>${ks(r.camLeft)} ${ks(r.camRight)}</td><td>Stick droit, ${pb('camLeft')} ${pb('camRight')}</td></tr>
+        <tr><td>Action</td><td>${ks(f.interact)}</td><td>${ks(r.interact)}</td><td>${pb('interact')}</td></tr>
+        <tr><td>Courir</td><td>${ks(f.sprint)}</td><td>${ks(r.sprint)}</td><td>${pb('sprint')}</td></tr>
+        <tr><td>Zoomies / Friandise</td><td>${ks(f.special)}</td><td>${ks(r.special)}</td><td>${pb('special')}</td></tr>
+        <tr><td>Aboyer / Appeler</td><td>${ks(f.bark)}</td><td>${ks(r.bark)}</td><td>${pb('bark')}</td></tr>
+        <tr><td>S'asseoir (Tofu)</td><td>${ks(f.sit)}</td><td>${ks(r.sit)}</td><td>${pb('sit')}</td></tr>
+        <tr><td>Vue du dessus</td><td>${ks(f.tactical)}</td><td>${ks(r.tactical)}</td><td>${pb('tactical')}</td></tr>
+        <tr><td>Pause</td><td>${ks(f.pause)}</td><td>${ks(r.pause)}</td><td>${pb('pause')}</td></tr>
       </table>
       <p>📱 Sur téléphone : joystick à gauche, glisser à droite pour tourner la caméra, gros boutons à droite.</p>
       <div class="foot"><button class="big" data-back>⬅ Retour</button></div></div>`;
@@ -827,23 +852,34 @@ export class Screens {
     this.show(s);
   }
 
-  showSettings(onBack: () => void, inGame = false) {
+  showSettings(onBack: () => void, inGame = false, focus?: string) {
     const s = el('div', 'screen dim');
     const a = sfx.settings;
     const q = this.app.gr.quality;
-    s.innerHTML = `<div class="panel" style="max-width:560px"><h2>⚙️ Réglages</h2>
+    const p = this.prefs;
+    const seg = (k: string, opts: [string, string][], cur: string) =>
+      `<div class="seg" data-k="${k}">${opts.map(([v, n]) => `<button class="${cur === v ? 'sel' : ''}" data-v="${v}">${n}</button>`).join('')}</div>`;
+    const yes = (b: boolean) => (b ? '1' : '0');
+    s.innerHTML = `<div class="panel" style="max-width:600px"><h2>⚙️ Réglages</h2>
       <div class="opts">
-        <span>Volume général</span><input type="range" min="0" max="1" step="0.05" value="${a.master}" data-k="master">
-        <span>Effets sonores</span><input type="range" min="0" max="1" step="0.05" value="${a.sfx}" data-k="sfx">
-        <span>Musique</span><input type="range" min="0" max="1" step="0.05" value="${a.music}" data-k="music">
-        <span>Son</span><div class="seg" data-k="mute"><button class="${!a.muted ? 'sel' : ''}" data-v="0">Activé</button><button class="${a.muted ? 'sel' : ''}" data-v="1">Coupé</button></div>
-        <span>Graphismes</span><div class="seg" data-k="quality">${[['high', 'Beaux'], ['medium', 'Moyens'], ['low', 'Rapides']].map(([v, n]) => `<button class="${q === v ? 'sel' : ''}" data-v="${v}">${n}</button>`).join('')}</div>
-        <span>Caméra auto</span><div class="seg" data-k="autocam"><button class="${!this.prefs.autoCam ? 'sel' : ''}" data-v="0">Non</button><button class="${this.prefs.autoCam ? 'sel' : ''}" data-v="1">Suit le personnage</button></div>
-        ${isTouch() ? '' : '<span>Clavier</span><div class="seg" data-k="keys"><button data-v="1">⌨️ Changer les touches</button></div>'}
-        <span>Astuces</span><div class="seg" data-k="tips"><button data-v="reset">Revoir les astuces</button></div>
+        <h3>🔊 Son</h3>
+        <span>Volume général</span><input type="range" min="0" max="1" step="0.05" value="${a.master}" data-k="master" aria-label="Volume général">
+        <span>Effets sonores</span><input type="range" min="0" max="1" step="0.05" value="${a.sfx}" data-k="sfx" aria-label="Effets sonores">
+        <span>Musique</span><input type="range" min="0" max="1" step="0.05" value="${a.music}" data-k="music" aria-label="Musique">
+        <span>Son</span>${seg('mute', [['0', 'Activé'], ['1', 'Coupé']], yes(a.muted))}
+        <h3>👀 Affichage</h3>
+        <span>Taille du texte</span>${seg('text', [['0', 'Normale'], ['1', 'Grande'], ['2', 'Très grande']], String(p.textSize))}
+        <span>Couleurs</span>${seg('contrast', [['0', 'Normales'], ['1', 'Contrastées']], yes(p.contrast))}
+        <span>Secousses de l'écran</span>${seg('shake', [['1', 'Oui'], ['0', 'Non']], yes(p.shake))}
+        <span>Astuces en jeu</span><div class="seg" data-k="tips"><button class="${p.tips ? 'sel' : ''}" data-v="1">Oui</button><button class="${!p.tips ? 'sel' : ''}" data-v="0">Non</button><button data-v="reset">Revoir depuis le début</button></div>
+        <span>Graphismes</span>${seg('quality', [['high', 'Beaux'], ['medium', 'Moyens'], ['low', 'Rapides']], q)}
         <span>Plein écran</span><div class="seg" data-k="fs"><button data-v="1">Basculer</button></div>
+        <h3>🎮 Commandes</h3>
+        <span>Caméra auto</span>${seg('autocam', [['0', 'Non'], ['1', 'Suit le personnage']], yes(p.autoCam))}
+        <span>Manette</span><div class="seg" data-k="pad"><button data-v="1">🎮 Changer les boutons</button></div>
+        ${isTouch() ? '' : '<span>Clavier</span><div class="seg" data-k="keys"><button data-v="1">⌨️ Changer les touches</button></div>'}
       </div>
-      <p style="font-size:.85rem;opacity:.8">Les graphismes « Rapides » conviennent aux téléphones et aux vieux PC (rechargement de la page nécessaire).</p>
+      <p class="small">Les graphismes « Rapides » conviennent aux téléphones et aux vieux PC (rechargement de la page nécessaire).</p>
       <div class="foot"><button class="big primary" data-back>✔ OK</button></div></div>`;
     s.addEventListener('input', (e) => {
       const t = e.target as HTMLInputElement;
@@ -853,54 +889,74 @@ export class Screens {
         sfx.apply();
       }
     });
+    const comfort = () => {
+      savePrefs(p);
+      applyComfort(p);
+    };
     s.addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest('button') as HTMLButtonElement | null;
       if (!b) return;
       sfx.play('click');
-      const seg = b.closest('.seg') as HTMLElement | null;
-      if (seg) {
-        const k = seg.dataset.k;
+      const sg = b.closest('.seg') as HTMLElement | null;
+      if (sg) {
+        const k = sg.dataset.k!;
+        const v = b.dataset.v!;
         if (k === 'mute') {
-          a.muted = b.dataset.v === '1';
+          a.muted = v === '1';
           sfx.apply();
         }
         if (k === 'quality') {
           try {
-            localStorage.setItem('tofu.quality', b.dataset.v!);
+            localStorage.setItem('tofu.quality', v);
           } catch {
             /* ignore */
           }
           if (!inGame) location.reload();
         }
         if (k === 'autocam') {
-          this.prefs.autoCam = b.dataset.v === '1';
-          savePrefs(this.prefs);
-          this.app.session?.locals.forEach((l) => (l.rig.autoFollow = this.prefs.autoCam));
+          p.autoCam = v === '1';
+          savePrefs(p);
+          this.app.session?.locals.forEach((l) => (l.rig.autoFollow = p.autoCam));
         }
+        if (k === 'text') p.textSize = Number(v);
+        if (k === 'contrast') p.contrast = v === '1';
+        if (k === 'shake') p.shake = v === '1';
+        if (k === 'tips' && v !== 'reset') p.tips = v === '1';
+        if (['text', 'contrast', 'shake', 'tips'].includes(k)) comfort();
         if (k === 'keys') {
-          this.showKeys(() => this.showSettings(onBack, inGame));
+          this.showKeys(() => this.showSettings(onBack, inGame, 'keys'));
           return;
         }
-        if (k === 'tips') {
+        if (k === 'pad') {
+          this.showPad(() => this.showSettings(onBack, inGame, 'pad'));
+          return;
+        }
+        if (k === 'tips' && v === 'reset') {
           try {
             localStorage.removeItem('tofu.tips');
           } catch {
             /* ignore */
           }
-          b.textContent = 'OK !';
-          return;
+          this.app.resetTips();
+          p.tips = true;
+          comfort();
         }
         if (k === 'fs') {
           if (document.fullscreenElement) void document.exitFullscreen();
           else void document.documentElement.requestFullscreen?.().catch(() => undefined);
           return;
         }
-        this.showSettings(onBack, inGame);
+        // Redraw with the new choice, keeping the gamepad/keyboard focus on it.
+        this.showSettings(onBack, inGame, `${k}:${v}`);
         return;
       }
       if (b.hasAttribute('data-back')) onBack();
     });
-    this.show(s);
+    this.show(s, !focus);
+    if (focus) {
+      const [k, v] = focus.split(':');
+      s.querySelector<HTMLElement>(`.seg[data-k="${k}"] button${v ? `[data-v="${v}"]` : ''}`)?.focus();
+    }
   }
 
   /** Keyboard remapping for the three keyboard layouts (saved in this browser). */
@@ -971,6 +1027,109 @@ export class Screens {
     });
     render();
     this.show(s, false);
+  }
+
+  /**
+   * Gamepad remapping (saved in this browser). It works with the gamepad alone:
+   * the d-pad moves between the "Changer" buttons, A chooses, then the next
+   * button pressed is bound. The d-pad always moves the character.
+   */
+  showPad(onBack: () => void) {
+    const ACTIONS: [PadAction, string][] = [
+      ['interact', 'Action'], ['sprint', 'Courir'], ['special', 'Zoomies / Friandise'], ['bark', 'Aboyer / Appeler'],
+      ['sit', "S'asseoir (Tofu)"], ['camLeft', 'Tourner la caméra à gauche'], ['camRight', 'Tourner la caméra à droite'],
+      ['tactical', 'Vue du dessus'], ['pause', 'Pause'],
+    ];
+    let waiting: PadAction | null = null;
+    // Buttons already down when the wait starts (the A that chose "Changer").
+    let held: boolean[][] = [];
+    // After a choice the menus wait until every button is up, so that this
+    // press does not also click or go back.
+    let release = false;
+    let padCount = -1;
+    const s = el('div', 'screen dim');
+    const snapshot = () => {
+      held = [];
+      for (const p of listGamepads()) held[p.index] = p.buttons.map((_, i) => padHeld(p, i));
+    };
+    const render = (focusKey?: PadAction) => {
+      s.toggleAttribute('data-padjoin', waiting !== null || release);
+      const pads = listGamepads();
+      padCount = pads.length;
+      const name = pads[0]?.id.replace(/\s*\(.*$/, '').replace(/[<>&"']/g, '').slice(0, 48);
+      s.innerHTML = `<div class="panel" style="max-width:640px"><h2>🎮 Boutons de la manette</h2>
+        <p class="small">${name ? `Manette : ${name}` : 'Aucune manette détectée : branchez-la, puis appuyez sur un de ses boutons.'}</p>
+        <table class="keys remap">${ACTIONS.map(([k, label]) => `<tr><td>${label}</td><td>${waiting === k
+          ? '<b>Appuie sur un bouton de la manette…</b> <small>(croix ou Échap : annuler)</small>'
+          : PADMAP[k].length ? PADMAP[k].map((b) => `<kbd>${padButtonLabel(b)}</kbd>`).join(' ') : '<em>aucun</em>'}</td>
+          <td><button class="mini" data-bind="${k}">Changer</button></td></tr>`).join('')}
+          <tr><td>Bouger</td><td><kbd>Stick gauche</kbd> <kbd>Croix</kbd></td><td></td></tr>
+          <tr><td>Caméra</td><td><kbd>Stick droit</kbd></td><td></td></tr></table>
+        <p class="small">Un bouton ne fait qu'une seule action. Dans les menus, A valide et B revient en arrière.</p>
+        <div class="foot"><button class="big" data-reset>↺ Boutons d'origine</button><button class="big primary" data-back>✔ OK</button></div></div>`;
+      if (focusKey) s.querySelector<HTMLElement>(`[data-bind="${focusKey}"]`)?.focus();
+    };
+    const done = (button: number | null) => {
+      const k = waiting!;
+      if (button !== null) bindPad(k, button);
+      waiting = null;
+      release = true;
+      sfx.play('click');
+      render(k);
+    };
+    const loop = () => {
+      if (!s.isConnected) {
+        window.removeEventListener('keydown', onKey, true);
+        return;
+      }
+      const pads = listGamepads();
+      if (waiting) {
+        for (const p of pads) {
+          const was = held[p.index] ?? [];
+          const now = p.buttons.map((_, i) => padHeld(p, i));
+          const i = now.findIndex((v, j) => v && !was[j]);
+          held[p.index] = now;
+          if (i >= 0) {
+            done(DPAD.includes(i) ? null : i);
+            break;
+          }
+        }
+      } else if (release) {
+        if (!pads.some((p) => p.buttons.some((_, i) => padHeld(p, i)))) {
+          release = false;
+          s.removeAttribute('data-padjoin');
+        }
+      } else if (pads.length !== padCount) render();
+      requestAnimationFrame(loop);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (!waiting || e.code !== 'Escape') return;
+      e.preventDefault();
+      e.stopPropagation();
+      done(null);
+    };
+    window.addEventListener('keydown', onKey, true);
+    s.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest('button') as HTMLButtonElement | null;
+      if (!b || release) return;
+      sfx.play('click');
+      if (b.dataset.bind) {
+        waiting = b.dataset.bind as PadAction;
+        snapshot();
+        render();
+        return;
+      }
+      if (b.hasAttribute('data-reset')) {
+        resetPadmap();
+        waiting = null;
+        render();
+        return;
+      }
+      if (b.hasAttribute('data-back')) onBack();
+    });
+    render();
+    this.show(s);
+    requestAnimationFrame(loop);
   }
 }
 

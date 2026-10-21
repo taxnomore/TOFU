@@ -39,6 +39,7 @@ Depuis un clone neuf du dépôt (Node 22.22, npm 10.9, Linux) :
 | `tests/ai.test.ts` | 7 | manches complètes ordinateur contre ordinateur (1 et 2 humains, et dans chaque ambiance), bêtises variées de l'IA, aspirateur éteint par l'humain quand Tofu l'a allumé, coéquipier qui laisse au joueur le désordre dont il s'occupe, désordre tombé dans le recoin derrière le fauteuil toujours nettoyable |
 | `tests/net.test.ts` | 3 | instantanés différentiels : l'état reconstruit chez le client égale celui du serveur pendant une manche complète ; validation des messages ; prédiction identique au serveur |
 | `tests/mischief.test.ts` | 16 | arrosoir qui fuit (gouttes, glissade, remplissage), réactions en chaîne (chat sur le plan de travail, balle, aspirateur), automne (tas de feuilles, feuilles dans la maison, ratissage), hiver (pattes mouillées, rue déneigée, bonhomme de neige), jour de marché (étals, vol, repas, retour au bon étal, cageot), défis propres à chaque ambiance, objets absents hors de leur ambiance |
+| `tests/comfort.test.ts` | 4 | remappage de la manette : un bouton par action, croix réservée au déplacement, lecture des nouveaux boutons en jeu (pause comprise), sauvegarde dans le navigateur, sauvegarde abîmée ignorée, noms des boutons |
 | `tests/server.test.ts` | 2 | vrai serveur HTTP + WebSocket avec 3 clients : salon, rôles, droits de l'hôte, départ, déplacements identiques chez tous, accusés de réception, entrées refusées pour un siège d'un autre, déconnexion reprise par l'ordinateur, reconnexion, fin, revanche avec rotation de Tofu, retour au salon, spectateurs, client trop bavard coupé, message trop gros refusé |
 
 ## Tests dans un navigateur
@@ -55,6 +56,9 @@ Outil : Chromium sans écran piloté par Playwright, rendu 3D logiciel (SwiftSha
 | Écran partagé à 3 (clavier gauche, clavier droit, manette simulée) | 3 vues indépendantes et une vue d'ensemble |
 | Téléphone : joystick, bouton Action, rotation de caméra par glissement, écran de fin, carte de rôle | réussi après corrections de mise en page |
 | Remappage du clavier | touche changée, conflit retiré, réglage gardé après rechargement, retour aux touches d'origine |
+| Remappage de la manette, avec la manette seule (simulée) : croix pour choisir la ligne, A pour « Changer », puis le nouveau bouton, B pour revenir | bouton changé, conflit retiré, croix qui annule, retour aux réglages sans clic parasite, aide « Comment jouer » à jour, réglage gardé |
+| Réglages de confort : taille du texte, couleurs contrastées, astuces coupées, gardés après rechargement ; écran de jeu à 1280 × 720 et 740 × 360, seul et en écran partagé, avec le texte le plus grand | réussi, sans erreur dans la console ; sur petit écran, les jauges du haut gardent leur seule icône pour ne pas déborder |
+| Salon réseau : bouton 🎲 | prénom changé et transmis au serveur |
 | Fichier unique `tofu-qui-a-fait-ca.html` ouvert depuis le disque (file://), seul dans un dossier | menus, solo et écran partagé fonctionnent, sans aucune autre requête |
 | Ambiances dans le navigateur : écran de lancement avec le choix d'ambiance, décor de chaque ambiance, tas de feuilles éparpillé puis feuilles dans le salon, bonhomme de neige démoli puis traces mouillées, arrosoir volé qui goutte (repris par l'humain ordinateur), fromage volé sur un étal | réussi, sans erreur dans la console |
 | Écran de chargement dans 10 situations : normale, 3D coupée (`--disable-3d-apis`), fichier tronqué à 500 Ko, `index.html` du code source et de `dist/` ouverts d'un double clic, scripts bloqués par une politique de sécurité, JavaScript coupé, page dans une iframe isolée (comme un aperçu), rendu qui ne démarre pas, version servie par `npm run start` | jamais de page blanche : le jeu démarre, ou un message dit pourquoi et quoi faire ; le bouton « Ouvrir le jeu » mène au fichier unique, qui démarre ; le jeu tourne aussi dans l'iframe isolée |
@@ -88,7 +92,7 @@ Sur 60 manches (Normal, un humain), Tofu allume maintenant l'aspirateur 107 fois
 ## Limites connues
 
 - **Pas d'essai sur de vrais appareils** : ni iPhone, ni Android, ni Firefox, ni carte graphique réelle. Le rendu logiciel des tests tourne à 3 à 10 images par seconde ; il ne dit rien des objectifs de 60 images par seconde sur PC et 30 sur téléphone.
-- **Manettes** : testées seulement avec une manette simulée. Les boutons de manette ne se remappent pas.
+- **Manettes** : seule une manette simulée a servi aux essais, en disposition standard. Une manette non standard peut nommer ses boutons autrement ; le remappage aide alors à s'y retrouver.
 - **Sons** : générés par le code ; l'environnement de test n'a pas de haut-parleur, je n'ai donc pas pu les écouter. Le code des sons s'exécute sans erreur.
 - **IA** : les mesures d'équilibre opposent l'ordinateur à lui-même ; contre de vrais joueurs, le bon niveau reste à trouver en famille.
 - **Réseau** : réseau local seulement, en HTTP, un salon par serveur.
