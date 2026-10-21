@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createAI } from '../src/shared/ai/ai';
-import { parseClientMsg } from '../src/shared/net/protocol';
+import { PROTOCOL_VERSION, parseClientMsg } from '../src/shared/net/protocol';
 import { SnapshotEncoder, applySnap } from '../src/shared/net/snapshot';
 import { Game } from '../src/shared/sim/game';
 import { applyMovement } from '../src/shared/sim/movement';
@@ -76,7 +76,9 @@ describe('client message validation', () => {
     expect(parseClientMsg('{"t":"in","f":"x"}')).toBeNull();
     expect(parseClientMsg('{"t":"in","f":[[0,1,"a",0,0]]}')).toBeNull();
     expect(parseClientMsg('{"t":"hello","v":999,"clientId":"abcdef","seats":[]}')).toBeNull();
-    expect(parseClientMsg('{"t":"hello","v":1,"clientId":"<script>","seats":[]}')).toBeNull();
+    expect(parseClientMsg(`{"t":"hello","v":${PROTOCOL_VERSION},"clientId":"<script>","seats":[]}`)).toBeNull();
+    // An older page (version 1) is told to reload instead of joining.
+    expect(parseClientMsg('{"t":"hello","v":1,"clientId":"abcdef","seats":[]}')).toBeNull();
     expect(parseClientMsg('{"t":"teleport","x":5}')).toBeNull();
     const m = parseClientMsg('{"t":"in","f":[[0,1,50,50,4095]]}');
     expect(m?.t).toBe('in');
@@ -84,7 +86,7 @@ describe('client message validation', () => {
     const [, , mx, mz, b] = m.f[0];
     expect(Math.hypot(mx, mz)).toBeLessThanOrEqual(1.0000001);
     expect(b).toBe(31);
-    const h = parseClientMsg(JSON.stringify({ t: 'hello', v: 1, clientId: 'abcd1234', seats: [{ name: '<b>Zoé</b>'.repeat(5), avatar: 99, pref: 'boss' }] }));
+    const h = parseClientMsg(JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION, clientId: 'abcd1234', seats: [{ name: '<b>Zoé</b>'.repeat(5), avatar: 99, pref: 'boss' }] }));
     expect(h?.t).toBe('hello');
     if (h?.t !== 'hello') return;
     expect(h.seats[0].name).not.toContain('<');
@@ -93,6 +95,10 @@ describe('client message validation', () => {
     expect(h.seats[0].pref).toBe('any');
     const s = parseClientMsg('{"t":"settings","settings":{"duration":5,"difficulty":9,"fillAI":"yes"}}');
     expect(s).toEqual({ t: 'settings', settings: { duration: 60, difficulty: 2 } });
+    // Host tools: a key of bounded length, a plain yes or no.
+    expect(parseClientMsg('{"t":"kick","key":5}')).toBeNull();
+    expect(parseClientMsg(JSON.stringify({ t: 'kick', key: 'x'.repeat(500) }))).toEqual({ t: 'kick', key: 'x'.repeat(64) });
+    expect(parseClientMsg('{"t":"lock","locked":"yes"}')).toEqual({ t: 'lock', locked: false });
   });
 });
 

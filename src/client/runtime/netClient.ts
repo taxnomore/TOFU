@@ -1,10 +1,12 @@
-// WebSocket link to the LAN server: hello, automatic reconnection with the
-// same client id, ping, and dispatch of server messages.
-import { ClientMsg, PROTOCOL_VERSION, SeatReq, ServerMsg } from '../../shared/net/protocol';
+// WebSocket link to the game server (home network or Internet): hello,
+// automatic reconnection with the same client id, ping, and dispatch of
+// server messages.
+import { CLOSE_FINAL, ClientMsg, PROTOCOL_VERSION, SeatReq, ServerMode, ServerMsg } from '../../shared/net/protocol';
 
 export type LobbyMsg = Extract<ServerMsg, { t: 'lobby' }>;
 export type StartMsg = Extract<ServerMsg, { t: 'start' }>;
 export type SnapMsg = Extract<ServerMsg, { t: 'snap' }>;
+export type WelcomeMsg = Extract<ServerMsg, { t: 'welcome' }>;
 /** connecting: first attempt · open: connected · lost: retrying · closed: given up or left. */
 export type NetStatus = 'connecting' | 'open' | 'lost' | 'closed';
 
@@ -28,8 +30,13 @@ export function tabClientId(): string {
   }
 }
 
+/** WebSocket address of this page's server; `room` is a code, or "new" to create a room. */
+export function serverUrl(room = ''): string {
+  return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws${room ? `?salon=${encodeURIComponent(room)}` : ''}`;
+}
+
 export function defaultServerUrl(): string {
-  return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
+  return serverUrl();
 }
 
 export class NetClient {
@@ -37,6 +44,10 @@ export class NetClient {
   status: NetStatus = 'connecting';
   host = false;
   lanUrls: string[] = [];
+  mode: ServerMode = 'lan';
+  /** Code of the room on an Internet server. */
+  room = '';
+  publicUrl = '';
   lobby: LobbyMsg | null = null;
   /** Smoothed round-trip time in ms. */
   rtt = 0;
@@ -47,6 +58,7 @@ export class NetClient {
   onStart: ((m: StartMsg) => void) | null = null;
   onSnap: ((m: SnapMsg) => void) | null = null;
   onStatus: ((s: NetStatus) => void) | null = null;
+  onWelcome: ((m: WelcomeMsg) => void) | null = null;
   private ws: WebSocket | null = null;
   private left = false;
   private lastMsgAt = 0;
@@ -87,7 +99,8 @@ export class NetClient {
         this.setStatus('closed');
         return;
       }
-      if (e.code === 4004) {
+      if (e.code >= CLOSE_FINAL.version && e.code < 4100) {
+        // Refused (version, room unknown or full, sent away): the server said why.
         this.left = true;
         this.setStatus('closed');
         return;
@@ -159,6 +172,12 @@ export class NetClient {
       case 'welcome':
         this.host = m.host;
         this.lanUrls = m.lanUrls;
+        this.mode = m.mode;
+        this.room = m.room;
+        this.publicUrl = m.publicUrl;
+        // Reconnections go back to this room, not to a new one.
+        if (m.room) this.url = `${this.url.replace(/\?.*$/, '')}?salon=${m.room}`;
+        this.onWelcome?.(m);
         break;
       case 'lobby':
         this.lobby = m;

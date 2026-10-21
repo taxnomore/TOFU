@@ -145,7 +145,10 @@ export class Screens {
   private countdownEl: HTMLElement | null = null;
   private introEls: HTMLElement[] = [];
   /** Network screens are injected by the LAN module. */
-  lan: { open(): void; leave(): void; rematch(rotate: boolean): void; toLobby(): void; isActive(): boolean; isHost(): boolean } | null = null;
+  lan: {
+    open(how?: 'lan' | 'online' | 'join'): void; menu(remote: boolean): { top: string; bottom: string };
+    leave(): void; rematch(rotate: boolean): void; toLobby(): void; isActive(): boolean; isHost(): boolean;
+  } | null = null;
 
   constructor(readonly app: App) {
     applyComfort(this.prefs);
@@ -185,23 +188,37 @@ export class Screens {
 
   // ---------------------------------------------------------------- Title
 
+  private titleMenu(): string {
+    const remote = !['localhost', '127.0.0.1', '::1', ''].includes(location.hostname);
+    const net = this.lan?.menu(remote) ?? { top: '', bottom: '' };
+    return `${net.top}
+        <button class="${net.top.includes('primary') ? '' : 'primary'}" data-a="solo"><span class="ico">🐶</span><span>Jouer seul<small>Contre l'ordinateur</small></span></button>
+        <button data-a="local"><span class="ico">🎮</span><span>Plusieurs joueurs sur ce PC<small>Écran partagé, 2 ou 3 joueurs</small></span></button>
+        ${net.bottom}
+        <div class="row" style="justify-content:stretch">
+          <button data-a="howto" style="flex:1"><span class="ico">❓</span><span>Comment jouer</span></button>
+          <button data-a="settings" style="flex:1"><span class="ico">⚙️</span><span>Réglages</span></button>
+        </div>`;
+  }
+
+  /** Redraws the title menu once the server has said how it plays (home or Internet). */
+  refreshTitle() {
+    const m = this.current?.dataset.screen === 'title' ? this.current.querySelector('.menu') : null;
+    if (!m) return;
+    const html = this.titleMenu();
+    if (m.innerHTML === html) return;
+    m.innerHTML = html;
+    (m.querySelector('button.primary') as HTMLElement | null)?.focus({ preventScroll: true });
+  }
+
   showTitle() {
     this.leaveGame();
     this.startAttract();
     const s = el('div', 'screen');
-    const remote = !['localhost', '127.0.0.1', '::1', ''].includes(location.hostname);
+    s.dataset.screen = 'title';
     s.innerHTML = `
       <div class="logo"><img src="./favicon.svg" alt=""><div class="t1">TOFU !</div><div class="t2">QUI A FAIT ÇA ?</div></div>
-      <div class="menu">
-        ${remote ? '<button class="primary" data-a="lan"><span class="ico">📱</span><span>Rejoindre la partie<small>Partie en réseau local (Wi-Fi)</small></span></button>' : ''}
-        <button class="${remote ? '' : 'primary'}" data-a="solo"><span class="ico">🐶</span><span>Jouer seul<small>Contre l'ordinateur</small></span></button>
-        <button data-a="local"><span class="ico">🎮</span><span>Plusieurs joueurs sur ce PC<small>Écran partagé, 2 ou 3 joueurs</small></span></button>
-        ${remote ? '' : '<button data-a="lan"><span class="ico">📱</span><span>Réseau local<small>Téléphones et autres PC sur le Wi-Fi</small></span></button>'}
-        <div class="row" style="justify-content:stretch">
-          <button data-a="howto" style="flex:1"><span class="ico">❓</span><span>Comment jouer</span></button>
-          <button data-a="settings" style="flex:1"><span class="ico">⚙️</span><span>Réglages</span></button>
-        </div>
-      </div>
+      <div class="menu">${this.titleMenu()}</div>
       <div class="hint">Un jeu de bêtises pour toute la famille · Clavier, manette ou écran tactile</div>`;
     s.addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest('button');
@@ -210,7 +227,7 @@ export class Screens {
       const a = b.dataset.a;
       if (a === 'solo') this.showSolo();
       if (a === 'local') this.showLocal();
-      if (a === 'lan') this.lan?.open();
+      if (a === 'lan' || a === 'online' || a === 'join') void this.lan?.open(a);
       if (a === 'howto') this.showHowTo();
       if (a === 'settings') this.showSettings(() => this.showTitle());
     });

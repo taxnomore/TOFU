@@ -1,109 +1,21 @@
 // End-to-end LAN test: a real HTTP + WebSocket server, three clients, a lobby,
 // a synchronized match, validation, a disconnect/reconnect and a rematch.
-import http from 'node:http';
-import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { WebSocket, WebSocketServer } from 'ws';
-import { Room } from '../server/room';
-import type { LobbyPlayer, SeatReq, ServerMsg } from '../src/shared/net/protocol';
-import { applySnap } from '../src/shared/net/snapshot';
-import type { GameState } from '../src/shared/sim/types';
+import type { Room } from '../server/room';
+import { TestClient, seat, sleep, startServer, until } from './netHelpers';
 
-type Lobby = Extract<ServerMsg, { t: 'lobby' }>;
-type Start = Extract<ServerMsg, { t: 'start' }>;
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-async function until<T>(f: () => T | undefined | null | false, ms = 4000, what = 'condition'): Promise<T> {
-  const t0 = Date.now();
-  for (;;) {
-    const v = f();
-    if (v) return v;
-    if (Date.now() - t0 > ms) throw new Error(`timeout waiting for ${what}`);
-    await sleep(10);
-  }
-}
-
-class TestClient {
-  ws!: WebSocket;
-  lobby: Lobby | null = null;
-  start: Start | null = null;
-  starts = 0;
-  state: GameState | null = null;
-  ack: Record<number, number> = {};
-  snaps = 0;
-  errors: string[] = [];
-  closedCode = 0;
-  seq = 0;
-
-  constructor(readonly url: string, readonly id: string, readonly seats: SeatReq[]) {}
-
-  async open() {
-    this.ws = new WebSocket(this.url);
-    this.closedCode = 0;
-    this.ws.on('message', (data) => this.onMessage(JSON.parse(data.toString()) as ServerMsg));
-    this.ws.on('close', (code) => (this.closedCode = code));
-    await new Promise<void>((res, rej) => {
-      this.ws.once('open', () => res());
-      this.ws.once('error', rej);
-    });
-    this.send({ t: 'hello', v: 1, clientId: this.id, seats: this.seats });
-  }
-
-  private onMessage(m: ServerMsg) {
-    if (m.t === 'lobby') this.lobby = m;
-    else if (m.t === 'start') {
-      this.start = m;
-      this.starts++;
-      this.state = m.state;
-      this.ack = {};
-      this.seq = 0;
-    } else if (m.t === 'snap' && this.state) {
-      applySnap(this.state, m.d);
-      this.ack = m.ack;
-      this.snaps++;
-    } else if (m.t === 'error') this.errors.push(m.msg);
-  }
-
-  send(m: unknown) {
-    this.ws.send(typeof m === 'string' ? m : JSON.stringify(m));
-  }
-
-  /** Sends n input frames in real time (one 60 Hz tick each). */
-  async drive(n: number, mx: number, mz: number, buttons = 0) {
-    for (let i = 0; i < n; i += 2) {
-      this.send({ t: 'in', f: [[0, ++this.seq, mx, mz, buttons], [0, ++this.seq, mx, mz, buttons]] });
-      await sleep(33);
-    }
-  }
-
-  me(): LobbyPlayer | undefined {
-    return this.lobby?.players.find((p) => p.clientId === this.id);
-  }
-
-  close() {
-    this.ws.close();
-  }
-}
-
-const seat = (name: string, pref: SeatReq['pref']): SeatReq => ({ name, avatar: 0, pref, device: 'keyboard' });
-
-let server: http.Server;
+let srv: Awaited<ReturnType<typeof startServer>>;
 let room: Room;
 let url = '';
 
 beforeAll(async () => {
-  room = new Room({ countdown: 0.3 });
-  server = http.createServer();
-  const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 64 * 1024 });
-  wss.on('connection', (ws, req) => room.connect(ws, req.socket.remoteAddress ?? ''));
-  await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
-  url = `ws://127.0.0.1:${(server.address() as AddressInfo).port}/ws`;
+  srv = await startServer({ mode: 'lan', room: { countdown: 0.3 } });
+  room = srv.manager.lan!;
+  url = srv.url();
 });
 
 afterAll(async () => {
-  room.close();
-  await new Promise((r) => server.close(r));
+  await srv.close();
 });
 
 describe('LAN server with three clients', () => {

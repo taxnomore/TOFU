@@ -1,5 +1,6 @@
-// One LAN room: lobby (players, roles, settings), authoritative 60 Hz game
-// loop, delta snapshots at 20 Hz, AI takeover on disconnect, rematch.
+// One room: lobby (players, roles, settings), authoritative 60 Hz game loop,
+// delta snapshots at 20 Hz, AI takeover on disconnect, rematch. A home server
+// has a single room; an Internet server has one per code (see rooms.ts).
 import type { WebSocket } from 'ws';
 import { randomBytes } from 'node:crypto';
 import { AIController, createAI } from '../src/shared/ai/ai';
@@ -7,8 +8,8 @@ import { COUNTDOWN_TIME, DEFAULT_DURATION, SIM_DT } from '../src/shared/constant
 import { Game } from '../src/shared/sim/game';
 import type { GameConfig, GameEvent, InputFrame, PlayerSlot } from '../src/shared/sim/types';
 import {
-  LobbyPlayer, LobbySettings, MAX_PLAYERS, MAX_SEATS_PER_CLIENT, PROTOCOL_VERSION, SNAPSHOT_EVERY, SeatReq, ServerMsg,
-  parseClientMsg,
+  CLOSE_FINAL, LobbyPlayer, LobbySettings, MAX_PLAYERS, MAX_SEATS_PER_CLIENT, PROTOCOL_VERSION, SNAPSHOT_EVERY, SeatReq, ServerMode,
+  ServerMsg, parseClientMsg,
 } from '../src/shared/net/protocol';
 import { SnapshotEncoder } from '../src/shared/net/snapshot';
 import { lanAddresses } from './net-util';
@@ -38,6 +39,13 @@ export interface RoomOptions {
   log?: (s: string) => void;
   /** Countdown override in seconds (tests). */
   countdown?: number;
+  mode?: ServerMode;
+  /** Room code (Internet), empty at home. */
+  code?: string;
+  /** Public address of the game, if known (shared with the code). */
+  publicUrl?: string;
+  /** Asked before each match: false when the server already runs too many. */
+  canStart?: () => boolean;
 }
 
 /** Connections beyond this are refused (players + spectators). */
@@ -62,9 +70,37 @@ export class Room {
   private timer: ReturnType<typeof setInterval> | null = null;
   private acc = 0;
   private lastT = 0;
-  private emptySince = 0;
+  private emptySince = Date.now();
+  /** Last lobby choice or match start (an idle lobby closes on the Internet). */
+  lastActivity = Date.now();
+  /** Clients the host sent away. */
+  private banned = new Set<string>();
+  /** Every client that has entered (they may come back when the room is locked). */
+  private known = new Set<string>();
+  /** The host closed the room to newcomers. */
+  locked = false;
 
   constructor(readonly opts: RoomOptions = {}) {}
+
+  get mode(): ServerMode {
+    return this.opts.mode ?? 'lan';
+  }
+
+  get code(): string {
+    return this.opts.code ?? '';
+  }
+
+  /** Clients with an open connection. */
+  connectedCount(): number {
+    let n = 0;
+    for (const c of this.clients.values()) if (c.ws) n++;
+    return n;
+  }
+
+  /** How long nobody has been connected (0 while someone is). */
+  emptyFor(now = Date.now()): number {
+    return this.connectedCount() || !this.emptySince ? 0 : now - this.emptySince;
+  }
 
   private log(s: string) {
     this.opts.log?.(s);
@@ -92,6 +128,16 @@ export class Room {
       if (!client) {
         if (msg.t !== 'hello') return;
         clearTimeout(helloTimer);
+        if (this.banned.has(msg.clientId)) {
+          ws.send(JSON.stringify({ t: 'error', msg: "L'hôte t'a retiré de ce salon." } satisfies ServerMsg));
+          ws.close(CLOSE_FINAL.kicked, 'kicked');
+          return;
+        }
+        if (this.locked && !this.known.has(msg.clientId)) {
+          ws.send(JSON.stringify({ t: 'error', msg: "L'hôte a fermé ce salon aux nouveaux joueurs." } satisfies ServerMsg));
+          ws.close(CLOSE_FINAL.version, 'locked');
+          return;
+        }
         if (!this.clients.has(msg.clientId) && this.clients.size >= MAX_CLIENTS) {
           ws.send(JSON.stringify({ t: 'error', msg: 'Le salon est complet.' } satisfies ServerMsg));
           ws.close(4004, 'full');
@@ -144,10 +190,16 @@ export class Room {
       if (!c.seats.length) c.seats.push({ name: 'Joueur', avatar: 0, pref: 'any', device: 'keyboard' });
       this.clients.set(clientId, c);
       this.order.push(clientId);
+      this.known.add(clientId);
       this.log(`join ${clientId} from ${addr}`);
     }
+    this.emptySince = 0;
     if (!this.hostId || !this.clients.get(this.hostId)?.ws) this.hostId = this.pickHost(clientId);
-    this.send(c, { t: 'welcome', clientId, host: this.hostId === clientId, lanUrls: lanAddresses().map((ip) => `http://${ip}:${this.opts.port ?? 8080}/`) });
+    // The addresses of the home network stay private on the Internet.
+    const lanUrls = this.mode === 'lan' ? lanAddresses().map((ip) => `http://${ip}:${this.opts.port ?? 8080}/`) : [];
+    this.send(c, {
+      t: 'welcome', clientId, host: this.hostId === clientId, lanUrls, mode: this.mode, room: this.code, publicUrl: this.opts.publicUrl ?? '',
+    });
     if (this.phase === 'game' && this.game) {
       // Rejoin a running match: give control back to the player.
       this.reattach(c);
@@ -156,9 +208,9 @@ export class Room {
     return c;
   }
 
-  /** Prefer a client on the host machine as host. */
+  /** At home, prefer a client on the server machine; on the Internet, the room's creator. */
   private pickHost(fallback: string): string {
-    for (const id of this.order) {
+    for (const id of this.mode === 'lan' ? this.order : []) {
       const c = this.clients.get(id);
       if (c?.ws && /^(::1|127\.|::ffff:127\.)/.test(c.addr)) return id;
     }
@@ -184,7 +236,11 @@ export class Room {
     }
     if (this.hostId === c.id) this.hostId = this.pickHost('');
     this.broadcastLobby();
-    if (![...this.clients.values()].some((x) => x.ws)) this.emptySince = Date.now();
+    if (![...this.clients.values()].some((x) => x.ws)) {
+      this.emptySince = Date.now();
+      // Nobody left to open the door: an empty room is open again.
+      this.locked = false;
+    }
   }
 
   private reattach(c: Client) {
@@ -216,6 +272,7 @@ export class Room {
 
   private onMessage(c: Client, msg: NonNullable<ReturnType<typeof parseClientMsg>>) {
     const isHost = c.id === this.hostId;
+    if (msg.t !== 'in' && msg.t !== 'ping') this.lastActivity = Date.now();
     switch (msg.t) {
       case 'seat': {
         const s = c.seats[msg.seat];
@@ -288,6 +345,17 @@ export class Room {
         }
         return;
       }
+      case 'kick': {
+        const target = this.clients.get(msg.key.split(':')[0]);
+        if (!isHost || !target || target === c) return;
+        this.kick(target);
+        return;
+      }
+      case 'lock':
+        if (!isHost) return;
+        this.locked = msg.locked;
+        this.broadcastLobby();
+        return;
       case 'ping':
         this.send(c, { t: 'pong', c: msg.c, s: Date.now() });
         return;
@@ -342,7 +410,7 @@ export class Room {
     const humans = players.filter((p) => p.role === 'human').length;
     const msg: ServerMsg = {
       t: 'lobby', players, settings: this.settings, hostId: this.hostId, phase: this.phase,
-      ai: { tofu: !hasTofu, humans: humans === 0 ? 1 : 0 },
+      ai: { tofu: !hasTofu, humans: humans === 0 ? 1 : 0 }, locked: this.locked,
     };
     const s = JSON.stringify(msg);
     for (const c of this.clients.values()) this.send(c, s);
@@ -350,7 +418,25 @@ export class Room {
 
   // ------------------------------------------------------------ game
 
+  /** The host sends a player away: they cannot come back to this room. */
+  private kick(target: Client) {
+    this.banned.add(target.id);
+    this.log(`kick ${target.id}`);
+    const ws = target.ws;
+    if (!ws) return;
+    this.send(target, { t: 'error', msg: "L'hôte t'a retiré de ce salon." });
+    ws.close(CLOSE_FINAL.kicked, 'kicked');
+    // Forgotten in the lobby; during a match the computer plays their character.
+    this.disconnect(target);
+  }
+
   private startGame(rotate: boolean): void {
+    if (!this.game && this.opts.canStart && !this.opts.canStart()) {
+      const host = this.clients.get(this.hostId);
+      if (host) this.send(host, { t: 'error', msg: 'Le serveur est très occupé en ce moment. Réessayez dans quelques minutes.' });
+      return;
+    }
+    this.lastActivity = Date.now();
     const lobby = this.lobbyPlayers().filter((p) => p.role !== 'wait' && p.connected);
     if (rotate && this.cfg) {
       // Next player in the list becomes Tofu.
@@ -446,7 +532,7 @@ export class Room {
       this.clients.clear();
       this.order = [];
       this.hostId = '';
-      this.emptySince = 0;
+      this.emptySince = Date.now();
     }
   }
 
@@ -496,9 +582,15 @@ export class Room {
     }
   }
 
-  close() {
+  /** Closes the room, telling the players why when there is a reason. */
+  close(reason = '') {
     this.stopGame();
-    for (const c of this.clients.values()) c.ws?.close();
+    for (const c of this.clients.values()) {
+      if (reason) this.send(c, { t: 'error', msg: reason });
+      c.ws?.close(reason ? CLOSE_FINAL.noRoom : 1000, 'closed');
+    }
+    this.clients.clear();
+    this.order = [];
   }
 }
 

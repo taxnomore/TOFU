@@ -12,6 +12,7 @@
     "dev": "node scripts/check-node.mjs && tsx server/main.ts --dev",
     "build": "node scripts/check-node.mjs && tsc --noEmit && vite build && node scripts/build-single.mjs && node scripts/build-server.mjs",
     "start": "node scripts/check-node.mjs && node dist-server/main.js",
+    "internet": "node scripts/check-node.mjs && node scripts/internet.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

@@ -1,17 +1,23 @@
-// Local game server: serves the web client and hosts LAN sessions over
-// WebSockets on the same port. `npm run dev` mounts Vite (hot reload),
-// `npm run start` serves the production build from dist/.
+// Game server: serves the web client and hosts network games over WebSockets
+// on the same port. `npm run dev` mounts Vite (hot reload), `npm run start`
+// serves the production build from dist/. With `--internet` (or
+// TOFU_MODE=internet) each family gets its own room with a code.
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { lanAddresses } from './net-util';
-import { Room } from './room';
+import { RoomManager } from './rooms';
 
 const DEV = process.argv.includes('--dev');
 const PORT = Number(process.env.PORT ?? 8080);
 const HOST = process.env.HOST ?? '0.0.0.0';
+const MODE = process.argv.includes('--internet') || process.env.TOFU_MODE === 'internet' ? 'internet' : 'lan';
+/** Address players use on the Internet (given by the tunnel or the reverse proxy). */
+const PUBLIC_URL = (process.env.PUBLIC_URL ?? '').replace(/\/+$/, '');
+const TRUST_PROXY = process.env.TRUST_PROXY === '1';
+const envInt = (k: string) => (Number.isInteger(Number(process.env[k])) && Number(process.env[k]) > 0 ? Number(process.env[k]) : undefined);
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(here, '..');
 const DIST = path.join(ROOT, 'dist');
@@ -55,6 +61,9 @@ function serveStatic(req: http.IncomingMessage, res: http.ServerResponse): void 
       res.writeHead(200, {
         'content-type': MIME[ext] ?? 'application/octet-stream',
         'cache-control': immutable ? 'public, max-age=31536000, immutable' : 'no-cache',
+        'x-content-type-options': 'nosniff',
+        // Room codes travel in the address: never pass it on to other sites.
+        'referrer-policy': 'no-referrer',
       });
       res.end(data);
     });
@@ -62,16 +71,23 @@ function serveStatic(req: http.IncomingMessage, res: http.ServerResponse): void 
 }
 
 function info() {
-  const ips = lanAddresses();
+  // The addresses of the home network stay private on the Internet.
+  const ips = MODE === 'lan' ? lanAddresses() : [];
   return {
     port: PORT,
+    mode: MODE,
+    publicUrl: PUBLIC_URL,
     lanUrls: ips.map((ip) => `http://${ip}:${PORT}/`),
-    version: '0.1.0',
+    version: '0.2.0',
   };
 }
 
 async function main() {
-  const room = new Room({ port: PORT, log: (s) => console.log(`  [salon] ${s}`) });
+  const rooms = new RoomManager({
+    mode: MODE, port: PORT, publicUrl: PUBLIC_URL || undefined, trustProxy: TRUST_PROXY,
+    limits: { maxRooms: envInt('TOFU_MAX_ROOMS'), maxGames: envInt('TOFU_MAX_GAMES') },
+    log: (s) => console.log(`  [salon] ${s}`),
+  });
   let viteMiddleware: ((req: http.IncomingMessage, res: http.ServerResponse, next: () => void) => void) | null = null;
   const server = http.createServer((req, res) => {
     if (req.url?.startsWith('/api/info')) {
@@ -92,18 +108,15 @@ async function main() {
     const { createServer } = await import('vite');
     const vite = await createServer({
       root: ROOT,
-      server: { middlewareMode: true, hmr: { server } },
+      // Vite only serves known host names; the public one comes from the tunnel or proxy.
+      server: { middlewareMode: true, hmr: { server }, allowedHosts: PUBLIC_URL ? [new URL(PUBLIC_URL).hostname] : [] },
       appType: 'spa',
     });
     viteMiddleware = vite.middlewares;
   }
 
   const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 });
-  server.on('upgrade', (req, socket, head) => {
-    const url = new URL(req.url ?? '/', 'http://x');
-    if (url.pathname !== '/ws') return; // other upgrades (Vite HMR) are handled elsewhere
-    wss.handleUpgrade(req, socket, head, (ws) => room.connect(ws, req.socket.remoteAddress ?? ''));
-  });
+  rooms.attach(server, wss);
 
   server.on('error', (e: NodeJS.ErrnoException) => {
     if (e.code === 'EADDRINUSE') {
@@ -120,17 +133,23 @@ async function main() {
     console.log('   🐶  TOFU ! QUI A FAIT ÇA ?  est prêt !');
     console.log(`  ${line}`);
     console.log(`   Sur ce PC          : http://localhost:${PORT}/`);
-    if (i.lanUrls.length) {
+    if (MODE === 'internet') {
+      console.log(`   Adresse publique   : ${PUBLIC_URL || '(celle de votre serveur ou de votre tunnel)'}`);
+      console.log('   Salons             : chaque famille crée le sien et partage son code');
+    } else if (i.lanUrls.length) {
       console.log(`   Téléphones (Wi-Fi) : ${i.lanUrls[0]}`);
       for (const u of i.lanUrls.slice(1)) console.log(`                        ${u}`);
     } else {
       console.log('   Réseau local       : aucune adresse trouvée (PC hors Wi-Fi ?)');
     }
-    console.log(`   Mode               : ${DEV ? 'développement (rechargement auto)' : 'production'}`);
+    console.log(`   Mode               : ${MODE === 'internet' ? 'Internet' : 'réseau local'}, ${DEV ? 'développement (rechargement auto)' : 'production'}`);
     console.log(`  ${line}`);
-    console.log('   Astuce : si les téléphones ne se connectent pas, autorisez le');
-    console.log(`   port ${PORT} (TCP) dans le pare-feu, par ex. « sudo ufw allow ${PORT}/tcp ».`);
-    console.log(`  ${line}\n`);
+    if (MODE === 'lan') {
+      console.log('   Astuce : si les téléphones ne se connectent pas, autorisez le');
+      console.log(`   port ${PORT} (TCP) dans le pare-feu, par ex. « sudo ufw allow ${PORT}/tcp ».`);
+      console.log(`  ${line}`);
+    }
+    console.log('');
   });
 }
 

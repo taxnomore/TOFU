@@ -1,15 +1,33 @@
-// LAN protocol (JSON over WebSocket). The server is authoritative: clients only
-// send inputs and lobby choices; everything else is validated server-side.
+// Network protocol (JSON over WebSocket), for the home network and the
+// Internet. The server is authoritative: clients only send inputs and lobby
+// choices; everything else is validated server-side.
 import { BTN_ALL } from '../constants';
 import type { GameConfig, GameEvent, GameState } from '../sim/types';
 import { Variant, isVariant } from '../world/variants';
 
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 export const MAX_PLAYERS = 3;
 export const MAX_SEATS_PER_CLIENT = 3;
 export const SNAPSHOT_EVERY = 3; // ticks (60 Hz / 3 = 20 Hz)
 
 export type RolePref = 'tofu' | 'human' | 'any';
+
+/** Home network: one room for every device. Internet: rooms with a code. */
+export type ServerMode = 'lan' | 'internet';
+
+/** Room codes: consonants only, so no look-alike letters and no words. */
+export const ROOM_LETTERS = 'BCDFGHJKLMNPQRSTVWXZ';
+export const ROOM_CODE_LENGTH = 5;
+
+/** Cleans a typed room code ("kzp-tm" → "KZPTM"); null if it cannot be one. */
+export function normalizeRoomCode(s: unknown): string | null {
+  if (typeof s !== 'string' || s.length > 20) return null;
+  const c = s.toUpperCase().replace(/[\s.\-_]/g, '');
+  return c.length === ROOM_CODE_LENGTH && [...c].every((ch) => ROOM_LETTERS.includes(ch)) ? c : null;
+}
+
+/** Close codes after which the client must not reconnect on its own. */
+export const CLOSE_FINAL = { version: 4004, kicked: 4005, noRoom: 4006, busy: 4007 } as const;
 
 export interface SeatReq {
   name: string;
@@ -52,12 +70,18 @@ export type ClientMsg =
   | { t: 'in'; f: [number, number, number, number, number][] }
   | { t: 'rematch'; rotate: boolean }
   | { t: 'to_lobby' }
+  | { t: 'kick'; key: string }
+  | { t: 'lock'; locked: boolean }
   | { t: 'ping'; c: number };
 
 // ---- Server -> client ----
 export type ServerMsg =
-  | { t: 'welcome'; clientId: string; host: boolean; lanUrls: string[] }
-  | { t: 'lobby'; players: LobbyPlayer[]; settings: LobbySettings; hostId: string; phase: 'lobby' | 'game'; ai: { tofu: boolean; humans: number } }
+  | { t: 'welcome'; clientId: string; host: boolean; lanUrls: string[]; mode: ServerMode; room: string; publicUrl: string }
+  | {
+    t: 'lobby'; players: LobbyPlayer[]; settings: LobbySettings; hostId: string; phase: 'lobby' | 'game'; ai: { tofu: boolean; humans: number };
+    /** Closed to newcomers by the host. */
+    locked: boolean;
+  }
   | { t: 'start'; cfg: GameConfig; you: { seat: number; charId: number }[]; state: GameState }
   | { t: 'snap'; ack: Record<number, number>; d: Snap }
   | { t: 'pong'; c: number; s: number }
@@ -175,6 +199,10 @@ export function parseClientMsg(raw: string): ClientMsg | null {
       return { t: 'rematch', rotate: o.rotate === true };
     case 'to_lobby':
       return { t: 'to_lobby' };
+    case 'kick':
+      return typeof o.key === 'string' ? { t: 'kick', key: o.key.slice(0, 64) } : null;
+    case 'lock':
+      return { t: 'lock', locked: o.locked === true };
     case 'ping':
       return isNum(o.c) ? { t: 'ping', c: o.c } : null;
     default:

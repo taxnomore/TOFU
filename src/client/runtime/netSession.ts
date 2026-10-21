@@ -3,6 +3,7 @@
 // interpolation between snapshots) and predicts the local characters with the
 // shared movement code, replaying unacknowledged inputs after each snapshot.
 import { BTN_ALL, BTN_INTERACT, DOG, SIM_DT } from '../../shared/constants';
+import { SNAPSHOT_EVERY } from '../../shared/net/protocol';
 import { lerp, lerpAngle } from '../../shared/math';
 import { applySnap } from '../../shared/net/snapshot';
 import { Game } from '../../shared/sim/game';
@@ -12,8 +13,9 @@ import type { Character, GameEvent, GameState, InputFrame } from '../../shared/s
 import type { NetClient, SnapMsg, StartMsg } from './netClient';
 import type { LocalPlayer, Session } from './session';
 
-/** Render delay for remote objects (two snapshots at 20 Hz). */
+/** Render delay for remote objects (two snapshots at 20 Hz); more on a jittery Internet link. */
 const INTERP_DELAY = 0.1;
+const MAX_INTERP_DELAY = 0.3;
 const MAX_PENDING = 240;
 const MAX_STEPS = 15;
 
@@ -69,6 +71,8 @@ export class NetSession implements Session {
   private predByChar = new Map<number, Pred>();
   private frames: Frame[] = [];
   private clockOff: number | null = null;
+  /** How late the recent snapshots arrived compared with the earliest ones (s). */
+  private late: number[] = [];
   private acc = 0;
   private seq = 0;
   private events: GameEvent[] = [];
@@ -107,7 +111,11 @@ export class NetSession implements Session {
     const st = m.d.tick * SIM_DT;
     const off = st - performance.now() / 1000;
     if (this.clockOff === null || Math.abs(off - this.clockOff) > 1) this.clockOff = off;
-    else this.clockOff += (off - this.clockOff) * (off > this.clockOff ? 0.25 : 0.03);
+    else {
+      this.late.push(Math.max(0, this.clockOff - off));
+      if (this.late.length > 40) this.late.shift();
+      this.clockOff += (off - this.clockOff) * (off > this.clockOff ? 0.25 : 0.03);
+    }
     this.pushFrame(st);
     for (const p of this.preds) this.reconcile(p, m.ack[p.seat]);
   }
@@ -214,10 +222,16 @@ export class NetSession implements Session {
     this.state = this.buildView(dt);
   }
 
+  /** Render delay: long enough for the next snapshot to be there, even a late one (last 2 s). */
+  get renderDelay(): number {
+    const late = this.late.length ? Math.max(...this.late) : 0;
+    return Math.min(MAX_INTERP_DELAY, Math.max(INTERP_DELAY, SNAPSHOT_EVERY * SIM_DT + late + 0.015));
+  }
+
   /** Two frames around the render time and the blend factor between them. */
   private bracket(): [Frame, Frame, number] {
     const fr = this.frames;
-    const rt = performance.now() / 1000 + (this.clockOff ?? 0) - INTERP_DELAY;
+    const rt = performance.now() / 1000 + (this.clockOff ?? 0) - this.renderDelay;
     let i = fr.length - 1;
     while (i > 0 && fr[i].t > rt) i--;
     const a = fr[i];

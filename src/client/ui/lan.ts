@@ -1,13 +1,14 @@
-// LAN multiplayer: lobby screen (QR code, players, roles, settings) and the
-// glue between the server connection and network game sessions.
+// Network play, at home (Wi-Fi) or on the Internet (rooms with a code): lobby
+// screen (QR code or share link, players, roles, settings) and the glue
+// between the server connection and network game sessions.
 import qrcode from 'qrcode-generator';
 import { VARIANTS, isVariant } from '../../shared/world/variants';
-import { MAX_SEATS_PER_CLIENT } from '../../shared/net/protocol';
-import type { LobbyPlayer, RolePref, SeatReq } from '../../shared/net/protocol';
+import { MAX_SEATS_PER_CLIENT, normalizeRoomCode } from '../../shared/net/protocol';
+import type { LobbyPlayer, RolePref, SeatReq, ServerMode } from '../../shared/net/protocol';
 import { sfx } from '../audio/sfx';
 import { InputDevice, KEYMAPS, KeyboardDevice } from '../input/devices';
 import { HUMAN_LOOKS } from '../render/characters';
-import { LobbyMsg, NetClient, NetStatus, StartMsg } from '../runtime/netClient';
+import { LobbyMsg, NetClient, NetStatus, StartMsg, serverUrl } from '../runtime/netClient';
 import { NetSession } from '../runtime/netSession';
 import type { LocalPlayer } from '../runtime/session';
 import { el } from './hud';
@@ -25,6 +26,54 @@ export function installLan(screens: Screens) {
   screens.lan = new Lan(screens);
 }
 
+interface ServerInfo {
+  mode: ServerMode;
+  publicUrl: string;
+}
+
+let infoPromise: Promise<ServerInfo | null> | null = null;
+
+/** Mode of the server that sent this page (null: no server, as with the downloaded file). */
+function serverInfo(): Promise<ServerInfo | null> {
+  if (location.protocol === 'file:') return Promise.resolve(null);
+  infoPromise ??= fetch('/api/info', { cache: 'no-store' })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((j) => (j && (j.mode === 'lan' || j.mode === 'internet') ? { mode: j.mode, publicUrl: typeof j.publicUrl === 'string' ? j.publicUrl : '' } : null))
+    .catch(() => null);
+  return infoPromise;
+}
+
+/** Room code given in the page address (?salon=KZPTM). */
+export function urlRoom(): string | null {
+  return normalizeRoomCode(new URLSearchParams(location.search).get('salon'));
+}
+
+/** Keeps the room code in the address, so a reload goes back to the room. */
+function setUrlRoom(code: string) {
+  try {
+    const u = new URL(location.href);
+    if (code) u.searchParams.set('salon', code);
+    else u.searchParams.delete('salon');
+    history.replaceState(history.state, '', u);
+  } catch {
+    /* address bar left as it is */
+  }
+}
+
+const LOCAL_HOSTS = ['localhost', '127.0.0.1', '::1', '[::1]'];
+
+const lastHtml = new WeakMap<Element, string>();
+/**
+ * Replaces the content only when it changed. The lobby redraws every second:
+ * rewriting the same buttons would lose focus and clicks in progress. (The
+ * browser's own innerHTML is no reference: it writes attributes its own way.)
+ */
+function setHtml(e: Element, html: string) {
+  if (lastHtml.get(e) === html) return;
+  lastHtml.set(e, html);
+  e.innerHTML = html;
+}
+
 class Lan {
   net: NetClient | null = null;
   private mode: 'off' | 'lobby' | 'game' = 'off';
@@ -34,8 +83,16 @@ class Lan {
   private profileKey = '';
   private joinKey = '';
   private watchdog: ReturnType<typeof setInterval> | null = null;
+  private info: ServerInfo | null = null;
+  /** Kick button armed (second press confirms). */
+  private armed = '';
 
-  constructor(private screens: Screens) {}
+  constructor(private screens: Screens) {
+    void serverInfo().then((i) => {
+      this.info = i;
+      this.screens.refreshTitle();
+    });
+  }
 
   isActive() {
     return this.mode !== 'off';
@@ -45,24 +102,88 @@ class Lan {
     return !!this.net?.host;
   }
 
-  open() {
+  private get online(): boolean {
+    return this.info?.mode === 'internet';
+  }
+
+  /** Network buttons of the title menu: `top` goes first, `bottom` after the local modes. */
+  menu(remote: boolean): { top: string; bottom: string } {
+    const code = urlRoom();
+    const btn = (a: string, ico: string, title: string, sub: string, primary: boolean) =>
+      `<button class="${primary ? 'primary' : ''}" data-a="${a}"><span class="ico">${ico}</span><span>${title}<small>${sub}</small></span></button>`;
+    if (this.online) {
+      const play = btn('online', '🌍', 'Jouer en ligne', 'Créer un salon ou entrer un code', remote && !code);
+      if (code) return { top: btn('join', '🔑', `Rejoindre le salon ${code}`, 'Partie en ligne', true), bottom: play };
+      return remote ? { top: play, bottom: '' } : { top: '', bottom: play };
+    }
+    if (remote) return { top: btn('lan', '📱', 'Rejoindre la partie', 'Partie en réseau local (Wi-Fi)', true), bottom: '' };
+    return { top: '', bottom: btn('lan', '📱', 'Réseau local', 'Téléphones et autres PC sur le Wi-Fi', false) };
+  }
+
+  /** From the title menu: home network, online rooms, or the room in the address. */
+  async open(how: 'lan' | 'online' | 'join' = 'lan') {
     if (location.protocol === 'file:') {
       this.showNeedsServer();
       return;
     }
-    if (!this.net) {
-      const p = this.screens.prefs;
-      const name = p.name || NAMES[Math.floor(Math.random() * NAMES.length)];
-      const seat: SeatReq = { name, avatar: p.avatar, pref: 'any', device: isTouch() ? 'touch' : 'keyboard' };
-      const net = new NetClient([seat]);
-      net.onLobby = (m) => this.onLobby(m);
-      net.onStart = (m) => this.onStart(m);
-      net.onStatus = (s) => this.onStatus(s);
-      this.net = net;
-      net.connect();
-      this.watchdog = setInterval(() => this.checkLink(), 1000);
+    if (this.net) {
+      this.showLobby();
+      return;
     }
+    this.info ??= await serverInfo();
+    if (!this.online) this.connect('');
+    else if (how === 'join' && urlRoom()) this.connect(urlRoom()!);
+    else this.showOnline();
+  }
+
+  /** Joins a room (`room`: a code, "new" to create one, empty at home). */
+  private connect(room: string) {
+    if (this.net) return;
+    const p = this.screens.prefs;
+    const name = p.name || NAMES[Math.floor(Math.random() * NAMES.length)];
+    const seat: SeatReq = { name, avatar: p.avatar, pref: 'any', device: isTouch() ? 'touch' : 'keyboard' };
+    const net = new NetClient([seat], serverUrl(room));
+    net.onLobby = (m) => this.onLobby(m);
+    net.onStart = (m) => this.onStart(m);
+    net.onStatus = (s) => this.onStatus(s);
+    net.onWelcome = (m) => {
+      if (m.room) setUrlRoom(m.room);
+    };
+    this.net = net;
+    net.connect();
+    this.watchdog = setInterval(() => this.checkLink(), 1000);
     this.showLobby();
+  }
+
+  /** Internet server: create a room, or join one with its code. */
+  private showOnline(err = '') {
+    const s = el('div', 'screen dim');
+    s.innerHTML = `<div class="panel" style="max-width:560px">
+      <h2>🌍 Jouer en ligne</h2>
+      <p>Chaque famille joue dans son propre salon. Celui qui crée le salon devient l'hôte 👑 : il envoie ensuite le lien ou le code aux autres joueurs.</p>
+      <button class="big primary" data-create><span class="ico">➕</span><span>Créer un salon<small>Puis partager le lien avec les autres joueurs</small></span></button>
+      <h3>J'ai un code</h3>
+      <div class="namerow"><input type="text" data-code maxlength="9" placeholder="Par exemple KZPTM" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" aria-label="Code du salon"><button class="big" data-join>Rejoindre ▶</button></div>
+      ${err ? `<p class="err">${esc(err)}</p>` : ''}
+      <div class="foot"><button class="big" data-back>⬅ Retour</button></div></div>`;
+    const join = () => {
+      const typed = (s.querySelector('[data-code]') as HTMLInputElement).value;
+      const code = normalizeRoomCode(typed);
+      if (!code) this.showOnline('Un code compte 5 lettres, sans voyelles (par exemple KZPTM).');
+      else this.connect(code);
+    };
+    s.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest('button');
+      if (!b) return;
+      sfx.play('click');
+      if (b.hasAttribute('data-create')) this.connect('new');
+      else if (b.hasAttribute('data-join')) join();
+      else if (b.hasAttribute('data-back')) this.screens.showTitle();
+    });
+    s.addEventListener('keydown', (e) => {
+      if ((e.target as HTMLElement).hasAttribute('data-code') && e.key === 'Enter') join();
+    });
+    this.screens.show(s);
   }
 
   /** Opened from the downloaded HTML file: network play needs the small server. */
@@ -76,6 +197,7 @@ class Lan {
         <li>Tapez <kbd>npm run start</kbd>.</li>
         <li>Ouvrez <b>http://localhost:8080/</b> dans le navigateur, puis « Réseau local ».</li>
       </ol>
+      <p>Pour jouer par Internet avec de la famille qui habite ailleurs, tapez plutôt <kbd>npm run internet</kbd> (voir le fichier README, « Jouer par Internet »).</p>
       <p>Ce fichier suffit pour jouer seul ou à plusieurs sur ce PC (écran partagé).</p>
       <div class="foot"><button class="big primary" data-back>⬅ Retour</button></div></div>`;
     s.querySelector('[data-back]')!.addEventListener('click', () => {
@@ -86,6 +208,7 @@ class Lan {
   }
 
   leave() {
+    if (this.net?.room) setUrlRoom('');
     this.net?.close();
     this.net = null;
     this.mode = 'off';
@@ -145,6 +268,14 @@ class Lan {
   }
 
   private onStatus(s: NetStatus) {
+    const net = this.net;
+    if (s === 'closed' && this.mode === 'lobby' && net && !net.lobby && this.online) {
+      // Refused before entering (unknown code, server busy): back to the choice.
+      const err = net.error || 'Impossible de rejoindre ce salon.';
+      this.leave();
+      this.showOnline(err);
+      return;
+    }
     if (this.mode === 'lobby') this.render();
     else if (this.mode === 'game') {
       if (s === 'open') this.setBanner('');
@@ -153,12 +284,15 @@ class Lan {
     }
   }
 
-  /** Warns when snapshots stop arriving (weak Wi-Fi) before the socket notices. */
+  /** Warns when snapshots stop arriving (weak Wi-Fi) before the socket notices, or when the link is slow. */
   private checkLink() {
+    if (this.mode === 'lobby') this.render();
     if (this.mode !== 'game' || !this.session || !this.net?.connected) return;
     const gap = performance.now() - this.session.lastSnapAt;
+    const rtt = this.net.rtt;
     if (gap > 2500) this.setBanner('📡 Connexion instable…');
-    else if (this.banner && !this.banner.classList.contains('fatal')) this.setBanner('');
+    else if (rtt > 300) this.setBanner(`🐢 Connexion lente (${Math.round(rtt)} ms) : tes actions arrivent en retard.`);
+    else if (this.banner && !this.banner.classList.contains('fatal') && (rtt < 250 || !this.banner.textContent?.startsWith('🐢'))) this.setBanner('');
   }
 
   private setBanner(html: string, fatal = false) {
@@ -173,9 +307,10 @@ class Lan {
     }
     this.banner.classList.toggle('fatal', fatal);
     if (fatal) {
+      lastHtml.delete(this.banner);
       this.banner.innerHTML = `${html} <button class="big" data-quit>🏠 Menu</button>`;
       this.banner.querySelector('[data-quit]')!.addEventListener('click', () => this.screens.showTitle());
-    } else if (this.banner.innerHTML !== html) this.banner.innerHTML = html;
+    } else setHtml(this.banner, html);
   }
 
   private backToLobby() {
@@ -202,14 +337,14 @@ class Lan {
     this.joinKey = '';
     const s = el('div', 'screen dim');
     s.innerHTML = `<div class="panel lan-panel">
-      <h2>📱 Partie en réseau local</h2>
+      <h2 data-title>${this.online ? '🌍 Partie en ligne' : '📱 Partie en réseau local'}</h2>
       <div class="lan-status" data-status></div>
       <div class="lan-grid">
         <div class="lan-join" data-join></div>
         <div class="lan-main">
           <h3>Joueurs</h3>
           <div class="lobby-list" data-players></div>
-          <h3>Moi</h3>
+          <h3>Moi <small data-ping title="Temps d'aller-retour vers le serveur"></small></h3>
           <div data-profile></div>
           <h3>Réglages de la partie <small class="guest-only">(choisis par l'hôte 👑)</small></h3>
           <div class="opts" data-settings></div>
@@ -246,18 +381,24 @@ class Lan {
     const lob = net.lobby;
     const q = <T extends HTMLElement>(sel: string) => s.querySelector(sel) as T;
 
+    const title = net.room ? `🌍 Salon ${net.room}` : this.online ? '🌍 Partie en ligne' : '📱 Partie en réseau local';
+    const h2 = q<HTMLElement>('[data-title]');
+    if (h2.textContent !== title) h2.textContent = title;
+
     // Connection status.
     let status = '';
     if (net.status === 'connecting' || (net.status === 'open' && !lob)) status = '⏳ Connexion au serveur…';
     else if (net.status === 'lost') {
       status = '📡 Connexion perdue, nouvelle tentative…';
       if (net.failures >= 3) {
-        status += '<br><small>Le PC hôte doit lancer « npm run start » et tous les appareils doivent être sur le même Wi-Fi.</small>';
+        status += this.online
+          ? '<br><small>Vérifiez la connexion Internet. Si le serveur a redémarré, le salon n\'existe plus : créez-en un nouveau.</small>'
+          : '<br><small>Le PC hôte doit lancer « npm run start » et tous les appareils doivent être sur le même Wi-Fi.</small>';
       }
     } else if (net.status === 'closed') status = `❌ ${esc(net.error || 'Déconnecté du serveur.')}`;
     else if (lob?.phase === 'game') status = '🎮 Une partie est en cours : tu joueras à la prochaine manche.';
     const st = q<HTMLElement>('[data-status]');
-    if (st.innerHTML !== status) st.innerHTML = status;
+    setHtml(st, status);
     st.style.display = status ? '' : 'none';
 
     this.renderJoin(q('[data-join]'));
@@ -271,17 +412,26 @@ class Lan {
       const state = !p.connected ? '🔌 Parti' : p.clientId === lob.hostId ? '👑 Hôte' : p.ready ? '✅ Prêt' : '… pas prêt';
       const color = p.role === 'tofu' ? 'var(--tofu)' : hex(HUMAN_LOOKS[p.avatar % 4].shirt);
       const assign = net.host && p.role !== 'tofu' && p.connected ? `<button class="mini" data-assign="${esc(p.key)}" title="Ce joueur sera Tofu">En faire Tofu 🐶</button>` : '';
+      // The host can send away someone who should not be there (twice to confirm).
+      const kick = net.host && !mine && p.seat === 0 ? `<button class="mini" data-kick="${esc(p.key)}">${this.armed === p.key ? 'Confirmer ?' : 'Retirer'}</button>` : '';
       return `<div class="lobby-player ${mine ? 'me' : ''} ${p.connected ? '' : 'off'}">
         <span class="dot" style="background:${color}"></span><b>${esc(p.name)}</b>${mine ? '<small>(toi)</small>' : ''}<span>${dev}</span>
-        <span class="role">${role}</span>${assign}<span class="ready">${state}</span></div>`;
+        <span class="role">${role}</span>${assign}${kick}<span class="ready">${state}</span></div>`;
     });
     if (lob.ai.tofu) rows.push('<div class="lobby-player ai"><span class="dot" style="background:var(--tofu)"></span><b>Tofu</b><span>🤖 ordinateur</span><span class="role">🐶 Tofu</span></div>');
     if (lob.ai.humans) rows.push(`<div class="lobby-player ai"><span class="dot" style="background:${hex(HUMAN_LOOKS[0].shirt)}"></span><b>Maman</b><span>🤖 ordinateur</span><span class="role">🧑 Humain</span></div>`);
+    // Once everybody is in, the host can close the door to strangers.
+    if (net.host) rows.push(`<div class="lock-line"><button class="mini" data-lock>${lob.locked ? '🔓 Rouvrir le salon aux nouveaux joueurs' : '🔒 Fermer le salon aux nouveaux joueurs'}</button></div>`);
+    else if (lob.locked) rows.push('<div class="lock-line"><small>🔒 Salon fermé aux nouveaux joueurs</small></div>');
     const players = q<HTMLElement>('[data-players]');
     const html = rows.join('');
-    if (players.innerHTML !== html) players.innerHTML = html;
+    setHtml(players, html);
 
     this.renderProfile(q('[data-profile]'), lob);
+    // Updated every second on its own, so the buttons of the list stay put.
+    const ping = net.rtt ? `📶 ${Math.round(net.rtt)} ms` : '';
+    const pe = q<HTMLElement>('[data-ping]');
+    if (pe.textContent !== ping) pe.textContent = ping;
 
     // Settings (host edits, others see).
     const dis = net.host ? '' : 'disabled';
@@ -293,7 +443,7 @@ class Lan {
       <span>Ordinateur</span>${seg('diff', [[0, 'Facile'], [1, 'Normal'], [2, 'Difficile']], set.difficulty)}
       <span>Ambiance</span>${seg('variant', VARIANTS.map((d) => [d.id, `${d.icon} ${d.id === 'marche' ? 'Marché' : d.name}`] as [string, string]), set.variant ?? 'ete')}`;
     const se = q<HTMLElement>('[data-settings]');
-    if (se.innerHTML !== sh.replace(/\n\s+/g, '\n')) se.innerHTML = sh.replace(/\n\s+/g, '\n');
+    setHtml(se, sh);
 
     // Footer.
     const me = this.myPlayers()[0];
@@ -308,10 +458,56 @@ class Lan {
     sb.disabled = lob.phase !== 'lobby' || net.status !== 'open';
   }
 
+  /** Online room: its code, the link to share and its QR code. */
+  private renderShare(box: HTMLElement) {
+    const net = this.net!;
+    const base = (net.publicUrl || (LOCAL_HOSTS.includes(location.hostname) ? '' : location.origin)).replace(/\/+$/, '');
+    const link = net.room && base ? `${base}/?salon=${net.room}` : '';
+    const key = `share|${net.room}|${link}`;
+    if (key === this.joinKey) return;
+    this.joinKey = key;
+    if (!net.room) {
+      box.innerHTML = '';
+      return;
+    }
+    let qrSvg = '';
+    if (link) {
+      const qr = qrcode(0, 'M');
+      qr.addData(link);
+      qr.make();
+      qrSvg = `<div class="qr">${qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true })}</div>`;
+    }
+    const canShare = typeof navigator.share === 'function';
+    box.innerHTML = `<p>Code du salon :</p><div class="room-code">${net.room}</div>
+      ${link ? `<p><b>Pour inviter :</b> envoyez ce lien, ou faites scanner le code QR.</p>
+      <div class="url">${esc(link)}</div>
+      <div class="row"><button class="big" data-copy>📋 Copier le lien</button>${canShare ? '<button class="big" data-share>📤 Partager</button>' : ''}</div>
+      ${qrSvg}` : `<p class="small">Pour obtenir le lien à partager, ouvrez le jeu par son adresse publique (celle du tunnel ou du serveur), pas par « localhost ».</p>`}
+      <p class="small">On peut aussi ouvrir le jeu, choisir « Jouer en ligne » et taper le code.</p>`;
+  }
+
+  private async copyLink(b: HTMLButtonElement) {
+    const link = this.scr?.querySelector('.lan-join .url')?.textContent ?? '';
+    try {
+      await navigator.clipboard.writeText(link);
+      b.textContent = '✅ Lien copié !';
+    } catch {
+      // No clipboard access: select the link so that it can be copied by hand.
+      const u = this.scr?.querySelector('.lan-join .url');
+      if (u) getSelection()?.selectAllChildren(u);
+      b.textContent = '👆 Copiez le lien sélectionné';
+    }
+    setTimeout(() => (b.textContent = '📋 Copier le lien'), 2500);
+  }
+
   /** QR code and address for the other devices. */
   private renderJoin(box: HTMLElement) {
     const net = this.net!;
-    const local = ['localhost', '127.0.0.1', '::1', '[::1]'].includes(location.hostname);
+    if (this.online) {
+      this.renderShare(box);
+      return;
+    }
+    const local = LOCAL_HOSTS.includes(location.hostname);
     const url = local ? net.lanUrls[0] : `${location.protocol}//${location.host}/`;
     const key = `${url}|${net.lanUrls.join(',')}`;
     if (key === this.joinKey) return;
@@ -372,6 +568,36 @@ class Lan {
     }
     if (b.hasAttribute('data-ready')) {
       net.send({ t: 'ready', ready: !this.myPlayers()[0]?.ready });
+      return;
+    }
+    if (b.hasAttribute('data-lock')) {
+      net.send({ t: 'lock', locked: !net.lobby?.locked });
+      return;
+    }
+    if (b.hasAttribute('data-copy')) {
+      void this.copyLink(b);
+      return;
+    }
+    if (b.hasAttribute('data-share')) {
+      const link = this.scr?.querySelector('.lan-join .url')?.textContent ?? '';
+      navigator.share?.({ title: 'TOFU ! Qui a fait ça ?', text: `Viens jouer avec nous ! Salon ${net.room}`, url: link }).catch(() => undefined);
+      return;
+    }
+    if (b.dataset.kick) {
+      if (this.armed === b.dataset.kick) {
+        this.armed = '';
+        net.send({ t: 'kick', key: b.dataset.kick });
+      } else {
+        const key = b.dataset.kick;
+        this.armed = key;
+        setTimeout(() => {
+          if (this.armed === key) {
+            this.armed = '';
+            this.render();
+          }
+        }, 4000);
+      }
+      this.render();
       return;
     }
     if (b.hasAttribute('data-start')) {
