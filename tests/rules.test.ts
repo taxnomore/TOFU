@@ -11,15 +11,15 @@ describe('laundry theft and recovery', () => {
     const g = makeGame();
     const tofu = g.tofu;
     const human = g.state.chars[1];
-    // Tofu next to the hamper (2.95, -5.45), looking at it.
-    place(tofu, 2.95, -4.75, faceTo(2.95, -4.75, 2.95, -5.45));
+    // Tofu in front of the dresser (-10.6, -0.4), looking at it.
+    place(tofu, -10.6, -1.3, faceTo(-10.6, -1.3, -10.6, -0.4));
     const inter = listInteractions(g, tofu)[0];
     expect(inter.kind).toBe('take');
     press(g, tofu.id);
     expect(tofu.hold.length).toBe(1);
     const sock = g.state.items[tofu.hold[0]];
     expect(ITEM_TYPES[sock.type].category).toBe('laundry');
-    expect(g.state.chaos).toBeGreaterThanOrEqual(4);
+    expect(g.state.chaos).toBeGreaterThanOrEqual(2);
     expect(sock.disturbed).toBe(true);
 
     // Teleport into the garden and drop it.
@@ -48,7 +48,7 @@ describe('laundry theft and recovery', () => {
     const g = makeGame();
     const tofu = g.tofu;
     const human = g.state.chars[1];
-    place(tofu, 2.95, -4.75, Math.PI);
+    place(tofu, -10.6, -1.3, Math.PI);
     press(g, tofu.id);
     expect(tofu.hold.length).toBe(1);
     const item = tofu.hold[0];
@@ -199,7 +199,7 @@ describe('cat', () => {
     place(tofu, n.x - 2.0, n.z, Math.PI / 2);
     const before = g.state.chaos;
     press(g, tofu.id, BTN_BARK);
-    expect(g.state.chaos).toBeGreaterThan(before + 2);
+    expect(g.state.chaos).toBeGreaterThanOrEqual(before + 2);
   });
 });
 
@@ -218,7 +218,7 @@ describe('abilities', () => {
     const g = makeGame();
     const tofu = g.tofu;
     const human = g.state.chars[1];
-    place(tofu, 2.95, -4.75, Math.PI);
+    place(tofu, -10.6, -1.3, Math.PI);
     press(g, tofu.id);
     expect(tofu.hold.length).toBe(1);
     place(tofu, 0, 3.5, 0);
@@ -243,7 +243,7 @@ describe('abilities', () => {
 describe('win conditions', () => {
   it('Tofu wins when chaos reaches the goal', () => {
     const g = makeGame();
-    g.addChaos(150, 'test', 0, 0);
+    g.addChaos(250, 'test', 0, 0);
     steps(g, 1);
     expect(g.state.phase).toBe('end');
     expect(g.state.winner).toBe('tofu');
@@ -280,7 +280,7 @@ describe('win conditions', () => {
     steps(g, 10);
     expect(S.tasks.every((t) => t.done)).toBe(true);
     expect(S.guestsT).toBeGreaterThan(0);
-    steps(g, 60 * 9);
+    steps(g, 60 * 16);
     expect(S.phase).toBe('end');
     expect(S.winner).toBe('humans');
   });

@@ -77,7 +77,7 @@ export function eventToast(e: GameEvent, viewer: Character, S: GameState): Toast
     case 'secret': {
       const s = S.secrets[e.idx];
       const def = SECRET_DEFS.find((d) => d.id === s.id)!;
-      return dog ? { text: `🤫 Défi secret réussi : ${def.text} (+15)`, kind: 'big' } : { text: '🤫 Tofu a réussi un défi secret…', kind: 'bad' };
+      return dog ? { text: `🤫 Défi secret réussi : ${def.text} (+20)`, kind: 'big' } : { text: '🤫 Tofu a réussi un défi secret…', kind: 'bad' };
     }
     case 'guests':
       return e.on ? { text: '🔔 Ding dong ! Les invités arrivent !', kind: 'big' } : { text: '😱 Oh non ! La maison n\'est plus prête !', kind: 'bad' };

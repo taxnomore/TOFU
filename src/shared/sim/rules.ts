@@ -30,7 +30,7 @@ function storedAt(g: Game, itemId: string, stationId: string): boolean {
 export const TASK_DEFS: Record<TaskKind, TaskDef> = {
   linge: {
     kind: 'linge', title: 'Rentrer le linge', icon: '🧺',
-    hint: 'Décroche le linge du jardin et range-le dans le panier à linge (salle de bain) ou la commode.',
+    hint: 'Décroche le linge du jardin et range-le dans le panier à linge de la salle de bain (Tofu ne sait pas l\'ouvrir !).',
     eval(g) {
       const ids = ['linge_1', 'linge_2', 'linge_3', 'linge_4'];
       let n = 0;
@@ -120,12 +120,12 @@ export interface SecretDef {
 }
 
 export const SECRET_DEFS: SecretDef[] = [
-  { id: 'voleur', text: 'Vole 3 vêtements (chaussettes, slips, chaussons…)', goal: 3, icon: '🧦' },
-  { id: 'tresor', text: 'Cache 2 objets dans ton panier ou ta niche', goal: 2, icon: '💎' },
+  { id: 'voleur', text: 'Vole 5 vêtements (chaussettes, slips, chaussons…)', goal: 5, icon: '🧦' },
+  { id: 'tresor', text: 'Cache 3 objets dans ton panier ou ta niche', goal: 3, icon: '💎' },
   { id: 'rue', text: 'Emporte un objet de la maison jusque dans la rue', goal: 1, icon: '🛣️' },
-  { id: 'casse', text: 'Fais tomber 3 objets', goal: 3, icon: '💥' },
-  { id: 'boue_chambre', text: 'Laisse 6 traces de boue dans les chambres', goal: 6, icon: '🐾' },
-  { id: 'chat', text: 'Poursuis le chat pendant 6 secondes', goal: 6, icon: '🐈' },
+  { id: 'casse', text: 'Fais tomber 5 objets', goal: 5, icon: '💥' },
+  { id: 'boue_chambre', text: 'Laisse 12 traces de boue dans les chambres', goal: 12, icon: '🐾' },
+  { id: 'chat', text: 'Poursuis le chat pendant 8 secondes', goal: 8, icon: '🐈' },
   { id: 'poubelles', text: 'Renverse 2 poubelles', goal: 2, icon: '🗑️' },
   { id: 'gourmand', text: 'Mange quelque chose de bon', goal: 1, icon: '🥐' },
   { id: 'innocent', text: "Assieds-toi l'air innocent à côté d'une bêtise", goal: 1, icon: '😇' },

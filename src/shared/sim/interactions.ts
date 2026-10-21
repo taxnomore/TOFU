@@ -72,7 +72,7 @@ export function listInteractions(g: Game, c: Character): Interaction[] {
         let best = -1;
         let bestD = Infinity;
         for (const it of contents) {
-          if (!ITEM_TYPES[it.type].carry?.dog) continue;
+          if (!ITEM_TYPES[it.type].carry?.dog || it.guardT > 0) continue;
           const dd = Math.hypot(it.x - c.x, it.z - c.z);
           if (s.kind === 'clothesline' && dd > 1.5) continue;
           if (dd < bestD) {
@@ -177,7 +177,7 @@ export function listInteractions(g: Game, c: Character): Interaction[] {
     const d = Math.hypot(it.x - c.x, it.z - c.z) - t.size;
     if (d > reach) continue;
     if (isDog) {
-      if (!held.length && c.noPickup <= 0 && t.carry?.dog) {
+      if (!held.length && c.noPickup <= 0 && t.carry?.dog && it.guardT <= 0) {
         add('pickup', it.idx, `Attraper ${t.name}`, 0, it.x, it.y, it.z, d, 60);
       }
       if (it.type === 'trash_bag' && it.charge <= 0 && !held.length) {

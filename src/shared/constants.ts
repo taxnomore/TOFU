@@ -5,9 +5,11 @@ export const SIM_DT = 1 / SIM_HZ;
 
 export const DEFAULT_DURATION = 360;
 export const COUNTDOWN_TIME = 3;
-export const GUESTS_COUNTDOWN = 8;
+export const GUESTS_COUNTDOWN = 15;
 
-export const CHAOS_GOAL = 100;
+export const CHAOS_GOAL = 200;
+/** Chaos goal by number of humans (2 humans clean up faster). */
+export const CHAOS_GOAL_BY_HUMANS = [200, 200, 170];
 export const CLEAN_GOAL = 70;
 
 export const BTN_INTERACT = 1;
@@ -69,7 +71,7 @@ export const DOG = {
   innocentTime: 2.0,
   boopStun: 0.6,
   bedJumpCd: 6,
-  carrySlow: 0.05,
+  carrySlow: 0.14,
 };
 
 export const CAT = {
@@ -87,51 +89,51 @@ export const CAT = {
 
 /** Chaos points awarded to Tofu. */
 export const CHAOS = {
-  steal: 4,
-  stealRepeatWindow: 25,
-  stash: 6,
-  streetDrop: 6,
-  eat: 9,
-  ripBag: 6,
-  bedJump: 4,
-  muddyBed: 5,
-  sofaJump: 2,
-  muddySofa: 5,
-  dig: 5,
-  tablecloth: 9,
-  print: 0.35,
-  chasePerSec: 1.7,
-  chaseCapPerFlee: 10,
-  barkCat: 3,
-  barkCatCd: 4,
-  barkCarrier: 4,
-  boop: 2,
-  humanSlip: 2,
+  steal: 2,
+  stealRepeatWindow: 60,
+  stash: 3,
+  streetDrop: 4,
+  eat: 7,
+  ripBag: 4,
+  bedJump: 3,
+  muddyBed: 4,
+  sofaJump: 1.5,
+  muddySofa: 4,
+  dig: 4,
+  tablecloth: 7,
+  print: 0.15,
+  chasePerSec: 1.2,
+  chaseCapPerFlee: 6,
+  barkCat: 2,
+  barkCatCd: 6,
+  barkCarrier: 3,
+  boop: 1,
+  humanSlip: 1.5,
   /** Multiplier when a human or the cat knocks something (accident). */
   accidentMul: 0.5,
   catAccidentMul: 0.6,
   /** Passive chaos per second for each mess left uncleaned. */
-  messDrip: 0.022,
-  messDripCap: 0.25,
-  secret: 15,
-  innocent: 3,
+  messDrip: 0.012,
+  messDripCap: 0.12,
+  secret: 20,
+  innocent: 2,
 };
 
 /** Zoomies meter gain per mischief type (diminishing for repeats). */
 export const ZOOM_GAIN: Record<string, number> = {
-  steal: 0.16,
-  stash: 0.14,
-  knock: 0.2,
-  bin: 0.22,
-  eat: 0.2,
-  mud: 0.18,
-  chase: 0.22,
-  bark: 0.03,
-  bed: 0.16,
-  dig: 0.18,
-  tablecloth: 0.25,
-  treat: 0.12,
-  street: 0.16,
+  steal: 0.1,
+  stash: 0.08,
+  knock: 0.13,
+  bin: 0.14,
+  eat: 0.14,
+  mud: 0.12,
+  chase: 0.15,
+  bark: 0.02,
+  bed: 0.1,
+  dig: 0.12,
+  tablecloth: 0.16,
+  treat: 0.08,
+  street: 0.1,
 };
 
 export const CLEANLINESS = {
@@ -145,5 +147,7 @@ export const CLEANLINESS = {
 export const TASKS_PER_HUMANS = [0, 4, 6];
 
 export const KNOCK_RESTORE_CD = 14;
+/** Protection after a human recovers an object or puts it back in place. */
+export const GUARD_TIME = 25;
 export const BAKERY_BUY_TIME = 1.4;
 export const BAGUETTE_RESPAWN = 45;

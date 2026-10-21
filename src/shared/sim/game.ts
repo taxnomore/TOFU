@@ -2,8 +2,8 @@
 // split screen) and on the Node LAN server. Fixed 60 Hz steps, deterministic
 // for a given seed and input sequence.
 import {
-  BAGUETTE_RESPAWN, BTN_BARK, BTN_INTERACT, BTN_SIT, BTN_SPECIAL, BTN_SPRINT, CHAOS, CHAOS_GOAL, CLEAN_GOAL,
-  COUNTDOWN_TIME, DOG, GUESTS_COUNTDOWN, HUMAN, KNOCK_RESTORE_CD, SIM_DT, ZOOM_GAIN,
+  BAGUETTE_RESPAWN, BTN_BARK, CHAOS_GOAL_BY_HUMANS, BTN_INTERACT, BTN_SIT, BTN_SPECIAL, BTN_SPRINT, CHAOS, CHAOS_GOAL, CLEAN_GOAL,
+  COUNTDOWN_TIME, DOG, GUARD_TIME, GUESTS_COUNTDOWN, HUMAN, KNOCK_RESTORE_CD, SIM_DT, ZOOM_GAIN,
 } from '../constants';
 import { Rng, clamp, dist } from '../math';
 import { ITEM_TYPES, MESS_TYPES, MessKind } from '../world/itemTypes';
@@ -80,13 +80,13 @@ export class Game {
         idx, id: p.id, type: p.type, state: st >= 0 ? 'stored' : t.knock ? 'home' : 'free',
         x, y, z, rot: p.rot ?? 0, tilt: 0, vx: 0, vy: 0, vz: 0, spin: 0, holder: -1, station: st, slot: -1, bounces: 0,
         disturbed: false, mess: -1, knockCd: 0, homeX: x, homeY: y, homeZ: z, homeRot: p.rot ?? 0, grabbedIn: '',
-        lastStealT: -999, stashed: false, streetScored: false, charge: p.type === 'watering_can' ? 2 : 0, respawnT: 0, by: -1, rev: 0,
+        lastStealT: -999, stashed: false, streetScored: false, charge: p.type === 'watering_can' ? 2 : 0, respawnT: 0, by: -1, guardT: 0, rev: 0,
       } as Item;
     });
     this.state = {
       phase: cfg.noCountdown ? 'play' : 'countdown',
       tick: 0, time: 0, duration: cfg.duration, countdown: COUNTDOWN_TIME,
-      chaos: 0, chaosGoal: cfg.chaosGoal ?? CHAOS_GOAL, cleanliness: 100, cleanGoal: cfg.cleanGoal ?? CLEAN_GOAL,
+      chaos: 0, chaosGoal: cfg.chaosGoal ?? CHAOS_GOAL_BY_HUMANS[Math.min(2, humanCount)] ?? CHAOS_GOAL, cleanliness: 100, cleanGoal: cfg.cleanGoal ?? CLEAN_GOAL,
       guestsT: 0, winner: null, endReason: '',
       chars, items, messes: [], stations,
       doors: DOORS.map((d, idx) => ({ idx, open: d.open, push: 0, rev: 0 })),
@@ -297,7 +297,8 @@ export class Game {
     // Interaction (instant or hold).
     if (pressed & BTN_INTERACT) {
       const list = listInteractions(this, c);
-      const inter = list[0];
+      const pk = inp.pick;
+      const inter = (pk && list.find((l) => l.kind === pk.kind && l.target === pk.target)) || list[0];
       if (inter) {
         if (inter.hold <= 0) executeInteraction(this, c, inter);
         else c.act = { kind: inter.kind, target: inter.target, t: 0, dur: inter.hold };
@@ -740,6 +741,7 @@ export class Game {
     const S = this.state;
     for (const it of S.items) {
       if (it.knockCd > 0) it.knockCd = Math.max(0, it.knockCd - dt);
+      if (it.guardT > 0) it.guardT = Math.max(0, it.guardT - dt);
       if (it.state === 'held') {
         const h = S.chars[it.holder];
         if (h) {
@@ -1116,6 +1118,7 @@ export class Game {
       this.putInStation(it, si);
       const homes = ITEM_TYPES[it.type].homes ?? [];
       if (homes.includes(s.kind)) {
+        it.guardT = GUARD_TIME;
         if (it.disturbed) {
           S.stats.recovered++;
           this.stat(c.id, 'returned');
@@ -1204,6 +1207,7 @@ export class Game {
     }
     this.bump(it);
     h.takeCd = HUMAN.takeCd;
+    it.guardT = GUARD_TIME;
     this.oneShot(h, Anim.Interact, 0.3);
     S.stats.recovered++;
     this.stat(h.id, 'recovered');

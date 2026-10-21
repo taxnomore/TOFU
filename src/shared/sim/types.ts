@@ -29,6 +29,11 @@ export interface InputFrame {
   mx: number;
   mz: number;
   buttons: number;
+  /**
+   * Optional preferred interaction (used by the AI). Only honored if it is
+   * currently valid and in reach, exactly like the default choice.
+   */
+  pick?: { kind: string; target: number };
 }
 
 export const EMPTY_INPUT: InputFrame = { mx: 0, mz: 0, buttons: 0 };
@@ -153,6 +158,8 @@ export interface Item {
   respawnT: number;
   /** Who knocked / threw it (char id) for chaos attribution; -2 = cat. */
   by: number;
+  /** Seconds during which Tofu cannot grab it (just recovered or put away by a human). */
+  guardT: number;
   rev: number;
 }
 

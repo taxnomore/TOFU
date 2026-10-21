@@ -319,7 +319,7 @@ export const PROPS: PropDef[] = [
 
 /** Interaction stations. */
 export const STATIONS: StationDef[] = [
-  { id: 'panier_linge', kind: 'hamper', name: 'le panier à linge', x: 2.95, z: -5.45, y: 0.62, r: 1.0, dogReach: true, capacity: 12 },
+  { id: 'panier_linge', kind: 'hamper', name: 'le panier à linge', x: 2.95, z: -5.45, y: 0.62, r: 1.0, dogReach: false, capacity: 12 },
   { id: 'commode', kind: 'dresser', name: 'la commode', x: -10.6, z: -0.4, y: 0.9, r: 0.9, hw: 0.6, hd: 0.25, dogReach: true, capacity: 12 },
   { id: 'fil_linge', kind: 'clothesline', name: 'le fil à linge', x: -9.0, z: 13.5, y: 1.45, r: 1.0, hw: 3.0, hd: 0.1, dogReach: true, capacity: 4,
     slots: [[-2.4, 1.45, 0], [-0.8, 1.45, 0], [0.8, 1.45, 0], [2.4, 1.45, 0]] },
