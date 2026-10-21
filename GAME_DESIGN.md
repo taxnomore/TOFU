@@ -159,16 +159,19 @@ Contre-jeu des humains : la friandise attire Tofu jusqu'à 9 m (la balle jusqu'�
 
 ## 10. Équilibrage
 
-- Objectif de bêtises : 220 contre un humain, 170 contre deux (deux humains nettoient plus vite mais ont 6 tâches).
-- 3 tâches à un humain, 6 à deux. Avec 4 tâches, un humain seul perdait 3 manches sur 4 contre l'ordinateur au niveau Normal ; avec 3 tâches et 220 points, l'équilibre revient à une manche sur deux.
+- Objectif de bêtises : 250 contre un humain, 180 contre deux (deux humains nettoient plus vite mais ont 6 tâches). Les nouvelles bêtises (arrosoir, réactions en chaîne, ambiances) ont fait passer ces objectifs de 220 et 170 à 250 et 180.
+- 3 tâches à un humain, 6 à deux. Avec 4 tâches, un humain seul perdait 3 manches sur 4 contre l'ordinateur au niveau Normal ; avec 3 tâches, l'équilibre revient à une manche sur deux.
 - Trois niveaux d'ordinateur (réactivité, précision des friandises, insistance de Tofu à défaire les tâches).
 - Mesures automatiques, ordinateur contre ordinateur, manches de 6 minutes (script de simulation sans rendu) :
 
 | Niveau de l'ordinateur | Tofu contre 1 humain | Tofu contre 2 humains |
 |---|---|---|
-| Facile | Tofu gagne 3 fois sur 30 | Tofu gagne 7 fois sur 30 |
-| Normal | Tofu gagne 30 fois sur 60 | Tofu gagne 33 fois sur 60 |
-| Difficile | Tofu gagne 28 fois sur 30 | Tofu gagne 24 fois sur 30 |
+| Facile (été) | Tofu gagne 9 fois sur 50 | Tofu gagne 11 fois sur 50 |
+| Normal, été | Tofu gagne 56 fois sur 100 | Tofu gagne 60 fois sur 100 |
+| Normal, automne | Tofu gagne 43 fois sur 100 | Tofu gagne 54 fois sur 100 |
+| Normal, hiver | Tofu gagne 49 fois sur 100 | Tofu gagne 56 fois sur 100 |
+| Normal, jour de marché | Tofu gagne 50 fois sur 100 | Tofu gagne 55 fois sur 100 |
+| Difficile (été) | Tofu gagne 46 fois sur 50 | Tofu gagne 44 fois sur 50 |
 
 Dans ces mesures, l'ordinateur joue les deux camps au même niveau ; elles ne disent rien de son niveau face à de vrais joueurs. Pour les plus jeunes, commencez en « Facile ». Les manches durent de 2 à 6 minutes et se jouent souvent sur la fin.
 
@@ -208,9 +211,10 @@ Tous les modèles sont construits en code (formes simples assemblées, couleurs 
 
 ## 13. Intelligence artificielle
 
-- **Navigation** : grilles de 0,5 m (une pour les humains, une pour Tofu, qui passe sous les tables et par la chatière), A* avec coût pour les portes, lissage du chemin, détection de blocage et nouveau calcul.
-- **Tofu** : choisit une bêtise selon la distance, la variété, ses défis secrets et la position des humains ; fuit quand on le poursuit, lâche ce qu'il porte face à une friandise, défait les tâches finies selon la difficulté.
-- **Humains** : se répartissent les tâches (réservations partagées), nettoient, reprennent les objets volés, protègent les tâches faites, lancent des friandises, ferment les portes, interceptent Tofu pendant le compte des invités.
+- **Navigation** : grilles de 0,5 m (une pour les humains, une pour Tofu, qui passe sous les tables et par la chatière), A* avec coût pour les portes, lissage du chemin, détection de blocage et nouveau calcul. Un but inaccessible (dans un meuble, ou dans un recoin fermé derrière le fauteuil) est remplacé par la case la plus proche que le personnage peut vraiment atteindre.
+- **Tofu** : choisit une bêtise selon la distance, la variété, ses défis secrets et la position des humains ; fuit quand on le poursuit, lâche ce qu'il porte face à une friandise, défait les tâches finies selon la difficulté. Il allume l'aspirateur surtout quand des objets fragiles l'entourent (réaction en chaîne), poursuit le chat jusque dans la cuisine, vole l'arrosoir de préférence quand les fleurs restent à arroser, puis court dans la maison pour qu'il fuie partout. Il exploite chaque ambiance (tas de feuilles, bonshommes de neige, étals).
+- **Humains** : se répartissent les tâches (réservations partagées), nettoient, reprennent les objets volés, protègent les tâches faites, lancent des friandises, ferment les portes, interceptent Tofu pendant le compte des invités. Ils éteignent l'aspirateur quand Tofu l'a allumé ou qu'il fonce vers un objet fragile, l'allument pour aspirer un sol couvert d'empreintes, essuient les pattes de Tofu à la porte avant qu'il entre, laissent sécher les traces d'eau et rendent la marchandise volée au bon étal.
+- **Coéquipier** : un humain joué par l'ordinateur laisse au joueur le désordre ou l'objet dont celui-ci s'occupe déjà (joueur à moins de 3 m et plus proche que lui).
 
 ## 14. Architecture technique
 

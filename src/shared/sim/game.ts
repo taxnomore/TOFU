@@ -907,7 +907,7 @@ export class Game {
       }
     }
     if (!reachable) {
-      const q = nav.nearestFree(p.x, p.z, 8);
+      const q = nav.nearestFree(p.x, p.z, 8, this.mainComp());
       if (q) {
         p.x = q.x;
         p.z = q.z;

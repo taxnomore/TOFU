@@ -199,10 +199,10 @@ export class NavGrid {
     return i >= 0 && !this.blocked[i];
   }
 
-  /** Nearest free cell center (BFS in rings). */
-  nearestFree(x: number, z: number, maxRadius = 12): PathPoint | null {
+  /** Nearest free cell center (BFS in rings), optionally inside one connected component. */
+  nearestFree(x: number, z: number, maxRadius = 12, comp = -1): PathPoint | null {
     const i0 = this.cellOf(x, z);
-    if (i0 >= 0 && !this.blocked[i0]) return { x, z };
+    if (i0 >= 0 && !this.blocked[i0] && (comp < 0 || this.comp[i0] === comp)) return { x, z };
     const cx0 = Math.floor((x - this.x0) / this.cell);
     const cz0 = Math.floor((z - this.z0) / this.cell);
     const maxR = Math.ceil(maxRadius / this.cell);
@@ -216,7 +216,7 @@ export class NavGrid {
           const cz = cz0 + dz;
           if (cx < 0 || cz < 0 || cx >= this.w || cz >= this.h) continue;
           const i = cz * this.w + cx;
-          if (this.blocked[i]) continue;
+          if (this.blocked[i] || (comp >= 0 && this.comp[i] !== comp)) continue;
           const c = this.centerOf(i);
           const d = (c.x - x) ** 2 + (c.z - z) ** 2;
           if (d < bestD) {
@@ -260,8 +260,11 @@ export class NavGrid {
       s = this.cellOf(p.x, p.z);
     }
     let target = { x: tx, z: tz };
-    if (this.blocked[t]) {
-      const p = this.nearestFree(tx, tz, 4);
+    // Unreachable goal (inside furniture, or in a closed-off nook): aim for the
+    // closest cell the walker can actually get to.
+    const sc = this.comp[s];
+    if (this.blocked[t] || (sc >= 0 && this.comp[t] !== sc)) {
+      const p = this.nearestFree(tx, tz, 4, sc);
       if (!p) return null;
       t = this.cellOf(p.x, p.z);
       target = p;

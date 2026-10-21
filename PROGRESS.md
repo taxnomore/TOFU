@@ -36,7 +36,7 @@ Depuis un clone neuf du dépôt (Node 22.22, npm 10.9, Linux) :
 |---|---|---|
 | `tests/world.test.ts` | 29 | carte : apparitions libres, toutes les zones, emplacements et objets atteignables, chemin chambre → square et boulangerie, portes, chatière, trou de la haie réservé à Tofu, graphe du chat sans obstacle ; pour chacune des 4 ambiances : apparitions libres, objets et emplacements atteignables, objets posés hors des meubles, chemins du chat libres |
 | `tests/rules.test.ts` | 19 | vol et retour du linge, reprise dans la gueule de Tofu, linge de l'étendoir, boue et nettoyage, pattes essuyées, plante renversée puis remise, poubelle de rue, chat, zoomies, friandise, endurance, papier toilette, aspirateur robot, priorité des portes, victoires de Tofu (bêtises, temps) et des humains, revanche identique à graine égale |
-| `tests/ai.test.ts` | 3 | manches complètes ordinateur contre ordinateur (1 et 2 humains), bêtises variées de l'IA |
+| `tests/ai.test.ts` | 7 | manches complètes ordinateur contre ordinateur (1 et 2 humains, et dans chaque ambiance), bêtises variées de l'IA, aspirateur éteint par l'humain quand Tofu l'a allumé, coéquipier qui laisse au joueur le désordre dont il s'occupe, désordre tombé dans le recoin derrière le fauteuil toujours nettoyable |
 | `tests/net.test.ts` | 3 | instantanés différentiels : l'état reconstruit chez le client égale celui du serveur pendant une manche complète ; validation des messages ; prédiction identique au serveur |
 | `tests/mischief.test.ts` | 16 | arrosoir qui fuit (gouttes, glissade, remplissage), réactions en chaîne (chat sur le plan de travail, balle, aspirateur), automne (tas de feuilles, feuilles dans la maison, ratissage), hiver (pattes mouillées, rue déneigée, bonhomme de neige), jour de marché (étals, vol, repas, retour au bon étal, cageot), défis propres à chaque ambiance, objets absents hors de leur ambiance |
 | `tests/server.test.ts` | 2 | vrai serveur HTTP + WebSocket avec 3 clients : salon, rôles, droits de l'hôte, départ, déplacements identiques chez tous, accusés de réception, entrées refusées pour un siège d'un autre, déconnexion reprise par l'ordinateur, reconnexion, fin, revanche avec rotation de Tofu, retour au salon, spectateurs, client trop bavard coupé, message trop gros refusé |
@@ -63,13 +63,15 @@ Le script `scripts/smoke-test.mjs` reprend le parcours et les commandes tactiles
 
 ## Équilibrage mesuré
 
-Ordinateur contre ordinateur, manches de 6 minutes, même niveau pour les deux camps :
+Ordinateur contre ordinateur, manches de 6 minutes, même niveau pour les deux camps. Le détail par ambiance est dans [GAME_DESIGN.md](GAME_DESIGN.md), section 10.
 
 | Niveau | Tofu contre 1 humain | Tofu contre 2 humains |
 |---|---|---|
-| Facile | 3 victoires sur 30 | 7 victoires sur 30 |
-| Normal | 30 victoires sur 60 | 33 victoires sur 60 |
-| Difficile | 28 victoires sur 30 | 24 victoires sur 30 |
+| Facile (été) | 9 victoires sur 50 | 11 victoires sur 50 |
+| Normal (moyenne des 4 ambiances) | 198 victoires sur 400 | 225 victoires sur 400 |
+| Difficile (été) | 46 victoires sur 50 | 44 victoires sur 50 |
+
+Sur 60 manches (Normal, un humain), Tofu allume maintenant l'aspirateur 107 fois, dans 44 manches (4 fois avant) ; les humains l'éteignent 73 fois et l'allument 3 fois pour aspirer la boue.
 
 ## Corrections notables pendant les vérifications
 
@@ -80,6 +82,7 @@ Ordinateur contre ordinateur, manches de 6 minutes, même niveau pour les deux c
 - La fin de la protection d'un objet n'était pas transmise en réseau. Corrigé ; le test d'instantanés le vérifie.
 - Le serveur de fichiers acceptait le dossier voisin `dist-server/`. Corrigé.
 - L'écran « Comment jouer » annonçait 100 points de bêtises au lieu de la vraie valeur.
+- L'humain ordinateur pouvait s'acharner toute une manche sur un désordre tombé dans le recoin derrière le fauteuil du salon (la recherche de chemin visait une case isolée). Il vise désormais la case accessible la plus proche ; un objet qui atterrit dans un recoin est déplacé vers la zone principale.
 - Page blanche signalée dans Firefox et Chromium à l'ouverture du jeu. Je n'ai pas accès à l'ordinateur concerné ; j'ai trouvé deux causes possibles. L'archive contient des fichiers `index.html` qui restent blancs d'un double clic, et le jeu restait blanc quand le navigateur n'offre pas WebGL 2. Un écran de chargement s'affiche maintenant avant le jeu ; en cas d'échec, il donne la cause et la marche à suivre. Le jeu choisit aussi les graphismes « Rapides » quand la 3D passe par le processeur (rendu logiciel).
 
 ## Limites connues
@@ -87,7 +90,7 @@ Ordinateur contre ordinateur, manches de 6 minutes, même niveau pour les deux c
 - **Pas d'essai sur de vrais appareils** : ni iPhone, ni Android, ni Firefox, ni carte graphique réelle. Le rendu logiciel des tests tourne à 3 à 10 images par seconde ; il ne dit rien des objectifs de 60 images par seconde sur PC et 30 sur téléphone.
 - **Manettes** : testées seulement avec une manette simulée. Les boutons de manette ne se remappent pas.
 - **Sons** : générés par le code ; l'environnement de test n'a pas de haut-parleur, je n'ai donc pas pu les écouter. Le code des sons s'exécute sans erreur.
-- **IA** : l'ordinateur allume rarement l'aspirateur robot (4 manches sur 60 contre un humain) et ne l'éteint jamais lui-même ; l'aspirateur s'arrête seul au bout de 25 secondes.
+- **IA** : les mesures d'équilibre opposent l'ordinateur à lui-même ; contre de vrais joueurs, le bon niveau reste à trouver en famille.
 - **Réseau** : réseau local seulement, en HTTP, un salon par serveur.
 - **WebGL 2 obligatoire** : sans lui, le jeu ne peut pas tourner. La page l'explique et donne les réglages à essayer.
 - **Taille** : le fichier JavaScript du jeu pèse 870 ko (250 ko compressé) ; le premier chargement sur téléphone peut prendre quelques secondes.

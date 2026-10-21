@@ -369,7 +369,11 @@ export class TofuAI implements AIController {
         if (t.edible && this.secret('gourmand')) base += 18;
         if (it.type === 'baguette') base += this.secret('baguette') ? 45 : -10;
         if (it.type === 'toilet_roll') base += it.charge > 0 ? (this.secret('papier') ? 40 : 0) : -40;
-        if (it.type === 'watering_can') base += it.charge > 0 ? 6 + (this.secret('arrosoir') ? 30 : 0) : -40;
+        if (it.type === 'watering_can') {
+          // Even better while the humans still have flowers to water.
+          const flowers = S.tasks.some((tk) => tk.kind === 'fleurs' && !tk.done);
+          base += it.charge > 0 ? 6 + (flowers ? 8 : 0) + (this.secret('arrosoir') ? 30 : 0) : -40;
+        }
         if (t.category === 'market') base += 10 + (this.secret('marche') ? 25 : 0);
         const d = dist(me.x, me.z, it.x, it.z);
         add(base - d * 0.8 - this.risk(it.x, it.z), { key: `item:${it.idx}`, kind: 'act', want: { kind: want, target: it.idx }, x: it.x, z: it.z, timeout: 22 });
@@ -398,7 +402,13 @@ export class TofuAI implements AIController {
       if (S.vacuum.mode === 'dock' && S.vacuum.t <= 0) {
         const v = S.vacuum;
         const dv = dist(me.x, me.z, v.x, v.z);
-        add(34 + (this.secret('chaine') ? 20 : 0) - dv * 0.8 - this.risk(v.x, v.z), { key: 'vacuum', kind: 'act', want: { kind: 'vacuum', target: 0 }, x: v.x, z: v.z, timeout: 15 });
+        // Better with fragile things on the floor nearby: they will fall (chain reaction).
+        let fragile = 0;
+        for (const it of S.items) {
+          const k = ITEM_TYPES[it.type].knock;
+          if (it.state === 'home' && it.y < 0.3 && k && k.push <= 0 && dist(it.x, it.z, v.x, v.z) < 4) fragile++;
+        }
+        add(34 + Math.min(12, fragile * 6) + (this.secret('chaine') ? 20 : 0) - dv * 0.8 - this.risk(v.x, v.z), { key: 'vacuum', kind: 'act', want: { kind: 'vacuum', target: 0 }, x: v.x, z: v.z, timeout: 15 });
       }
 
       // --- Stations: bed, sofa, flowerbeds, tablecloth, trash bag ---

@@ -20,10 +20,9 @@ Les tests automatiques ont tourné dans Chromium, avec un rendu 3D logiciel (san
 
 ## Priorité 3 : contenu
 
-1. Davantage de réactions en chaîne : le chat qui fait tomber des objets de plus haut, l'arrosoir qui fuit, la balle qui rebondit sur les meubles.
-2. IA : apprendre à l'ordinateur à éteindre l'aspirateur robot quand il gêne, et à l'allumer plus souvent pour nettoyer la boue.
-3. Nouvelles tâches et nouveaux défis secrets (ajout par les données, voir GAME_DESIGN.md, section 15).
-4. Variantes de la carte : saison (feuilles mortes, neige), jour de marché sur le square.
+1. Nouvelles tâches et nouveaux défis secrets (ajout par les données, voir GAME_DESIGN.md, section 15).
+2. D'autres ambiances sur le même modèle (jour de pluie avec flaques partout, Noël avec un sapin à renverser).
+3. Une tâche propre à chaque ambiance pour les humains (ratisser le jardin, déneiger l'allée, faire le marché).
 
 ## Priorité 4 : technique
 

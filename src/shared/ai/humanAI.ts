@@ -1,9 +1,9 @@
 // AI for the humans: chase Tofu to recover stolen objects, clean messes, do the
 // household jobs, refill treats, close doors behind them, coordinate with the
 // other human through shared claims.
-import { BTN_INTERACT, BTN_SPECIAL, BTN_SPRINT, HUMAN } from '../constants';
+import { BTN_INTERACT, BTN_SPECIAL, BTN_SPRINT, HUMAN, VACUUM } from '../constants';
 import { Rng, angleDiff, dist } from '../math';
-import { ITEM_TYPES, MESS_TYPES } from '../world/itemTypes';
+import { ITEM_TYPES, MESS_TYPES, isTrail } from '../world/itemTypes';
 import { DOORS, STATIONS, inHouse, zoneAt } from '../world/map';
 import type { Game } from '../sim/game';
 import { IKind, listInteractions } from '../sim/interactions';
@@ -38,6 +38,9 @@ const PROTECT_STATION: Partial<Record<string, string>> = {
   courrier: 'console',
   table: 'table_salon',
 };
+
+/** Ways into the house for a muddy dog (back door flap, bay window). */
+const HOUSE_DOORS: [number, number][] = [[-6.5, 6.6], [0.75, 6.6]];
 
 const PROTECTED_DOORS: Record<string, (g: Game) => boolean> = {
   porte_enfants: (g) => g.state.tasks.some((t) => t.kind === 'jouets' && t.done),
@@ -201,6 +204,32 @@ export class HumanAI implements AIController {
     return false;
   }
 
+  /**
+   * A human player (not the computer) is closer to this spot than us and right
+   * next to it: they are surely dealing with it, leave it to them.
+   */
+  private playerOnIt(x: number, z: number): boolean {
+    const me = this.me;
+    const mine = dist(me.x, me.z, x, z);
+    for (const c of this.g.state.chars) {
+      if (c.role !== 'human' || c.ai || c.id === this.id) continue;
+      const d = dist(c.x, c.z, x, z);
+      if (d < 3 && d < mine) return true;
+    }
+    return false;
+  }
+
+  /** Floor objects the robot vacuum could knock over around (x, z). */
+  private fragileNear(x: number, z: number, r: number): number {
+    let n = 0;
+    for (const it of this.g.state.items) {
+      if (it.state !== 'home' || it.y > 0.3) continue;
+      const k = ITEM_TYPES[it.type].knock;
+      if (k && k.push <= 0 && dist(it.x, it.z, x, z) < r) n++;
+    }
+    return n;
+  }
+
   /** Distance of the closest other human to (x,z). */
   private otherHumanDist(x: number, z: number): number {
     let best = Infinity;
@@ -232,8 +261,10 @@ export class HumanAI implements AIController {
         track: () => (tofu.hold.length ? { x: tofu.x + tofu.vx * 0.35, z: tofu.z + tofu.vz * 0.35 } : null),
       });
     }
-    // 2. Dirty paws inside the house (outside in winter, they get snowy again at once).
-    if (tofu.mud > 0.25 && dT < 9 && (inHouse(tofu.x, tofu.z) || (dT < 4 && tofu.pawKind !== 'snow'))) {
+    // 2. Dirty paws inside the house, or at the door before he comes in
+    // (outside in winter, they get snowy again at once).
+    const atDoor = tofu.pawKind !== 'snow' && tofu.mud > 0.4 && HOUSE_DOORS.some(([x, z]) => dist(tofu.x, tofu.z, x, z) < 3.5);
+    if (tofu.mud > 0.25 && dT < 9 && (inHouse(tofu.x, tofu.z) || atDoor || (dT < 4 && tofu.pawKind !== 'snow'))) {
       add(70 - dT * 2, {
         key: 'paws', want: { kind: 'paws', target: tofu.id }, x: tofu.x, z: tofu.z, sprint: dT > 3, timeout: 8,
         track: () => (tofu.mud > 0.08 ? { x: tofu.x + tofu.vx * 0.3, z: tofu.z + tofu.vz * 0.3 } : null),
@@ -250,9 +281,28 @@ export class HumanAI implements AIController {
       const dirt = MESS_TYPES[m.kind].dirt;
       // Water marks dry up by themselves: better spend the time elsewhere.
       const dries = m.kind === 'wet' ? 16 : 0;
-      add(48 + dirt * 1.5 - d * 1.1 + cleanUrgency + (allTasks ? 15 : 0) - dries, {
+      const player = this.playerOnIt(m.x, m.z) ? 22 : 0;
+      add(48 + dirt * 1.5 - d * 1.1 + cleanUrgency + (allTasks ? 15 : 0) - dries - player, {
         key: `mess:${m.id}`, want: { kind: 'clean', target: m.id }, x: m.x, z: m.z, timeout: 18,
       });
+    }
+    // 4b. The robot vacuum: switch it off when Tofu started it or when it heads
+    // for fragile things; switch it on when the floor is full of prints.
+    const v = S.vacuum;
+    const dv = dist(me.x, me.z, v.x, v.z);
+    if (v.mode === 'run' && dv < 12 && (v.by === tofu.id || this.fragileNear(v.x, v.z, 2.5) > 0)) {
+      add(64 - dv * 1.8, {
+        key: 'vacuum-off', want: { kind: 'vacuum', target: 0 }, x: v.x, z: v.z, timeout: 8,
+        track: () => (S.vacuum.mode === 'run' ? { x: S.vacuum.x, z: S.vacuum.z } : null),
+      });
+    } else if (v.mode === 'dock' && v.t <= 0 && dv < 14 && dist(tofu.x, tofu.z, v.x, v.z) > 5) {
+      let marks = 0;
+      for (const m of S.messes) {
+        if (isTrail(m.kind) && m.kind !== 'wet' && dist(m.x, m.z, VACUUM.dock.x, VACUUM.dock.z) < 5) marks += m.prints.length / 3;
+      }
+      if (marks >= 15 && this.fragileNear(VACUUM.dock.x, VACUUM.dock.z, 3) <= 1) {
+        add(40 + Math.min(20, marks) - dv * 1.2, { key: 'vacuum-on', want: { kind: 'vacuum', target: 0 }, x: v.x, z: v.z, timeout: 10 });
+      }
     }
     // 5. Jobs.
     if (!me.hold.length || g.canCarryAny(me)) {
@@ -274,7 +324,7 @@ export class HumanAI implements AIController {
           continue;
         }
         if (!goal.want) continue;
-        add(56 - d * 0.9 + late, goal);
+        add(56 - d * 0.9 + late - (this.playerOnIt(goal.x, goal.z) ? 20 : 0), goal);
       }
     }
     // 6. Return objects lying around (stolen and dropped by Tofu).
@@ -285,7 +335,7 @@ export class HumanAI implements AIController {
         if (it.state !== 'free' && !inBasket) continue;
         if (!g.canCarry(me, it)) continue;
         const d = dist(me.x, me.z, it.x, it.z);
-        add(44 - d * 1.0 + cleanUrgency * 0.5, { key: `item:${it.idx}`, want: this.itemWant(it), x: it.x, z: it.z, timeout: 20 });
+        add(44 - d * 1.0 + cleanUrgency * 0.5 - (this.playerOnIt(it.x, it.z) ? 20 : 0), { key: `item:${it.idx}`, want: this.itemWant(it), x: it.x, z: it.z, timeout: 20 });
       }
     }
     // 7. Treat refill.
@@ -338,7 +388,8 @@ export class HumanAI implements AIController {
     const s = STATIONS[si];
     switch (s.kind) {
       case 'flowerbed':
-        return { kind: 'water', target: si };
+        // A dug bed must be filled in first (its hole is a mess to clean).
+        return this.g.state.stations[si].dug ? null : { kind: 'water', target: si };
       case 'tap':
         return { kind: 'fill', target: si };
       case 'bed':
