@@ -32,7 +32,11 @@ Si Node.js manque ou date trop :
 - Fedora : `sudo dnf install nodejs`
 - Arch, Manjaro : `sudo pacman -S nodejs npm`
 
-### Installation
+### Version téléchargée (.zip)
+
+L'archive .zip contient le jeu déjà construit. Décompressez-la, ouvrez un terminal dans le dossier `tofu-qui-a-fait-ca`, puis passez directement à l'étape 2 (`npm run start`). Seul Node.js est nécessaire ; `npm install` et `npm run build` servent uniquement si vous modifiez le code.
+
+### Installation depuis le code source
 
 Dans un terminal, placez-vous dans le dossier du jeu, puis :
 
