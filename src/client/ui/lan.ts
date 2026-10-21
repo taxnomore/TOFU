@@ -43,6 +43,10 @@ class Lan {
   }
 
   open() {
+    if (location.protocol === 'file:') {
+      this.showNeedsServer();
+      return;
+    }
     if (!this.net) {
       const p = this.screens.prefs;
       const name = p.name || NAMES[Math.floor(Math.random() * NAMES.length)];
@@ -56,6 +60,26 @@ class Lan {
       this.watchdog = setInterval(() => this.checkLink(), 1000);
     }
     this.showLobby();
+  }
+
+  /** Opened from the downloaded HTML file: network play needs the small server. */
+  private showNeedsServer() {
+    const s = el('div', 'screen dim');
+    s.innerHTML = `<div class="panel" style="max-width:640px">
+      <h2>📱 Partie en réseau local</h2>
+      <p>Pour jouer avec des téléphones, le jeu a besoin de son petit serveur, qui tourne sur ce PC :</p>
+      <ol>
+        <li>Ouvrez un terminal dans le dossier du jeu (celui de l'archive .zip).</li>
+        <li>Tapez <kbd>npm run start</kbd>.</li>
+        <li>Ouvrez <b>http://localhost:8080/</b> dans le navigateur, puis « Réseau local ».</li>
+      </ol>
+      <p>Ce fichier suffit pour jouer seul ou à plusieurs sur ce PC (écran partagé).</p>
+      <div class="foot"><button class="big primary" data-back>⬅ Retour</button></div></div>`;
+    s.querySelector('[data-back]')!.addEventListener('click', () => {
+      sfx.play('click');
+      this.screens.showTitle();
+    });
+    this.screens.show(s);
   }
 
   leave() {

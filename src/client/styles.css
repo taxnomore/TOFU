@@ -76,19 +76,19 @@ kbd {
   margin-bottom: 0.5rem;
 }
 .logo .t1 {
-  font-size: clamp(3rem, 11vw, 7.5rem);
+  font-size: clamp(2.4rem, min(11vw, 13vh), 7.5rem);
   font-weight: 700;
   color: var(--sun);
   -webkit-text-stroke: 3px var(--ink);
   letter-spacing: 0.02em;
 }
 .logo .t2 {
-  font-size: clamp(1.4rem, 4.5vw, 3rem);
+  font-size: clamp(1.1rem, min(4.5vw, 5.2vh), 3rem);
   font-weight: 700;
   color: #fff;
   -webkit-text-stroke: 2px var(--ink);
 }
-.logo img { width: clamp(70px, 12vw, 120px); display: block; margin: 0 auto -0.4rem; animation: bob 2.4s ease-in-out infinite; }
+.logo img { width: clamp(56px, min(12vw, 13vh), 120px); display: block; margin: 0 auto -0.4rem; animation: bob 2.4s ease-in-out infinite; }
 @keyframes bob { 50% { transform: translateY(-8px) rotate(-4deg); } }
 .panel {
   background: var(--panel);
@@ -102,6 +102,12 @@ kbd {
 .panel h3 { margin: 0.8rem 0 0.4rem; }
 .panel p { margin: 0.3rem 0; line-height: 1.35; }
 .menu { display: flex; flex-direction: column; gap: 0.7rem; width: min(440px, 92vw); }
+/* Laptop screens (about 650 px of page height): the whole title menu stays visible. */
+@media (max-height: 760px) {
+  .screen { gap: 0.6rem; }
+  .menu { gap: 0.5rem; }
+  .menu button { padding: 0.55rem 0.9rem; font-size: 1.15rem; }
+}
 .row { display: flex; gap: 0.7rem; flex-wrap: wrap; justify-content: center; align-items: stretch; }
 button.big, .menu button {
   font: 700 1.3rem var(--font);

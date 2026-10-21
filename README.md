@@ -32,9 +32,15 @@ Si Node.js manque ou date trop :
 - Fedora : `sudo dnf install nodejs`
 - Arch, Manjaro : `sudo pacman -S nodejs npm`
 
+### Le plus simple : un double clic
+
+Le fichier **`tofu-qui-a-fait-ca.html`** contient tout le jeu. Double-cliquez dessus : il s'ouvre dans le navigateur, sans installation et sans Internet. Il suffit pour jouer seul ou à plusieurs sur le même PC (écran partagé). Seul le jeu avec des téléphones (réseau local) demande le petit serveur décrit plus bas.
+
+Ce fichier se trouve à la racine de l'archive .zip ; après `npm run build`, il est aussi dans `dist/`.
+
 ### Version téléchargée (.zip)
 
-L'archive .zip contient le jeu déjà construit. Décompressez-la, ouvrez un terminal dans le dossier `tofu-qui-a-fait-ca`, puis passez directement à l'étape 2 (`npm run start`). Seul Node.js est nécessaire ; `npm install` et `npm run build` servent uniquement si vous modifiez le code.
+L'archive .zip contient le jeu déjà construit. Pour le réseau local, décompressez-la, ouvrez un terminal dans le dossier `tofu-qui-a-fait-ca`, puis passez directement à l'étape 2 (`npm run start`). Seul Node.js est nécessaire ; `npm install` et `npm run build` servent uniquement si vous modifiez le code.
 
 ### Installation depuis le code source
 
