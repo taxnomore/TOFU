@@ -382,7 +382,8 @@ export class PlayerHud {
     }
   }
 
-  layout(rect: { x: number; y: number; w: number; h: number }, compact: boolean) {
+  layout(rect: { x: number; y: number; w: number; h: number }, compact: boolean, underBar = false) {
+    this.el.classList.toggle('under-bar', underBar);
     const s = this.el.style;
     s.left = `${rect.x}px`;
     s.top = `${rect.y}px`;
@@ -429,7 +430,8 @@ export class PlayerHud {
     const compact = rect.w < 700 || rect.h < 420;
     const dog = me.role === 'tofu';
     // Badge.
-    const nameHtml = `<i style="background:${playerColor(me)}"></i>${dog ? '🐶 Tofu' : '🧑 ' + me.name}`;
+    const who = dog ? '🐶 Tofu' : '🧑 ' + me.name;
+    const nameHtml = `<i style="background:${playerColor(me)}"></i>${this.lp.spectator ? `👀 Spectateur · ${who}` : who}`;
     if (this.badge.innerHTML !== nameHtml) this.badge.innerHTML = nameHtml;
     // Task / secret list.
     let listHtml = '';
@@ -451,7 +453,8 @@ export class PlayerHud {
       this.list.innerHTML = listHtml;
     }
     // Prompt.
-    const inter = S.phase === 'play' ? listInteractions(g, me)[0] : undefined;
+    const inter = S.phase === 'play' && !this.lp.spectator ? listInteractions(g, me)[0] : undefined;
+    this.bars.style.display = this.lp.spectator ? 'none' : '';
     if (inter) {
       this.prompt.style.display = '';
       const k = glyph(dev, BTN_INTERACT);

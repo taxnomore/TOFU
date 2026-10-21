@@ -14,6 +14,10 @@ export interface LocalPlayer {
   rect: ViewRect;
   raw: RawInput | null;
   name: string;
+  /** Seat index on this client (network games). */
+  seat?: number;
+  /** Watches the match without controlling a character. */
+  spectator?: boolean;
 }
 
 export interface Session {

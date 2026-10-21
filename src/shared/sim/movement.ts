@@ -4,9 +4,10 @@ import { approachAngle, clamp } from '../math';
 import { pushOutOfBox } from '../world/colliders';
 import { ITEM_TYPES } from '../world/itemTypes';
 import { MASK_DOG, MASK_HUMAN } from '../world/types';
-import { DOG, HUMAN } from '../constants';
+import { BTN_SIT, BTN_SPRINT, DOG, HUMAN } from '../constants';
 import type { World } from './world';
-import type { Character, DoorState, Item } from './types';
+import { Anim } from './types';
+import type { Character, DoorState, InputFrame, Item } from './types';
 
 export interface MoveContext {
   world: World;
@@ -175,4 +176,67 @@ export function separateCharacters(chars: Character[], ctx: MoveContext): void {
 export function clampToWorld(p: { x: number; z: number }, b: { x0: number; z0: number; x1: number; z1: number }) {
   p.x = clamp(p.x, b.x0 + 0.3, b.x1 - 0.3);
   p.z = clamp(p.z, b.z0 + 0.3, b.z1 - 0.3);
+}
+
+/**
+ * Movement part of a character update: sprint/stamina, speed modifiers and
+ * collision-aware integration. Returns whether the dog is sitting.
+ * Used by the simulation and by the client to predict its own character.
+ */
+export function applyMovement(c: Character, inp: InputFrame, dt: number, ctx: MoveContext): boolean {
+  const isDog = c.role === 'tofu';
+  let mx = inp.mx;
+  let mz = inp.mz;
+  const ml = Math.hypot(mx, mz);
+  if (ml > 1) {
+    mx /= ml;
+    mz /= ml;
+  }
+  if (c.act || (c.lockT > 0 && (c.anim === Anim.Eat || c.anim === Anim.Jump))) {
+    mx = 0;
+    mz = 0;
+  }
+  const moving = Math.hypot(mx, mz) > 0.2;
+  const sitting = isDog && !moving && !c.act && ((inp.buttons & BTN_SIT) !== 0 || c.idleT > DOG.idleSitDelay);
+  const wantSprint = (inp.buttons & BTN_SPRINT) !== 0 && moving;
+  const st = isDog ? DOG : HUMAN;
+  if (wantSprint && !c.exhausted && (c.sprinting || c.stamina > st.staminaMinStart) && c.zoomT <= 0) {
+    c.sprinting = true;
+    c.stamina -= st.staminaDrain * dt;
+    if (c.stamina <= 0) {
+      c.stamina = 0;
+      c.exhausted = true;
+      c.sprinting = false;
+    }
+  } else {
+    c.sprinting = false;
+    const mul = sitting ? DOG.sitRegenMul : 1;
+    c.stamina = Math.min(1, c.stamina + st.staminaRegen * mul * dt);
+    if (c.exhausted && c.stamina > 0.35) c.exhausted = false;
+  }
+  let maxSpeed: number;
+  if (isDog) {
+    maxSpeed = c.zoomT > 0 ? DOG.zoomies : c.sprinting ? DOG.sprint : DOG.walk;
+    if (c.hold.length) maxSpeed *= 1 - DOG.carrySlow;
+    if (c.pantT > 0) maxSpeed *= 0.75;
+  } else {
+    maxSpeed = c.sprinting ? HUMAN.sprint : HUMAN.walk;
+    let slow = 0;
+    for (const i of c.hold) slow += ITEM_TYPES[ctx.items[i].type].carry?.slow ?? 0;
+    maxSpeed *= 1 - Math.min(0.2, slow);
+  }
+  if (c.zoomT > 0 && moving) {
+    // Zoomies: always full speed in the stick direction.
+    const l = Math.hypot(mx, mz);
+    mx /= l;
+    mz /= l;
+  }
+  moveCharacter(c, mx, mz, maxSpeed, dt, ctx);
+  if (moving || c.act) c.idleT = 0;
+  else c.idleT += dt;
+  if (isDog) {
+    if (sitting) c.sitT += dt;
+    else c.sitT = 0;
+  }
+  return sitting;
 }

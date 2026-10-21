@@ -426,10 +426,10 @@ export function keyLabel(code: string): string {
     }
     return k;
   }
-  if (azerty) {
-    const az: Record<string, string> = { Slash: '!', Period: ':', Comma: ';', Semicolon: 'M' };
-    if (az[code]) return az[code];
-  }
+  const punct: Record<string, string> = azerty
+    ? { Slash: '!', Period: ':', Comma: ';', Semicolon: 'M', Minus: ')', Equal: '=' }
+    : { Slash: '/', Period: '.', Comma: ',', Semicolon: ';', Minus: '-', Equal: '=' };
+  if (punct[code]) return punct[code];
   return code.replace('Digit', '').replace('Numpad', 'Pavé ');
 }
 

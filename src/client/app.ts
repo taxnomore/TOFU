@@ -16,6 +16,8 @@ import { PlayerHud, TopBar, eventToast } from './ui/hud';
 export interface AppHooks {
   onEnd?(S: GameState): void;
   onPauseRequest?(slot: number): void;
+  /** Called every frame before one-shot key presses are cleared (menus that read devices). */
+  onFrame?(dt: number): void;
 }
 
 const tmpV = new THREE.Vector3();
@@ -129,12 +131,16 @@ export class App {
       const hh = Math.floor(H / 2) - 1;
       rects.push({ x: 0, y: 0, w: hw, h: hh }, { x: W - hw, y: 0, w: hw, h: hh }, { x: 0, y: H - hh, w: hw, h: hh });
     }
+    const sideBySide = n === 2 && rects[1].x > 0;
     s.locals.forEach((lp, i) => {
       lp.rect = rects[i] ?? rects[0];
       lp.rig.setAspect(lp.rect.w / lp.rect.h);
-      this.huds[i]?.layout(lp.rect, n > 1);
+      // The shared top bar covers the badge of the right-hand view.
+      this.huds[i]?.layout(lp.rect, n > 1, sideBySide && lp.rect.x > 0);
     });
     this.hudRoot.classList.toggle('split', n > 1);
+    // With three players the top bar moves into the overview quarter.
+    this.hudRoot.classList.toggle('split3', n === 3);
   }
 
   private overviewRect(): ViewRect | null {
@@ -147,8 +153,11 @@ export class App {
     return { x: W - hw, y: H - hh, w: hw, h: hh };
   }
 
+  /** Max simulated time per rendered frame (raised by ?fast for slow test renderers). */
+  maxDt = new URLSearchParams(location.search).has('fast') ? 0.5 : 0.1;
+
   private frame(now: number) {
-    const dt = Math.min(0.1, (now - this.last) / 1000);
+    const dt = Math.min(this.maxDt, (now - this.last) / 1000);
     this.last = now;
     this.fpsAcc += dt;
     this.fpsFrames++;
@@ -159,6 +168,11 @@ export class App {
     }
     try {
       this.tick(dt);
+    } catch (e) {
+      console.error(e);
+    }
+    try {
+      this.hooks.onFrame?.(dt);
     } catch (e) {
       console.error(e);
     }
@@ -186,7 +200,8 @@ export class App {
       this.intro -= dt;
       for (const lp of s.locals) if (lp.raw) lp.raw = { ...lp.raw, mx: 0, my: 0, buttons: 0 };
     }
-    if (this.intro <= 0) s.update(dt);
+    // Network sessions keep receiving server snapshots during the role cards.
+    if (this.intro <= 0 || s.kind === 'net') s.update(dt);
     const S = s.state;
     this.view.sync(S, dt, s.alpha, s.prev);
     this.effects.update(dt);
@@ -218,7 +233,7 @@ export class App {
       });
       this.gr.renderView(lp.rig.camera, lp.rect, lp.rig.focus);
       // Interaction highlight.
-      const inter = this.helper && S.phase === 'play' ? this.helperInteraction(me) : null;
+      const inter = this.helper && S.phase === 'play' && !lp.spectator ? this.helperInteraction(me) : null;
       this.view.setHighlight(i, inter, me.role === 'tofu' ? 0xffb03b : 0x6fd3ff);
     }
     const ov = this.overviewRect();

@@ -70,7 +70,7 @@ function info() {
 }
 
 async function main() {
-  const room = new Room();
+  const room = new Room({ port: PORT, log: (s) => console.log(`  [salon] ${s}`) });
   let viteMiddleware: ((req: http.IncomingMessage, res: http.ServerResponse, next: () => void) => void) | null = null;
   const server = http.createServer((req, res) => {
     if (req.url?.startsWith('/api/info')) {

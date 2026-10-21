@@ -2,7 +2,7 @@
 // split screen) and on the Node LAN server. Fixed 60 Hz steps, deterministic
 // for a given seed and input sequence.
 import {
-  BAGUETTE_RESPAWN, BTN_BARK, CHAOS_GOAL_BY_HUMANS, BTN_INTERACT, BTN_SIT, BTN_SPECIAL, BTN_SPRINT, CHAOS, CHAOS_GOAL, CLEAN_GOAL,
+  BAGUETTE_RESPAWN, BTN_BARK, CHAOS_GOAL_BY_HUMANS, BTN_INTERACT, BTN_SPECIAL, CHAOS, CHAOS_GOAL, CLEAN_GOAL,
   COUNTDOWN_TIME, DOG, GUARD_TIME, GUESTS_COUNTDOWN, HUMAN, KNOCK_RESTORE_CD, SIM_DT, ZOOM_GAIN,
 } from '../constants';
 import { Rng, clamp, dist } from '../math';
@@ -12,7 +12,7 @@ import { MASK_ITEM } from '../world/types';
 import { catHearsBark, initialCat, updateCat } from './cat';
 import { carrierHearsBark, initialCarrier, updateCarrier } from './carrier';
 import { executeInteraction, listInteractions } from './interactions';
-import { MoveContext, moveCharacter, resolveCircle, separateCharacters } from './movement';
+import { MoveContext, applyMovement, moveCharacter, resolveCircle, separateCharacters } from './movement';
 import { chooseSecrets, chooseTasks, computeCleanliness, evaluateTasks, secretDef } from './rules';
 import {
   Anim, Character, EMPTY_INPUT, GameConfig, GameEvent, GameState, InputFrame, Item, Mess, PlayerSlot,
@@ -51,7 +51,7 @@ export class Game {
   readonly tofuId: number;
   private events: GameEvent[] = [];
   private mudCells = new Map<string, number>();
-  readonly ctx: MoveContext;
+  ctx: MoveContext;
   private chaosText = 0;
 
   constructor(cfg: GameConfig) {
@@ -85,7 +85,7 @@ export class Game {
     });
     this.state = {
       phase: cfg.noCountdown ? 'play' : 'countdown',
-      tick: 0, time: 0, duration: cfg.duration, countdown: COUNTDOWN_TIME,
+      tick: 0, time: 0, duration: cfg.duration, countdown: cfg.countdown ?? COUNTDOWN_TIME,
       chaos: 0, chaosGoal: cfg.chaosGoal ?? CHAOS_GOAL_BY_HUMANS[Math.min(2, humanCount)] ?? CHAOS_GOAL, cleanliness: 100, cleanGoal: cfg.cleanGoal ?? CLEAN_GOAL,
       guestsT: 0, winner: null, endReason: '',
       chars, items, messes: [], stations,
@@ -126,6 +126,12 @@ export class Game {
       this.stationById('massif_est')!.watered = true;
       this.stationById('massif_sud')!.watered = true;
     }
+  }
+
+  /** Replaces the state (network clients mirror the server state). */
+  adoptState(S: GameState): void {
+    this.state = S;
+    this.ctx = { world: this.world, doors: S.doors, items: S.items };
   }
 
   get tofu(): Character {
@@ -349,61 +355,8 @@ export class Game {
       }
     }
 
-    // Movement.
-    let mx = inp.mx;
-    let mz = inp.mz;
-    const ml = Math.hypot(mx, mz);
-    if (ml > 1) {
-      mx /= ml;
-      mz /= ml;
-    }
-    if (c.act || (c.lockT > 0 && (c.anim === Anim.Eat || c.anim === Anim.Jump))) {
-      mx = 0;
-      mz = 0;
-    }
-    const moving = Math.hypot(mx, mz) > 0.2;
-    const sitting = isDog && !moving && !c.act && ((inp.buttons & BTN_SIT) !== 0 || c.idleT > DOG.idleSitDelay);
-    const wantSprint = (inp.buttons & BTN_SPRINT) !== 0 && moving;
-    const st = isDog ? DOG : HUMAN;
-    if (wantSprint && !c.exhausted && (c.sprinting || c.stamina > st.staminaMinStart) && c.zoomT <= 0) {
-      c.sprinting = true;
-      c.stamina -= st.staminaDrain * dt;
-      if (c.stamina <= 0) {
-        c.stamina = 0;
-        c.exhausted = true;
-        c.sprinting = false;
-      }
-    } else {
-      c.sprinting = false;
-      const mul = sitting ? DOG.sitRegenMul : 1;
-      c.stamina = Math.min(1, c.stamina + st.staminaRegen * mul * dt);
-      if (c.exhausted && c.stamina > 0.35) c.exhausted = false;
-    }
-    let maxSpeed: number;
-    if (isDog) {
-      maxSpeed = c.zoomT > 0 ? DOG.zoomies : c.sprinting ? DOG.sprint : DOG.walk;
-      if (c.hold.length) maxSpeed *= 1 - DOG.carrySlow;
-      if (c.pantT > 0) maxSpeed *= 0.75;
-    } else {
-      maxSpeed = c.sprinting ? HUMAN.sprint : HUMAN.walk;
-      let slow = 0;
-      for (const i of c.hold) slow += ITEM_TYPES[this.state.items[i].type].carry?.slow ?? 0;
-      maxSpeed *= 1 - Math.min(0.2, slow);
-    }
-    if (c.zoomT > 0 && moving) {
-      // Zoomies: always full speed in the stick direction.
-      const l = Math.hypot(mx, mz);
-      mx /= l;
-      mz /= l;
-    }
-    moveCharacter(c, mx, mz, maxSpeed, dt, this.ctx);
-
-    if (moving || c.act) c.idleT = 0;
-    else c.idleT += dt;
-    if (isDog) {
-      if (sitting) c.sitT += dt;
-      else c.sitT = 0;
-    }
+    // Movement (shared with client-side prediction).
+    const sitting = applyMovement(c, inp, dt, this.ctx);
     this.pickAnim(c, sitting);
   }
 
@@ -741,7 +694,10 @@ export class Game {
     const S = this.state;
     for (const it of S.items) {
       if (it.knockCd > 0) it.knockCd = Math.max(0, it.knockCd - dt);
-      if (it.guardT > 0) it.guardT = Math.max(0, it.guardT - dt);
+      if (it.guardT > 0) {
+        it.guardT = Math.max(0, it.guardT - dt);
+        if (it.guardT === 0) this.bump(it); // clients hide Tofu's prompt while guarded
+      }
       if (it.state === 'held') {
         const h = S.chars[it.holder];
         if (h) {

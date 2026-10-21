@@ -22,6 +22,8 @@ export interface GameConfig {
   difficulty?: number;
   /** Skip the 3-2-1 countdown (tests). */
   noCountdown?: boolean;
+  /** Countdown length in seconds (network games add time for the role cards). */
+  countdown?: number;
 }
 
 export interface InputFrame {

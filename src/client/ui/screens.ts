@@ -1,15 +1,16 @@
 // Menus and game flow screens (French UI).
 import type { App } from '../app';
 import { sfx } from '../audio/sfx';
-import { DEFAULT_DURATION } from '../../shared/constants';
+import { COUNTDOWN_TIME, DEFAULT_DURATION } from '../../shared/constants';
 import type { GameConfig, GameState, PlayerSlot } from '../../shared/sim/types';
 import { SECRET_DEFS, TASK_DEFS } from '../../shared/sim/rules';
 import { CameraRig } from '../render/camera';
 import { HUMAN_LOOKS } from '../render/characters';
 import { LocalSession } from '../runtime/localSession';
+import type { NetSession } from '../runtime/netSession';
 import type { LocalPlayer } from '../runtime/session';
 import {
-  GamepadDevice, InputDevice, KEYMAPS, KeyboardDevice, TouchDevice, keyDown, keyLabel, keyPressed, listGamepads,
+  GamepadDevice, InputDevice, KEYMAPS, KeyboardDevice, TouchDevice, keyLabel, listGamepads,
 } from '../input/devices';
 import { el, fmtTime, glyph } from './hud';
 import { BTN_BARK, BTN_INTERACT, BTN_SIT, BTN_SPECIAL, BTN_SPRINT } from '../../shared/constants';
@@ -52,6 +53,7 @@ class MenuNav {
     requestAnimationFrame(loop);
     window.addEventListener('keydown', (e) => {
       if (!this.active()) return;
+      if ((e.target as HTMLElement).tagName === 'INPUT' && (e.target as HTMLInputElement).type === 'text') return;
       if (['ArrowDown', 'ArrowRight'].includes(e.code)) this.move(1);
       else if (['ArrowUp', 'ArrowLeft'].includes(e.code)) this.move(-1);
       else return;
@@ -60,7 +62,7 @@ class MenuNav {
   }
 
   private active(): boolean {
-    return !!this.root.querySelector('.screen');
+    return !!this.root.querySelector('.screen') && !this.root.querySelector('.screen[data-padjoin]');
   }
 
   private focusables(): HTMLElement[] {
@@ -110,7 +112,7 @@ export class Screens {
   private countdownEl: HTMLElement | null = null;
   private introEls: HTMLElement[] = [];
   /** Network screens are injected by the LAN module. */
-  lan: { open(): void; leave(): void; rematch(rotate: boolean): void; isActive(): boolean } | null = null;
+  lan: { open(): void; leave(): void; rematch(rotate: boolean): void; toLobby(): void; isActive(): boolean; isHost(): boolean } | null = null;
 
   constructor(readonly app: App) {
     new MenuNav(app.uiRoot);
@@ -132,12 +134,12 @@ export class Screens {
     requestAnimationFrame(tick);
   }
 
-  private show(node: HTMLElement) {
+  show(node: HTMLElement, autofocus = true) {
     this.clear();
     this.current = node;
     this.app.uiRoot.appendChild(node);
     document.body.classList.remove('ingame');
-    setTimeout(() => (node.querySelector('button.primary, button') as HTMLElement | null)?.focus(), 30);
+    if (autofocus) setTimeout(() => (node.querySelector('button.primary, button') as HTMLElement | null)?.focus({ preventScroll: true }), 30);
   }
 
   clear() {
@@ -189,15 +191,23 @@ export class Screens {
       { role: 'human', name: 'Léa', avatar: 2, ai: true },
     ];
     const sess = new LocalSession({ seed: Math.floor(Math.random() * 1e9), duration: 100000, players, noCountdown: true, difficulty: 1 }, []);
+    sess.maxFrameDt = this.app.maxDt;
     this.app.start(sess, sess.game, true);
   }
 
   leaveGame() {
     this.lan?.leave();
+    this.endSession();
+  }
+
+  /** Stops the running game view without leaving a network room. */
+  endSession() {
     this.app.stop();
     this.touchDevice?.dispose();
     this.touchDevice = null;
     this.clearIntro();
+    this.overlay?.remove();
+    this.overlay = null;
   }
 
   // ---------------------------------------------------------------- Solo
@@ -303,64 +313,163 @@ export class Screens {
   // ---------------------------------------------------------------- Local split screen
 
   showLocal() {
-    interface Joined { dev: InputDevice; role: 'tofu' | 'human'; avatar: number }
+    interface Joined { dev: InputDevice; role: 'tofu' | 'human'; avatar: number; lx: number; ly: number }
     const joined: Joined[] = [];
-    const candidates = new Map<string, InputDevice>();
-    candidates.set('kb-left', new KeyboardDevice('kb-left', 'Clavier (gauche)', KEYMAPS.left));
-    candidates.set('kb-right', new KeyboardDevice('kb-right', 'Clavier (droite)', KEYMAPS.right));
+    const kbLeft = new KeyboardDevice('kb-left', 'Clavier gauche', KEYMAPS.left);
+    const kbRight = new KeyboardDevice('kb-right', 'Clavier droit', KEYMAPS.right);
     let fillAI = true;
     const s = el('div', 'screen dim');
+    // Join keys and gamepads are handled here, not by the menu navigation.
+    s.dataset.padjoin = '1';
+    const has = (id: string) => joined.some((j) => j.dev.id === id);
     const render = () => {
       const slots = [0, 1, 2].map((i) => {
         const j = joined[i];
         if (!j) {
-          return `<div class="slot"><h4>Joueur ${i + 1}</h4><p>Pour rejoindre :<br><kbd>${keyLabel('Space')}</kbd> clavier gauche (${keyLabel('KeyW')}${keyLabel('KeyA')}${keyLabel('KeyS')}${keyLabel('KeyD')})<br><kbd>Entrée</kbd> clavier droit (flèches)<br><kbd>A</kbd> sur une manette</p></div>`;
+          return `<div class="slot"><h4>Joueur ${i + 1}</h4><p>Pour rejoindre, appuie sur :</p><p>
+            ${has('kb-left') ? '' : `<kbd>${keyLabel('Space')}</kbd> clavier gauche (${keyLabel('KeyW')}${keyLabel('KeyA')}${keyLabel('KeyS')}${keyLabel('KeyD')})<br>`}
+            ${has('kb-right') ? '' : '<kbd>Entrée</kbd> clavier droit (flèches)<br>'}
+            <kbd>A</kbd> sur une manette</p></div>`;
         }
         return `<div class="slot joined"><h4>Joueur ${i + 1} · ${j.dev.label}</h4>
           <div class="seg" data-i="${i}" data-k="role"><button class="${j.role === 'tofu' ? 'sel' : ''}" data-v="tofu">🐶 Tofu</button><button class="${j.role === 'human' ? 'sel' : ''}" data-v="human">🧑 Humain</button></div>
           ${j.role === 'human' ? `<div class="seg" data-i="${i}" data-k="avatar" style="margin-top:.5rem">${HUMAN_LOOKS.slice(0, 4).map((l, k) => `<button class="${j.avatar === k ? 'sel' : ''}" data-v="${k}">${l.name}</button>`).join('')}</div>` : ''}
-          <p><button class="big" data-leave="${i}" style="font-size:.9rem;padding:.3rem .6rem">Quitter</button></p></div>`;
+          <p class="small">Gauche / droite : rôle${j.role === 'human' ? ' · haut / bas : personnage' : ''}</p>
+          <p><button class="mini" data-leave="${i}">Quitter</button></p></div>`;
       }).join('');
       const tofus = joined.filter((j) => j.role === 'tofu').length;
       const err = tofus > 1 ? '<p class="err">Un seul joueur peut être Tofu !</p>' : '';
       s.innerHTML = `<div class="panel"><h2>🎮 Plusieurs joueurs sur ce PC</h2>
-        <p>Chaque joueur appuie sur son bouton pour rejoindre (2 ou 3 joueurs). L'écran se partage automatiquement.</p>
+        <p>Chaque joueur appuie sur son bouton pour rejoindre (1 à 3 joueurs). L'écran se partage automatiquement.</p>
         <div class="slots">${slots}</div>${err}
         <div class="opts"><span>Rôles manquants</span><div class="seg" data-k="fill"><button class="${fillAI ? 'sel' : ''}" data-v="1">Complétés par l'ordinateur</button><button class="${!fillAI ? 'sel' : ''}" data-v="0">Non</button></div>
         <span>Durée</span><div class="seg" data-k="dur">${[240, 360, 480].map((d) => `<button class="${this.prefs.duration === d ? 'sel' : ''}" data-v="${d}">${d / 60} min</button>`).join('')}</div></div>
+        <p class="small">Pour lancer : bouton « Jouer », ou la touche pause d'un joueur (${keyLabel('Escape')} · ⌫ · Start).</p>
         <div class="foot"><button class="big" data-back>⬅ Retour</button><button class="big primary" data-go ${joined.length < 1 || tofus > 1 ? 'disabled' : ''}>Jouer ▶</button></div></div>`;
     };
     render();
-    let alive = true;
-    const pollJoin = () => {
-      if (!alive) return;
-      if (joined.length < 3) {
-        // Keyboard halves.
-        if (keyPressed('Space') && !joined.some((j) => j.dev.id === 'kb-left') && !(document.activeElement?.tagName === 'BUTTON' && !keyDown('KeyW'))) {
-          joined.push({ dev: candidates.get('kb-left')!, role: joined.some((j) => j.role === 'tofu') ? 'human' : 'tofu', avatar: joined.length % 4 });
-          sfx.play('pickup');
-          render();
+    /** Gives a human player a look nobody else uses. */
+    const freeLook = (j: Joined) => {
+      if (j.role !== 'human') return;
+      const taken = new Set(joined.filter((o) => o !== j && o.role === 'human').map((o) => o.avatar));
+      if (taken.has(j.avatar)) j.avatar = [0, 1, 2, 3].find((a) => !taken.has(a)) ?? j.avatar;
+    };
+    const join = (dev: InputDevice) => {
+      if (joined.length >= 3 || has(dev.id)) return;
+      const used = new Set(joined.map((j) => j.avatar));
+      const avatar = [0, 1, 2, 3].find((a) => !used.has(a)) ?? 0;
+      joined.push({ dev, role: joined.some((j) => j.role === 'tofu') ? 'human' : 'tofu', avatar, lx: 0, ly: 0 });
+      sfx.play('pickup');
+      render();
+    };
+    const close = () => {
+      window.removeEventListener('keydown', onKey, true);
+      if (this.app.hooks.onFrame === onFrame) this.app.hooks.onFrame = undefined;
+    };
+    // Space / Enter join instead of pressing the focused menu button.
+    const onKey = (e: KeyboardEvent) => {
+      if (!s.isConnected) {
+        close();
+        return;
+      }
+      const left = e.code === 'Space';
+      const right = e.code === 'Enter' || e.code === 'NumpadEnter';
+      if (!left && !right) return;
+      e.preventDefault();
+      (document.activeElement as HTMLElement | null)?.blur?.();
+      if (!e.repeat) join(left ? kbLeft : kbRight);
+    };
+    window.addEventListener('keydown', onKey, true);
+    // Gamepad A / B edges (a held button does not count until released).
+    const padPrev = new Map<number, [boolean, boolean]>();
+    for (const p of listGamepads()) padPrev.set(p.index, [!!p.buttons[0]?.pressed, !!p.buttons[1]?.pressed]);
+    const onFrame = (dt: number) => {
+      if (!s.isConnected) {
+        close();
+        return;
+      }
+      for (const p of listGamepads()) {
+        const id = 'pad' + p.index;
+        const a = !!p.buttons[0]?.pressed;
+        const b = !!p.buttons[1]?.pressed;
+        const [pa, pb] = padPrev.get(p.index) ?? [false, false];
+        padPrev.set(p.index, [a, b]);
+        if (a && !pa && !has(id)) {
+          const dev = new GamepadDevice(id, `Manette ${p.index + 1}`, p.index);
+          dev.poll(0);
+          join(dev);
         }
-        if ((keyPressed('Enter') || keyPressed('NumpadEnter')) && !joined.some((j) => j.dev.id === 'kb-right') && document.activeElement?.tagName !== 'BUTTON') {
-          joined.push({ dev: candidates.get('kb-right')!, role: joined.some((j) => j.role === 'tofu') ? 'human' : 'tofu', avatar: joined.length % 4 });
-          sfx.play('pickup');
-          render();
-        }
-        for (const p of listGamepads()) {
-          const id = 'pad' + p.index;
-          if (joined.some((j) => j.dev.id === id)) continue;
-          if (p.buttons[0]?.pressed) {
-            const dev = new GamepadDevice(id, `Manette ${p.index + 1}`, p.index);
-            dev.poll(0);
-            joined.push({ dev, role: joined.some((j) => j.role === 'tofu') ? 'human' : 'tofu', avatar: joined.length % 4 });
-            sfx.play('pickup');
+        if (b && !pb) {
+          const k = joined.findIndex((j) => j.dev.id === id);
+          if (k >= 0) {
+            joined.splice(k, 1);
             render();
+          } else {
+            close();
+            this.showTitle();
+            return;
           }
         }
       }
-      requestAnimationFrame(pollJoin);
+      // Joined players: left/right switches the role, up/down the look, pause starts.
+      for (const j of joined) {
+        const r = j.dev.poll(dt);
+        const hx = r.mx > 0.6 ? 1 : r.mx < -0.6 ? -1 : 0;
+        const hy = r.my > 0.6 ? 1 : r.my < -0.6 ? -1 : 0;
+        if (hx && hx !== j.lx) {
+          j.role = j.role === 'tofu' ? 'human' : 'tofu';
+          freeLook(j);
+          sfx.play('click');
+          render();
+        }
+        if (hy && hy !== j.ly && j.role === 'human') {
+          // Next look not taken by another player.
+          const taken = new Set(joined.filter((o) => o !== j && o.role === 'human').map((o) => o.avatar));
+          for (let k = 1; k <= 4; k++) {
+            const a = (j.avatar + (hy > 0 ? 4 - k : k)) % 4;
+            if (!taken.has(a)) {
+              j.avatar = a;
+              break;
+            }
+          }
+          sfx.play('click');
+          render();
+        }
+        j.lx = hx;
+        j.ly = hy;
+        if (r.pause) {
+          go();
+          return;
+        }
+      }
     };
-    requestAnimationFrame(pollJoin);
+    this.app.hooks.onFrame = onFrame;
+    const go = () => {
+      const tofus = joined.filter((j) => j.role === 'tofu').length;
+      if (!joined.length || tofus > 1) return;
+      close();
+      const players: PlayerSlot[] = [];
+      const locals: LocalPlayer[] = [];
+      const tofuJ = joined.find((j) => j.role === 'tofu');
+      players.push({ role: 'tofu', name: 'Tofu', avatar: 0, ai: !tofuJ });
+      if (tofuJ) locals.push({ slot: joined.indexOf(tofuJ), charId: 0, device: tofuJ.dev, rig: this.newRig(), rect: { x: 0, y: 0, w: 1, h: 1 }, raw: null, name: 'Tofu' });
+      const humansJ = joined.filter((j) => j.role === 'human');
+      humansJ.forEach((j) => {
+        const id = players.length;
+        players.push({ role: 'human', name: HUMAN_LOOKS[j.avatar].name, avatar: j.avatar, ai: false });
+        locals.push({ slot: joined.indexOf(j), charId: id, device: j.dev, rig: this.newRig(), rect: { x: 0, y: 0, w: 1, h: 1 }, raw: null, name: HUMAN_LOOKS[j.avatar].name });
+      });
+      if (fillAI && humansJ.length === 0) {
+        players.push({ role: 'human', name: 'Maman', avatar: 0, ai: true });
+        players.push({ role: 'human', name: 'Papa', avatar: 1, ai: true });
+      } else if (fillAI && humansJ.length === 1 && joined.length === 1) {
+        players.push({ role: 'human', name: 'Papa', avatar: (humansJ[0].avatar + 1) % 4, ai: true });
+      }
+      if (!players.some((p) => p.role === 'human')) players.push({ role: 'human', name: 'Maman', avatar: 0, ai: true });
+      locals.sort((a, b) => a.slot - b.slot);
+      locals.forEach((l, i) => (l.slot = i));
+      this.startLocal({ seed: Math.floor(Math.random() * 1e9), duration: this.prefs.duration, players, difficulty: this.prefs.difficulty }, locals);
+    };
     s.addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest('button') as HTMLButtonElement | null;
       if (!b) return;
@@ -374,8 +483,17 @@ export class Screens {
           savePrefs(this.prefs);
         } else {
           const j = joined[Number(seg.dataset.i)];
-          if (k === 'role') j.role = b.dataset.v as 'tofu' | 'human';
-          if (k === 'avatar') j.avatar = Number(b.dataset.v);
+          if (k === 'role') {
+            j.role = b.dataset.v as 'tofu' | 'human';
+            freeLook(j);
+          }
+          if (k === 'avatar') {
+            // Taking a look already used swaps it with that player.
+            const v = Number(b.dataset.v);
+            const other = joined.find((o) => o !== j && o.role === 'human' && o.avatar === v);
+            if (other) other.avatar = j.avatar;
+            j.avatar = v;
+          }
         }
         render();
         return;
@@ -386,36 +504,12 @@ export class Screens {
         return;
       }
       if (b.hasAttribute('data-back')) {
-        alive = false;
+        close();
         this.showTitle();
       }
-      if (b.hasAttribute('data-go')) {
-        if (!joined.length) return;
-        alive = false;
-        const players: PlayerSlot[] = [];
-        const locals: LocalPlayer[] = [];
-        const tofuJ = joined.find((j) => j.role === 'tofu');
-        players.push({ role: 'tofu', name: 'Tofu', avatar: 0, ai: !tofuJ });
-        if (tofuJ) locals.push({ slot: joined.indexOf(tofuJ), charId: 0, device: tofuJ.dev, rig: this.newRig(), rect: { x: 0, y: 0, w: 1, h: 1 }, raw: null, name: 'Tofu' });
-        const humansJ = joined.filter((j) => j.role === 'human');
-        humansJ.forEach((j) => {
-          const id = players.length;
-          players.push({ role: 'human', name: HUMAN_LOOKS[j.avatar].name, avatar: j.avatar, ai: false });
-          locals.push({ slot: joined.indexOf(j), charId: id, device: j.dev, rig: this.newRig(), rect: { x: 0, y: 0, w: 1, h: 1 }, raw: null, name: HUMAN_LOOKS[j.avatar].name });
-        });
-        if (fillAI && humansJ.length === 0) {
-          players.push({ role: 'human', name: 'Maman', avatar: 0, ai: true });
-          players.push({ role: 'human', name: 'Papa', avatar: 1, ai: true });
-        } else if (fillAI && humansJ.length === 1 && joined.length === 1) {
-          players.push({ role: 'human', name: 'Papa', avatar: (humansJ[0].avatar + 1) % 4, ai: true });
-        }
-        if (!players.some((p) => p.role === 'human')) players.push({ role: 'human', name: 'Maman', avatar: 0, ai: true });
-        locals.sort((a, b) => a.slot - b.slot);
-        locals.forEach((l, i) => (l.slot = i));
-        this.startLocal({ seed: Math.floor(Math.random() * 1e9), duration: this.prefs.duration, players, difficulty: this.prefs.difficulty }, locals);
-      }
+      if (b.hasAttribute('data-go')) go();
     });
-    this.show(s);
+    this.show(s, false);
   }
 
   // ---------------------------------------------------------------- Game start / flow
@@ -424,22 +518,40 @@ export class Screens {
     this.clear();
     this.lastConfig = { cfg, locals };
     const sess = new LocalSession(cfg, locals);
+    sess.maxFrameDt = this.app.maxDt;
     this.app.start(sess, sess.game);
     document.body.classList.add('ingame');
     this.showIntro();
   }
 
+  /** Starts a network match (state mirrored from the LAN server). */
+  startNet(sess: NetSession) {
+    this.clear();
+    this.clearIntro();
+    this.app.start(sess, sess.helper);
+    document.body.classList.add('ingame');
+    const S = sess.state;
+    if (S.phase === 'countdown' && S.countdown > COUNTDOWN_TIME + 0.5) this.showIntro(S.countdown - COUNTDOWN_TIME);
+    else if (this.touchDevice) this.app.hudRoot.parentElement!.appendChild(this.touchDevice.el);
+  }
+
   /** Role cards before the 3-2-1 countdown. */
-  showIntro() {
+  showIntro(duration = 4.2) {
     const s = this.app.session;
     if (!s) return;
     this.clearIntro();
-    this.app.intro = 4.2;
+    this.app.intro = duration;
     const S = s.state;
     s.locals.forEach((lp, i) => {
       const me = S.chars[lp.charId];
       const card = el('div', 'intro-card');
       const dev = lp.device;
+      if (lp.spectator) {
+        card.innerHTML = '<div class="em">👀</div><h2>Tu regardes cette manche</h2><p>Tous les rôles sont pris : tu joueras à la prochaine !</p>';
+        (this.app.hudFor(i)?.el ?? this.app.hudRoot).appendChild(card);
+        this.introEls.push(card);
+        return;
+      }
       const ctr = `<p style="font-size:.9rem;opacity:.85">Action <kbd>${glyph(dev, BTN_INTERACT)}</kbd> · Courir <kbd>${glyph(dev, BTN_SPRINT)}</kbd> · ${me.role === 'tofu' ? 'Zoomies' : 'Friandise'} <kbd>${glyph(dev, BTN_SPECIAL)}</kbd> · ${me.role === 'tofu' ? 'Aboyer' : 'Appeler'} <kbd>${glyph(dev, BTN_BARK)}</kbd>${me.role === 'tofu' ? ` · Assis <kbd>${glyph(dev, BTN_SIT)}</kbd>` : ''}</p>`;
       if (me.role === 'tofu') {
         card.innerHTML = `<div class="em">🐶</div><h2>Tu es TOFU !</h2><p>Fais <b>${S.chaosGoal} points de bêtises</b> ou tiens jusqu'à la fin du temps !</p>
@@ -452,7 +564,7 @@ export class Screens {
       (vp ?? this.app.hudRoot).appendChild(card);
       this.introEls.push(card);
     });
-    setTimeout(() => this.clearIntro(), 4200);
+    setTimeout(() => this.clearIntro(), duration * 1000);
     if (this.touchDevice) {
       this.app.hudRoot.parentElement!.appendChild(this.touchDevice.el);
     }
@@ -491,10 +603,11 @@ export class Screens {
     if (this.overlay) {
       this.overlay.remove();
       this.overlay = null;
-      if (s.kind === 'local') s.paused = false;
+      s.paused = false;
       return;
     }
-    if (s.kind === 'local') s.paused = true;
+    // A network match keeps running; the player just stands still.
+    s.paused = true;
     const o = el('div', 'screen dim');
     o.innerHTML = `<div class="panel" style="max-width:420px"><h2>⏸ Pause</h2>${s.kind === 'net' ? '<p>La partie continue pour les autres joueurs.</p>' : ''}
       <div class="menu" style="width:100%">
@@ -519,20 +632,21 @@ export class Screens {
         this.overlay = null;
         this.showSettings(() => {
           this.clear();
-          if (s.kind === 'local') s.paused = false;
+          s.paused = false;
         }, true);
       }
       if (a === 'quit') this.showTitle();
     });
     this.overlay = o;
     this.app.uiRoot.appendChild(o);
-    setTimeout(() => (o.querySelector('button') as HTMLElement)?.focus(), 30);
+    setTimeout(() => (o.querySelector('button') as HTMLElement)?.focus({ preventScroll: true }), 30);
   }
 
   // ---------------------------------------------------------------- End screen
 
   showEnd(S: GameState) {
     if (!this.app.session) return;
+    const isNet = this.app.session.kind === 'net';
     const st = S.stats;
     const tofuWon = S.winner === 'tofu';
     const reason = S.endReason === 'chaos' ? 'Trop de bêtises dans la maison ! 😈'
@@ -559,7 +673,6 @@ export class Screens {
     if (st.catChase > 8) awards.push('🐈 Tofu, chasseur de chat');
     if (st.mudPrints > 30) awards.push('🐾 Tofu, artiste de la boue');
     const o = el('div', 'screen dim');
-    const isNet = this.app.session.kind === 'net';
     o.innerHTML = `<div class="end-banner ${tofuWon ? '' : 'humans'}">${tofuWon ? '😈 TOFU A GAGNÉ !' : '🎉 LES HUMAINS ONT GAGNÉ !'}</div>
       <div class="panel">
         <p style="text-align:center;font-size:1.2rem;font-weight:600">${reason}</p>
@@ -583,13 +696,21 @@ export class Screens {
           <div>✅ Tâches réussies <b>${st.tasksDone}</b></div>
         </div>
         ${awards.length ? `<div class="awards">${awards.map((a) => `<span class="award">${a}</span>`).join('')}</div>` : ''}
-        <div class="foot">
+        ${isNet ? `<div class="foot">
+          <button class="big" data-a="menu" data-back>🚪 Quitter</button>
+          <div class="row">
+            <button class="big" data-a="lobby">📋 Salon</button>
+            <button class="big host-only" data-a="rotate">🔁 Revanche (changer Tofu)</button>
+            <button class="big primary host-only" data-a="again">🔄 Revanche</button>
+            <span class="guest-only wait-host">⏳ L'hôte 👑 choisit la suite…</span>
+          </div>
+        </div>` : `<div class="foot">
           <button class="big" data-a="menu" data-back>🏠 Menu</button>
           <div class="row">
             <button class="big" data-a="rotate">🔁 Revanche (changer Tofu)</button>
             <button class="big primary" data-a="again">🔄 Revanche</button>
           </div>
-        </div>
+        </div>`}
       </div>`;
     o.addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest('button');
@@ -597,6 +718,11 @@ export class Screens {
       sfx.play('click');
       const a = b.dataset.a;
       if (a === 'menu') this.showTitle();
+      if (a === 'lobby') {
+        this.clear();
+        this.lan?.toLobby();
+        return;
+      }
       if (a === 'again' || a === 'rotate') {
         if (isNet) {
           this.clear();
@@ -613,7 +739,7 @@ export class Screens {
     this.clear();
     this.current = o;
     this.app.uiRoot.appendChild(o);
-    setTimeout(() => (o.querySelector('button.primary') as HTMLElement)?.focus(), 30);
+    setTimeout(() => (o.querySelector('button.primary') as HTMLElement)?.focus({ preventScroll: true }), 30);
   }
 
   // ---------------------------------------------------------------- How to play / settings
@@ -765,15 +891,18 @@ export class MultiDevice implements InputDevice {
   }
 }
 
-/** Gamepad that may be plugged in later (uses the first connected pad). */
+/** Gamepad that may be plugged in later (the nth connected pad). */
 export class LazyPad implements InputDevice {
   readonly kind = 'gamepad' as const;
-  readonly id = 'pad-any';
+  readonly id: string;
   readonly label = 'Manette';
   private dev: GamepadDevice | null = null;
+  constructor(private nth = 0) {
+    this.id = `pad-any-${nth}`;
+  }
   poll(dt: number) {
     if (!this.dev || !this.dev.connected) {
-      const p = listGamepads()[0];
+      const p = listGamepads()[this.nth];
       this.dev = p ? new GamepadDevice('pad' + p.index, 'Manette', p.index) : null;
     }
     return this.dev ? this.dev.poll(dt) : { mx: 0, my: 0, yaw: 0, pitch: 0, zoom: 0, buttons: 0, pause: false, tactical: false };
