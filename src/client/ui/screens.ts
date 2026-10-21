@@ -868,13 +868,14 @@ export class Screens {
       <h2>❓ Comment jouer</h2>
       <div class="cols">
         <div><h3>🐶 Tofu, le labrador</h3>
-          <p>Remplis la barre de <b>bêtises</b> (${CHAOS_GOAL_BY_HUMANS[1]} points, ${CHAOS_GOAL_BY_HUMANS[2]} contre deux humains) ou empêche les humains de finir avant la fin du temps.</p>
+          <p>Remplis la barre de <b>bêtises</b> (${CHAOS_GOAL_BY_HUMANS[1]} points contre un humain, moins contre deux : l'objectif s'affiche en haut de l'écran) ou empêche les humains de finir avant la fin du temps.</p>
           <p>Vole des chaussettes et cache-les dans ton panier, renverse les pots, poursuis le chat, roule-toi dans la boue puis cours dans la maison, renverse les poubelles, mange le goûter, déroule le papier toilette, allume l'aspirateur robot, vole l'arrosoir qui fuit… Tu as 3 <b>défis secrets</b> qui rapportent gros !</p>
           <p><b>Réactions en chaîne</b> : poursuivi dans la cuisine, le chat saute sur le plan de travail et fait tout tomber. Ça compte pour toi !</p>
           <p>Les bêtises variées remplissent les <b>zoomies</b> : un sprint fou qui renverse tout.</p>
           <p>Tu passes par la chatière et par le trou de la haie, et sous les tables. Les portes fermées se poussent (maintenir Action).</p></div>
         <div><h3>🧹 Les humains</h3>
           <p>Finissez toutes les <b>tâches</b> de la liste et gardez la maison <b>propre</b> (barre verte au-dessus du trait) : les invités arrivent alors !</p>
+          <p><b>Quatre lieux</b> : la maison, l'école, le centre commercial et le parc. Chaque lieu a ses tâches, ses cachettes et ses pièges (la fontaine et la pataugeoire mouillent les pattes !).</p>
           <p>Rattrapez Tofu pour <b>reprendre</b> ce qu'il porte, essuyez ses pattes, nettoyez les désordres (maintenir Action).</p>
           <p>Lancez une <b>friandise</b> : Tofu ne résiste pas et lâche tout. Fermez les portes pour le ralentir. Attention : en courant, on peut glisser ou renverser des choses !</p>
           <p>L'<b>aspirateur robot</b> du salon aspire la boue et le papier… mais bouscule tout sur son passage. On l'allume et on l'éteint avec Action.</p></div>

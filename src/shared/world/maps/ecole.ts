@@ -538,4 +538,6 @@ export const ECOLE: MapDef = {
   ],
   road: { z0: -23, z1: -16, walks: [[-16, -13], [-27.5, -23]], crossings: [[-1.6, 1.6]] },
   decor: 'ecole',
+  // Two computer humans clear this place faster than the house: a lower goal keeps the game even.
+  chaosGoals: [250, 140],
 };

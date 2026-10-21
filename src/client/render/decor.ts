@@ -192,8 +192,40 @@ function centre(ctx: DecorCtx): void {
   occl.torus(0.25, 0.04, { x: 13.6, y: 0.35, z: -7.3, ry: 0 }, 0x27ae60);
 }
 
+function parc(ctx: DecorCtx): void {
+  const { occl, opaque, root, mats } = ctx;
+  // Arch over the main gate.
+  const iron = new GeoBuilder();
+  for (const x of [-1.78, 1.78]) iron.cylU(0.05, 2.8, { x, y: 1.4, z: -19 }, 0x2f5d50, 8);
+  iron.box(3.7, 0.06, 0.06, { y: 2.78, z: -19 }, 0x2f5d50);
+  // Birthday banner and bunting over the picnic deck.
+  for (const x of [2.3, 13.7]) iron.cylU(0.05, 2.9, { x, y: 1.45, z: -6.3 }, 0xf5f6fa, 8);
+  root.add(iron.mesh(mats.vc));
+  sign(ctx, 'Parc des Tilleuls', { w: 2.8, h: 0.42, x: 0, y: 2.48, z: -19, ry: Math.PI, bg: '#2f5d50', fg: '#f8f1e0', font: 'bold 62px Georgia, serif', tw: 768, th: 116, twoSided: true });
+  sign(ctx, 'JOYEUX ANNIVERSAIRE !', { w: 5.2, h: 0.5, x: 8, y: 2.3, z: -6.3, ry: Math.PI, bg: '#ff8fab', fg: '#ffffff', border: '#f1c40f', font: 'bold 76px Arial, sans-serif', tw: 1024, th: 100, twoSided: true });
+  const flags = [0xe74c3c, 0xf1c40f, 0x3498db, 0x2ecc71, 0x9b59b6, 0xff8fab];
+  for (let i = 0; i < 22; i++) {
+    const x0 = 2.3 + i * (11.4 / 22);
+    const x1 = x0 + 11.4 / 22;
+    const sag = (t: number) => 2.78 - Math.sin(t * Math.PI) * 0.25;
+    const y0 = sag(i / 22);
+    const y1 = sag((i + 1) / 22);
+    opaque.tris([x0, y0, -6.3, x1, y1, -6.3, (x0 + x1) / 2, (y0 + y1) / 2 - 0.22, -6.3], flags[i % flags.length]);
+  }
+  // Snack bar and toilets.
+  sign(ctx, 'BUVETTE', { w: 2.2, h: 0.4, x: 24, y: 2.35, z: -10.83, bg: '#27ae60', fg: '#ffffff', border: '#f6c453', font: 'bold 80px Arial, sans-serif', tw: 512, th: 96 });
+  sign(ctx, 'Glaces · Crêpes · Boissons', { w: 2.4, h: 0.22, x: 24, y: 2.06, z: -10.83, bg: '#fdf6e3', fg: '#27ae60', font: 'italic bold 44px Georgia, serif', tw: 640, th: 60 });
+  sign(ctx, 'WC', { w: 0.6, h: 0.3, x: 28.5, y: 2.35, z: -10.83, bg: '#2a4f8f', fg: '#ffffff', font: 'bold 70px Arial, sans-serif', tw: 160, th: 80 });
+  // Tools leaning on the shed.
+  occl.cylU(0.02, 1.4, { x: 23.75, y: 0.7, z: 18.0, rz: 0.15 }, 0x9a7650, 6);
+  occl.box(0.35, 0.04, 0.05, { x: 23.65, y: 1.38, z: 18.0 }, 0x7f8c8d);
+  occl.cylU(0.02, 1.3, { x: 23.75, y: 0.65, z: 22.2, rz: -0.12 }, 0x9a7650, 6);
+  occl.box(0.2, 0.25, 0.03, { x: 23.82, y: 0.12, z: 22.2 }, 0x7f8c8d);
+}
+
 export const DECOR: Partial<Record<MapId, (ctx: DecorCtx) => void>> = {
   quartier,
   ecole,
   centre,
+  parc,
 };

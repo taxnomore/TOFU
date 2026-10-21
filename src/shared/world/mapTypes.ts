@@ -92,6 +92,8 @@ export interface CarrierDef {
   /** Chaos message when scared. */
   scared: string;
   look: 'carrier' | 'guard' | 'jogger';
+  /** Walking speed (m/s), 1.35 by default. */
+  speed?: number;
 }
 
 /** Hints for the computer players. */
@@ -163,6 +165,8 @@ export interface MapDef {
   backdrop?: [number, number, number, number, number][];
   /** Client decoration routine (signs, details). */
   decor: MapId;
+  /** Chaos goal with 1 and 2 humans, when the map needs its own (default 250 / 180). */
+  chaosGoals?: [number, number];
 }
 
 /** A map with its lookup helpers. */

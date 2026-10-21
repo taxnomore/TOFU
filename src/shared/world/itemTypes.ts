@@ -111,7 +111,7 @@ export const ITEM_TYPES: Record<string, ItemTypeDef> = {
     carry: { dog: true, human: true, stack: 1, slow: 0.02 }, homes: ['checkout', 'cupboard'] },
   // Parc: presents, beach toys.
   gift: { name: 'le cadeau', short: 'cadeau', category: 'gift', icon: '🎁', size: 0.17,
-    carry: { dog: true, human: true, stack: 2, slow: 0.03 }, homes: ['gift_table', 'cupboard'] },
+    carry: { dog: true, human: true, stack: 3, slow: 0.03 }, homes: ['gift_table', 'cupboard'] },
   sand_bucket: { name: 'le seau de plage', short: 'seau', category: 'toy', icon: '🪣', size: 0.12, carry: TOY, homes: ['toybox'] },
   shovel: { name: 'la pelle', short: 'pelle', category: 'toy', icon: '⛏️', size: 0.15, carry: TOY, homes: ['toybox'] },
   beach_ball: { name: 'le ballon de plage', short: 'ballon de plage', category: 'toy', icon: '🏐', size: 0.16, carry: TOY, homes: ['toybox'] },

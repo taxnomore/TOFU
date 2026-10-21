@@ -480,4 +480,6 @@ export const CENTRE: MapDef = {
   roofs: [{ x0: -26, z0: -7, x1: 26, z1: 18, style: 'flat', color: 0x9aa3a8 }],
   road: { z0: -27.5, z1: -23, walks: [[-23, -21]], crossings: [] },
   decor: 'centre',
+  // Two computer humans clear this place faster than the house: a lower goal keeps the game even.
+  chaosGoals: [250, 150],
 };

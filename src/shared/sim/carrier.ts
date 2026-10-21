@@ -36,7 +36,8 @@ export function updateCarrier(g: Game, dt: number): void {
     c.wait -= dt;
     return;
   }
-  const speed = c.scared > 0 ? 3.4 : 1.35;
+  const walk = p.speed ?? 1.35;
+  const speed = c.scared > 0 ? Math.max(3.4, walk * 1.4) : walk;
   const prev = c.x;
   c.x += speed * dt;
   if (prev < p.stopX && c.x >= p.stopX) c.wait = 2.5;

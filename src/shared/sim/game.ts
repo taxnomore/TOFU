@@ -102,7 +102,7 @@ export class Game {
     this.state = {
       phase: cfg.noCountdown ? 'play' : 'countdown',
       tick: 0, time: 0, duration: cfg.duration, countdown: cfg.countdown ?? COUNTDOWN_TIME,
-      chaos: 0, chaosGoal: cfg.chaosGoal ?? CHAOS_GOAL_BY_HUMANS[Math.min(2, humanCount)] ?? CHAOS_GOAL, cleanliness: 100, cleanGoal: cfg.cleanGoal ?? CLEAN_GOAL,
+      chaos: 0, chaosGoal: cfg.chaosGoal ?? this.map.chaosGoals?.[Math.min(2, Math.max(1, humanCount)) - 1] ?? CHAOS_GOAL_BY_HUMANS[Math.min(2, humanCount)] ?? CHAOS_GOAL, cleanliness: 100, cleanGoal: cfg.cleanGoal ?? CLEAN_GOAL,
       guestsT: 0, winner: null, endReason: '',
       chars, items, messes: [], stations,
       doors: DOORS.map((d, idx) => ({ idx, open: d.open, push: 0, rev: 0 })),

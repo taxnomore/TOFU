@@ -3,9 +3,10 @@
 import { GameMap, MapDef, MapId, TaskInfo, buildMap } from '../mapTypes';
 import { CENTRE } from './centre';
 import { ECOLE } from './ecole';
+import { PARC } from './parc';
 import { QUARTIER } from './quartier';
 
-const DEFS: MapDef[] = [QUARTIER, ECOLE, CENTRE];
+const DEFS: MapDef[] = [QUARTIER, ECOLE, CENTRE, PARC];
 
 export const DEFAULT_MAP: MapId = 'quartier';
 

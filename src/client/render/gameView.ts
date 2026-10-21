@@ -299,7 +299,9 @@ export class GameView {
     const car = S.carrier;
     this.carrier.root.visible = car.active;
     if (car.active) {
-      this.carrier.update({ x: car.x, z: car.z, facing: car.facing, speed: car.wait > 0 ? 0 : 1.3, anim: car.wait > 0 ? Anim.Idle : car.scared > 0 ? Anim.Run : Anim.Walk, animT: car.t, hold: [], stun: 0 }, dt);
+      const walk = this.map.carrier.speed ?? 1.35;
+      const running = car.scared > 0 || walk > 2;
+      this.carrier.update({ x: car.x, z: car.z, facing: car.facing, speed: car.wait > 0 ? 0 : running ? Math.max(3.4, walk) : walk, anim: car.wait > 0 ? Anim.Idle : running ? Anim.Run : Anim.Walk, animT: car.t, hold: [], stun: 0 }, dt);
     }
 
     // Robot vacuum: a little wobble when running, blinking green light, orange on its dock.
