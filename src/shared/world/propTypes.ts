@@ -47,7 +47,7 @@ export const PROP_TYPES: Record<PropType, PropTypeDef> = {
   rug_round: { w: 2, d: 2, h: 0.01, col: 'none', mask: 0 },
   floor_lamp: { w: 0.3, d: 0.3, h: 1.6, col: 'circle', r: 0.15, mask: MASK_SOLID },
   wall_shelf: { w: 1.0, d: 0.25, h: 0.05, col: 'none', mask: 0 },
-  picture: { w: 0.8, d: 0.04, h: 0.6, col: 'none', mask: 0 },
+  picture: { w: 0.8, d: 0.04, h: 0.6, col: 'none', mask: 0, tall: true },
   garden_table: { w: 1.2, d: 1.2, h: 0.74, col: 'circle', r: 0.55, mask: HUMAN_ONLY },
   garden_chair: { w: 0.5, d: 0.5, h: 0.85, col: 'box', mask: MASK_HUMAN, inset: 0.05 },
   parasol: { w: 2.4, d: 2.4, h: 2.4, col: 'none', mask: 0 },

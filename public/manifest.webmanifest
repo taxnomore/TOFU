@@ -1,0 +1,10 @@
+{
+  "name": "TOFU ! QUI A FAIT ÇA ?",
+  "short_name": "Tofu !",
+  "start_url": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#f6c453",
+  "theme_color": "#f6c453",
+  "icons": [{ "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
