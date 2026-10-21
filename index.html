@@ -10,6 +10,28 @@
     <title>TOFU ! QUI A FAIT ÇA ?</title>
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <link rel="manifest" href="./manifest.webmanifest" />
+    <style>
+      /* Loading screen: visible before the game code runs, and kept with an
+         explanation if the game cannot start (never a blank page). */
+      #boot { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 16px; overflow: auto;
+        background: #9fd0ef; color: #3b2a1e; font: 16px/1.45 system-ui, 'Segoe UI', Roboto, sans-serif; }
+      #boot .box { max-width: 640px; margin: auto; background: #fff8ea; border: 3px solid #3b2a1e; border-radius: 18px; padding: 16px 22px; text-align: center;
+        box-shadow: 0 6px 0 rgba(59, 42, 30, 0.25); }
+      #boot .dog { width: 64px; height: 64px; animation: bootbob 1.2s ease-in-out infinite; }
+      #boot h1 { font-size: 22px; margin: 4px 0 10px; }
+      #boot .msg.error { text-align: left; }
+      #boot ul { padding-left: 20px; }
+      #boot li { margin: 6px 0; }
+      #boot code { background: #f1e6cf; padding: 1px 5px; border-radius: 5px; overflow-wrap: anywhere; }
+      #boot .detail { font-size: 13px; opacity: 0.75; margin-top: 10px; word-break: break-word; }
+      #boot .go { display: inline-block; padding: 10px 24px; border: 3px solid #3b2a1e; border-radius: 12px; background: #f6c453; color: #3b2a1e;
+        font-weight: 700; text-decoration: none; }
+      /* Shown only when no script runs at all (scripts blocked, preview windows). */
+      #boot .late { margin: 0; max-height: 0; overflow: hidden; opacity: 0; animation: bootlate 0.4s 6s forwards; }
+      #boot.js .late { display: none; }
+      @keyframes bootbob { 50% { transform: translateY(-6px); } }
+      @keyframes bootlate { to { margin-top: 12px; max-height: 20em; opacity: 1; } }
+    </style>
   </head>
   <body>
     <div id="app">
@@ -17,7 +39,86 @@
       <div id="hud-root"></div>
       <div id="ui-root"></div>
     </div>
-    <noscript>Ce jeu a besoin de JavaScript.</noscript>
+    <div id="boot">
+      <div class="box">
+        <svg class="dog" viewBox="0 0 64 64" width="64" height="64" aria-hidden="true">
+          <circle cx="32" cy="34" r="22" fill="#f6c453"/>
+          <ellipse cx="14" cy="30" rx="7" ry="13" fill="#d9a03a" transform="rotate(20 14 30)"/>
+          <ellipse cx="50" cy="30" rx="7" ry="13" fill="#d9a03a" transform="rotate(-20 50 30)"/>
+          <ellipse cx="32" cy="42" rx="11" ry="8" fill="#fbe3a8"/>
+          <circle cx="24" cy="30" r="3.2" fill="#2d2016"/>
+          <circle cx="40" cy="30" r="3.2" fill="#2d2016"/>
+          <ellipse cx="32" cy="38" rx="4.5" ry="3.2" fill="#2d2016"/>
+          <path d="M27 45 q5 4 10 0" stroke="#2d2016" stroke-width="2" fill="none" stroke-linecap="round"/>
+        </svg>
+        <h1>TOFU ! QUI A FAIT ÇA ?</h1>
+        <div class="msg" id="boot-msg">Chargement du jeu…</div>
+        <p class="late">Rien ne se passe ? Le navigateur bloque les scripts de cette page, par exemple dans un aperçu. Enregistrez le fichier sur l’ordinateur, puis ouvrez-le d’un double clic avec Firefox, Chrome ou Chromium.</p>
+      </div>
+    </div>
+    <noscript><div style="position:fixed;inset:0;z-index:200;background:#9fd0ef;padding:40px;font:20px sans-serif">Ce jeu a besoin de JavaScript : activez-le dans le navigateur.</div></noscript>
+    <script>
+      // Shows what went wrong instead of a blank page if the game cannot start.
+      (function () {
+        var failed = false;
+        document.getElementById('boot').className = 'js';
+        function tips() {
+          var items = location.protocol === 'file:' ? [
+            'Vérifiez que le fichier <code>tofu-qui-a-fait-ca.html</code> pèse près de 1 Mo (plus de 900 Ko). S’il pèse moins, le téléchargement s’est arrêté en route ; téléchargez-le à nouveau.',
+            'Ouvrez-le avec un navigateur à jour : Firefox, Chrome ou Chromium.',
+            'Si la page s’affiche dans un aperçu (messagerie, stockage en ligne), enregistrez d’abord le fichier sur l’ordinateur, puis ouvrez-le d’un double clic.'
+          ] : [
+            'Rechargez la page.',
+            'Vérifiez que le serveur du jeu tourne toujours sur l’ordinateur hôte (fenêtre du terminal ouverte).',
+            'Utilisez un navigateur à jour : Firefox, Chrome, Chromium ou Safari.'
+          ];
+          return '<p>Essayez ceci :</p><ul><li>' + items.join('</li><li>') + '</li></ul>';
+        }
+        function fail(title, html, detail) {
+          if (failed) return;
+          failed = true;
+          var msg = document.getElementById('boot-msg');
+          msg.className = 'msg error';
+          msg.innerHTML = '<p><b>' + title + '</b></p>' + html;
+          if (detail) {
+            var d = document.createElement('div');
+            d.className = 'detail';
+            d.textContent = 'Détail technique : ' + detail;
+            msg.appendChild(d);
+          }
+        }
+        window.__bootFail = fail;
+        window.__bootTips = tips;
+        window.addEventListener('error', function (e) {
+          if (!window.__ready) fail('Le jeu n’a pas pu démarrer.', tips(), e.message || 'erreur inconnue');
+        });
+        window.addEventListener('unhandledrejection', function (e) {
+          var r = e.reason;
+          if (!window.__ready) fail('Le jeu n’a pas pu démarrer.', tips(), String((r && r.message) || r));
+        });
+        document.addEventListener('DOMContentLoaded', function () {
+          // index.html loads the game from separate files: browsers refuse that
+          // for a page opened from the disk, so point to the one-file version.
+          var mod = document.querySelector('script[type="module"][src]');
+          if (location.protocol === 'file:' && mod) {
+            var game = /\/src\//.test(mod.getAttribute('src')) ? 'dist/tofu-qui-a-fait-ca.html' : 'tofu-qui-a-fait-ca.html';
+            return fail('Ce fichier ne s’ouvre pas d’un double clic.',
+              '<p>Le fichier <code>index.html</code> sert au serveur du jeu. Pour jouer sur cet ordinateur, ouvrez plutôt le fichier <code>tofu-qui-a-fait-ca.html</code> : il contient tout le jeu.</p>' +
+              '<p style="text-align:center"><a class="go" href="' + game + '">Ouvrir le jeu</a></p>' +
+              '<p>Pour jouer avec des téléphones, lancez le serveur avec <code>npm run start</code> (voir README.md).</p>');
+          }
+          // The game module runs before this event; a truncated file never runs it.
+          if (!window.__started) fail('Le jeu n’a pas pu démarrer.', tips(), 'le code du jeu ne s’est pas lancé');
+        });
+        function slow() {
+          if (window.__ready) return;
+          if (document.hidden) return void setTimeout(slow, 1000);
+          fail('Le jeu met longtemps à démarrer.',
+            '<p>Patientez encore un peu : sur un ordinateur lent ou sans accélération graphique, le premier affichage peut prendre une minute. Le jeu s’affichera dès qu’il sera prêt.</p>' + tips());
+        }
+        setTimeout(slow, 15000);
+      })();
+    </script>
     <script type="module" src="./src/client/main.ts"></script>
   </body>
 </html>

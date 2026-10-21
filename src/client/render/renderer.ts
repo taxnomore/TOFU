@@ -109,6 +109,20 @@ export function detectQuality(): Quality {
     /* storage unavailable */
   }
   const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && !matchMedia('(pointer:fine)').matches);
-  if (mobile) return 'low';
+  if (mobile || softwareRendering()) return 'low';
   return 'high';
+}
+
+/** True when the browser draws 3D without the graphics card (much slower). */
+function softwareRendering(): boolean {
+  try {
+    const gl = document.createElement('canvas').getContext('webgl2');
+    if (!gl) return false;
+    const info = gl.getExtension('WEBGL_debug_renderer_info');
+    const name = String(gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER));
+    gl.getExtension('WEBGL_lose_context')?.loseContext();
+    return /swiftshader|llvmpipe|softpipe|software|basic render/i.test(name);
+  } catch {
+    return false;
+  }
 }

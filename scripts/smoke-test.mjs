@@ -154,6 +154,8 @@ async function open(viewport, mobile = false) {
     await C.waitForTimeout(30);
   }
   await C.waitForTimeout(1200);
+  // Software rendering can skip frames: keep walking until the vase is in reach.
+  await C.waitForFunction(() => /vase/.test(document.querySelector('.vp-prompt')?.textContent ?? ''), null, { timeout: 4000 }).catch(() => {});
   await touch('touchEnd', []);
   await C.waitForTimeout(400);
   const b = await info();

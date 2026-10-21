@@ -36,7 +36,9 @@ Si Node.js manque ou date trop :
 
 Le fichier **`tofu-qui-a-fait-ca.html`** contient tout le jeu. Double-cliquez dessus : il s'ouvre dans le navigateur, sans installation et sans Internet. Il suffit pour jouer seul ou à plusieurs sur le même PC (écran partagé). Seul le jeu avec des téléphones (réseau local) demande le petit serveur décrit plus bas.
 
-Ce fichier se trouve à la racine de l'archive .zip ; après `npm run build`, il est aussi dans `dist/`.
+Ce fichier se trouve à la racine de l'archive .zip ; `npm run build` le crée aussi dans `dist/`. Les fichiers `index.html` ne s'ouvrent pas d'un double clic : ils servent au serveur. Ouverts par erreur, ils affichent un bouton « Ouvrir le jeu » qui mène au bon fichier.
+
+Si le jeu ne peut pas démarrer, la page l'explique au lieu de rester blanche : 3D désactivée, fichier incomplet ou scripts bloqués. La section [Dépannage](#8-dépannage) reprend les solutions.
 
 ### Version téléchargée (.zip)
 
@@ -196,7 +198,10 @@ Le fichier [GAME_DESIGN.md](GAME_DESIGN.md) détaille les règles, les points et
 | Problème | Solution |
 |---|---|
 | « Le port 8080 est déjà utilisé » | Lancez `PORT=8081 npm run start` et utilisez les adresses affichées. |
-| Écran noir ou message d'erreur 3D | Activez l'accélération matérielle (WebGL) dans le navigateur. Dans Firefox, `about:support` indique si WebGL fonctionne. |
+| « Votre navigateur n'affiche pas la 3D » | Le jeu demande WebGL 2. Firefox : ouvrez `about:config`, passez `webgl.force-enabled` à `true`, relancez. Chrome ou Chromium : Paramètres → Système → « Utiliser l'accélération graphique si disponible » ; sinon, mettez `chrome://flags/#ignore-gpu-blocklist` sur « Enabled ». Relancez le navigateur. |
+| « Ce fichier ne s'ouvre pas d'un double clic » | Vous avez ouvert un `index.html`. Cliquez sur « Ouvrir le jeu » ou ouvrez `tofu-qui-a-fait-ca.html`. |
+| « Le jeu n'a pas pu démarrer » | Vérifiez que `tofu-qui-a-fait-ca.html` pèse près de 1 Mo ; sinon, téléchargez-le à nouveau. Le « détail technique » en bas du message aide à trouver la cause. |
+| « Chargement du jeu… » ne disparaît pas | Le navigateur bloque les scripts, souvent dans un aperçu (messagerie, stockage en ligne). Enregistrez le fichier, puis ouvrez-le d'un double clic. |
 | Le jeu saccade | **Réglages → Graphismes : Rapides** (la page se recharge). Fermez les autres onglets. |
 | Pas de son | Touchez l'écran ou appuyez sur une touche : les navigateurs exigent un geste avant de jouer du son. Vérifiez **Réglages → Son**. |
 | « Connexion perdue » sur un téléphone | Rapprochez-le de la box. Le jeu se reconnecte seul et rend la place au joueur. |

@@ -53,6 +53,8 @@ Outil : Chromium sans écran piloté par Playwright, rendu 3D logiciel (SwiftSha
 | Écran partagé à 3 (clavier gauche, clavier droit, manette simulée) | 3 vues indépendantes et une vue d'ensemble |
 | Téléphone : joystick, bouton Action, rotation de caméra par glissement, écran de fin, carte de rôle | réussi après corrections de mise en page |
 | Remappage du clavier | touche changée, conflit retiré, réglage gardé après rechargement, retour aux touches d'origine |
+| Fichier unique `tofu-qui-a-fait-ca.html` ouvert depuis le disque (file://), seul dans un dossier | menus, solo et écran partagé fonctionnent, sans aucune autre requête |
+| Écran de chargement dans 10 situations : normale, 3D coupée (`--disable-3d-apis`), fichier tronqué à 500 Ko, `index.html` du code source et de `dist/` ouverts d'un double clic, scripts bloqués par une politique de sécurité, JavaScript coupé, page dans une iframe isolée (comme un aperçu), rendu qui ne démarre pas, version servie par `npm run start` | jamais de page blanche : le jeu démarre, ou un message dit pourquoi et quoi faire ; le bouton « Ouvrir le jeu » mène au fichier unique, qui démarre ; le jeu tourne aussi dans l'iframe isolée |
 
 Le script `scripts/smoke-test.mjs` reprend le parcours et les commandes tactiles ; il passe contre `npm run start`.
 
@@ -75,6 +77,7 @@ Ordinateur contre ordinateur, manches de 6 minutes, même niveau pour les deux c
 - La fin de la protection d'un objet n'était pas transmise en réseau. Corrigé ; le test d'instantanés le vérifie.
 - Le serveur de fichiers acceptait le dossier voisin `dist-server/`. Corrigé.
 - L'écran « Comment jouer » annonçait 100 points de bêtises au lieu de la vraie valeur.
+- Page blanche signalée dans Firefox et Chromium à l'ouverture du jeu. Je n'ai pas accès à l'ordinateur concerné ; j'ai trouvé deux causes possibles. L'archive contient des fichiers `index.html` qui restent blancs d'un double clic, et le jeu restait blanc quand le navigateur n'offre pas WebGL 2. Un écran de chargement s'affiche maintenant avant le jeu ; en cas d'échec, il donne la cause et la marche à suivre. Le jeu choisit aussi les graphismes « Rapides » quand la 3D passe par le processeur (rendu logiciel).
 
 ## Limites connues
 
@@ -83,4 +86,5 @@ Ordinateur contre ordinateur, manches de 6 minutes, même niveau pour les deux c
 - **Sons** : générés par le code ; l'environnement de test n'a pas de haut-parleur, je n'ai donc pas pu les écouter. Le code des sons s'exécute sans erreur.
 - **IA** : l'ordinateur allume rarement l'aspirateur robot (4 manches sur 60 contre un humain) et ne l'éteint jamais lui-même ; l'aspirateur s'arrête seul au bout de 25 secondes.
 - **Réseau** : réseau local seulement, en HTTP, un salon par serveur.
-- **Taille** : le fichier JavaScript du jeu pèse 855 ko (250 ko compressé) ; le premier chargement sur téléphone peut prendre quelques secondes.
+- **WebGL 2 obligatoire** : sans lui, le jeu ne peut pas tourner. La page l'explique et donne les réglages à essayer.
+- **Taille** : le fichier JavaScript du jeu pèse 870 ko (250 ko compressé) ; le premier chargement sur téléphone peut prendre quelques secondes.

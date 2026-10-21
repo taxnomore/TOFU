@@ -7,7 +7,7 @@ Liste classée par priorité. Elle complète [PROGRESS.md](PROGRESS.md), qui dé
 Les tests automatiques ont tourné dans Chromium, avec un rendu 3D logiciel (sans carte graphique) et une émulation de téléphone. Il reste à essayer :
 
 1. **Téléphones réels** : un Android récent (Chrome) et un iPhone (Safari), en Wi-Fi sur le PC hôte. Points à regarder : fluidité (objectif 30 images/s), taille des boutons, joystick, rotation de caméra, son après le premier toucher, reconnexion après une mise en veille.
-2. **Firefox sur Linux** : rendu, manettes, clavier AZERTY, plein écran.
+2. **Firefox sur Linux** : fichier `tofu-qui-a-fait-ca.html` ouvert d'un double clic, rendu, manettes, clavier AZERTY, plein écran.
 3. **Fluidité sur PC** : vérifier 60 images/s avec une carte graphique intégrée, en solo et en écran partagé à 3 joueurs (4 vues). Si besoin, baisser l'ombre ou la résolution du niveau « Beaux », ou ajouter un niveau automatique selon les images par seconde mesurées.
 4. **Manettes réelles** : manette Xbox et PlayStation, branchées en USB et en Bluetooth, à 1, 2 et 3 joueurs.
 
@@ -30,4 +30,4 @@ Les tests automatiques ont tourné dans Chromium, avec un rendu 3D logiciel (san
 1. Étendre `scripts/smoke-test.mjs` (aujourd'hui : parcours au clavier et commandes tactiles) aux scénarios déjà essayés pendant le développement : réseau local à 3 appareils, écran partagé, vol et retour d'une chaussette, nettoyage de la boue.
 2. Jeu par Internet : le transport réseau sépare déjà la simulation du serveur ; il faudrait un hébergement, HTTPS et un code de salon.
 3. Installation comme application (PWA hors ligne) : demande HTTPS, donc surtout utile avec le jeu par Internet.
-4. Découper le fichier JavaScript du jeu (850 ko, 250 ko compressé) pour accélérer le premier chargement sur téléphone.
+4. Découper le fichier JavaScript du jeu (870 ko, 250 ko compressé) pour accélérer le premier chargement sur téléphone.

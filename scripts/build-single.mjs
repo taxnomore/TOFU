@@ -25,17 +25,24 @@ html = html.replace(/<link rel="stylesheet"[^>]*href="\.\/(assets\/[^"]+\.css)"[
   return `<style>\n${css}\n</style>`;
 });
 
-// Game code as an inline module (nothing to fetch, so file:// is fine).
-html = html.replace(/<script type="module"[^>]*src="\.\/(assets\/[^"]+\.js)"[^>]*><\/script>/, (_, rel) => {
-  let js = read(rel).toString('utf8');
-  js = js.replaceAll('./favicon.svg', favicon);
+// Game code as an inline module (nothing to fetch, so file:// is fine). It goes
+// at the end of the body, after the loading screen: that screen then shows,
+// and explains the problem, even when the browser cannot run the game.
+let js = '';
+html = html.replace(/\s*<script type="module"[^>]*src="\.\/(assets\/[^"]+\.js)"[^>]*><\/script>/, (_, rel) => {
+  js = read(rel).toString('utf8');
+  return '';
+});
+const end = html.lastIndexOf('</body>');
+if (js && end > html.indexOf('id="boot"')) {
   // A literal "</script" would end the inline script early.
   js = js.replace(/<\/script/gi, '<\\/script');
+  html = `${html.slice(0, end)}<script type="module">\n${js}\n</script>\n  ${html.slice(end)}`;
   inlined++;
-  return `<script type="module">\n${js}\n</script>`;
-});
+}
 
-html = html.replace(/<link rel="icon"[^>]*>/, `<link rel="icon" href="${favicon}" type="image/svg+xml" />`);
+// Icon (browser tab and loading screen) as a data URI; no install manifest for a local file.
+html = html.replaceAll('./favicon.svg', favicon);
 html = html.replace(/\s*<link rel="manifest"[^>]*>/, '');
 
 if (inlined !== 2 || /(src|href)="\.\//.test(html)) {
