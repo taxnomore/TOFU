@@ -43,7 +43,7 @@ export function installKeyboard() {
     if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
     if (!down.has(e.code)) pressedOnce.add(e.code);
     down.add(e.code);
-    if (GAME_KEYS.has(e.code)) e.preventDefault();
+    if (GAME_KEYS.has(e.code) || boundKeys.has(e.code)) e.preventDefault();
   });
   window.addEventListener('keyup', (e) => {
     down.delete(e.code);
@@ -92,6 +92,71 @@ export const KEYMAPS: Record<'full' | 'left' | 'right', KeyMap> = {
     zoomIn: [], zoomOut: [], tactical: ['Numpad5'], pause: ['Backspace'],
   },
 };
+
+// ---------------------------------------------------------------------------
+// Remapping (saved in localStorage)
+// ---------------------------------------------------------------------------
+
+export type KeymapName = keyof typeof KEYMAPS;
+const DEFAULT_KEYMAPS: Record<KeymapName, KeyMap> = JSON.parse(JSON.stringify(KEYMAPS));
+/** Remapped keys whose browser default action is blocked in game (menus keep Enter/Escape). */
+const boundKeys = new Set<string>();
+const MENU_KEYS = new Set(['Enter', 'NumpadEnter', 'Escape', 'Tab', 'Backspace']);
+
+function refreshBound() {
+  boundKeys.clear();
+  for (const name of Object.keys(KEYMAPS) as KeymapName[]) {
+    for (const codes of Object.values(KEYMAPS[name])) for (const c of codes) if (!MENU_KEYS.has(c)) boundKeys.add(c);
+  }
+}
+
+function saveKeymaps() {
+  try {
+    localStorage.setItem('tofu.keymaps', JSON.stringify(KEYMAPS));
+  } catch {
+    /* private mode */
+  }
+}
+
+/** Loads saved key bindings over the defaults (unknown or malformed entries are ignored). */
+export function loadKeymaps() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('tofu.keymaps') ?? '{}') as Record<string, Record<string, unknown>>;
+    for (const name of Object.keys(KEYMAPS) as KeymapName[]) {
+      const m = saved[name];
+      if (!m || typeof m !== 'object') continue;
+      for (const k of Object.keys(KEYMAPS[name]) as (keyof KeyMap)[]) {
+        const v = m[k];
+        if (Array.isArray(v) && v.every((c) => typeof c === 'string' && c.length < 32)) KEYMAPS[name][k] = (v as string[]).slice(0, 3);
+      }
+    }
+  } catch {
+    /* keep defaults */
+  }
+  refreshBound();
+}
+
+/**
+ * Binds a key to an action as its main key. The key is removed from the other
+ * actions of the same layout so one key never does two things.
+ */
+export function bindKey(name: KeymapName, action: keyof KeyMap, code: string) {
+  const m = KEYMAPS[name];
+  for (const k of Object.keys(m) as (keyof KeyMap)[]) {
+    if (k !== action) m[k] = m[k].filter((c) => c !== code);
+  }
+  m[action] = [code, ...m[action].slice(1).filter((c) => c !== code)].slice(0, 3);
+  refreshBound();
+  saveKeymaps();
+}
+
+export function resetKeymaps() {
+  for (const name of Object.keys(KEYMAPS) as KeymapName[]) {
+    for (const k of Object.keys(KEYMAPS[name]) as (keyof KeyMap)[]) KEYMAPS[name][k] = [...DEFAULT_KEYMAPS[name][k]];
+  }
+  refreshBound();
+  saveKeymaps();
+}
 
 function anyDown(codes: string[]) {
   for (const c of codes) if (down.has(c)) return true;

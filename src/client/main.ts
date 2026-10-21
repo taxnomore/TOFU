@@ -6,6 +6,9 @@ import './styles.css';
 import { App } from './app';
 import { Screens } from './ui/screens';
 import { installLan } from './ui/lan';
+import { loadKeymaps } from './input/devices';
+
+loadKeymaps();
 
 const app = new App();
 const screens = new Screens(app);

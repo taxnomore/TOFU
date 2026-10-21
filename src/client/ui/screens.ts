@@ -10,7 +10,8 @@ import { LocalSession } from '../runtime/localSession';
 import type { NetSession } from '../runtime/netSession';
 import type { LocalPlayer } from '../runtime/session';
 import {
-  GamepadDevice, InputDevice, KEYMAPS, KeyboardDevice, TouchDevice, keyLabel, listGamepads,
+  GamepadDevice, InputDevice, KEYMAPS, KeyMap, KeyboardDevice, KeymapName, TouchDevice, bindKey, keyLabel, listGamepads,
+  resetKeymaps,
 } from '../input/devices';
 import { el, fmtTime, glyph } from './hud';
 import { BTN_BARK, BTN_INTERACT, BTN_SIT, BTN_SPECIAL, BTN_SPRINT } from '../../shared/constants';
@@ -327,8 +328,8 @@ export class Screens {
         const j = joined[i];
         if (!j) {
           return `<div class="slot"><h4>Joueur ${i + 1}</h4><p>Pour rejoindre, appuie sur :</p><p>
-            ${has('kb-left') ? '' : `<kbd>${keyLabel('Space')}</kbd> clavier gauche (${keyLabel('KeyW')}${keyLabel('KeyA')}${keyLabel('KeyS')}${keyLabel('KeyD')})<br>`}
-            ${has('kb-right') ? '' : '<kbd>Entrée</kbd> clavier droit (flèches)<br>'}
+            ${has('kb-left') ? '' : `<kbd>${keyLabel(KEYMAPS.left.interact[0] ?? 'Space')}</kbd> clavier gauche (${['up', 'left', 'down', 'right'].map((k) => keyLabel(KEYMAPS.left[k as keyof KeyMap][0] ?? '')).join('')})<br>`}
+            ${has('kb-right') ? '' : `<kbd>${keyLabel(KEYMAPS.right.interact[0] ?? 'Enter')}</kbd> clavier droit (flèches)<br>`}
             <kbd>A</kbd> sur une manette</p></div>`;
         }
         return `<div class="slot joined"><h4>Joueur ${i + 1} · ${j.dev.label}</h4>
@@ -372,8 +373,8 @@ export class Screens {
         close();
         return;
       }
-      const left = e.code === 'Space';
-      const right = e.code === 'Enter' || e.code === 'NumpadEnter';
+      const left = KEYMAPS.left.interact.includes(e.code);
+      const right = KEYMAPS.right.interact.includes(e.code);
       if (!left && !right) return;
       e.preventDefault();
       (document.activeElement as HTMLElement | null)?.blur?.();
@@ -747,6 +748,11 @@ export class Screens {
   showHowTo() {
     const s = el('div', 'screen dim');
     const k = (c: string) => `<kbd>${keyLabel(c)}</kbd>`;
+    const f = KEYMAPS.full;
+    const r = KEYMAPS.right;
+    /** First key of an action (the keyboard can be remapped in the settings). */
+    const ks = (codes: string[]) => (codes.length ? k(codes[0]) : 'aucune');
+    const move = (m: KeyMap) => [m.up, m.left, m.down, m.right].map(ks).join('');
     s.innerHTML = `<div class="panel">
       <h2>❓ Comment jouer</h2>
       <div class="cols">
@@ -763,15 +769,15 @@ export class Screens {
       <h3>🎮 Commandes</h3>
       <table class="keys">
         <tr><td></td><td><b>Clavier</b></td><td><b>Clavier droit</b></td><td><b>Manette</b></td></tr>
-        <tr><td>Bouger</td><td>${k('KeyW')}${k('KeyA')}${k('KeyS')}${k('KeyD')} ou flèches</td><td>Flèches</td><td>Stick gauche</td></tr>
-        <tr><td>Caméra</td><td>Souris (glisser), ${k('KeyQ')} ${k('KeyE')}, molette</td><td>${k('KeyO')} ${k('KeyP')}</td><td>Stick droit, LB/RB</td></tr>
-        <tr><td>Action</td><td>${k('Space')}</td><td>${k('Enter')}</td><td>A</td></tr>
-        <tr><td>Courir</td><td>${k('ShiftLeft')}</td><td>${k('ShiftRight')}</td><td>RT / LT</td></tr>
-        <tr><td>Zoomies / Friandise</td><td>${k('KeyF')}</td><td>${k('Slash')}</td><td>X</td></tr>
-        <tr><td>Aboyer / Appeler</td><td>${k('KeyR')}</td><td>${k('Period')}</td><td>B</td></tr>
-        <tr><td>S'asseoir (Tofu)</td><td>${k('KeyC')}</td><td>${k('Comma')}</td><td>Y</td></tr>
-        <tr><td>Vue du dessus</td><td>${k('KeyV')}</td><td>Pavé 5</td><td>Select</td></tr>
-        <tr><td>Pause</td><td>${k('Escape')}</td><td>⌫</td><td>Start</td></tr>
+        <tr><td>Bouger</td><td>${move(f)}${f.up.includes('ArrowUp') ? ' ou flèches' : ''}</td><td>${move(r)}</td><td>Stick gauche</td></tr>
+        <tr><td>Caméra</td><td>Souris (glisser), ${ks(f.camLeft)} ${ks(f.camRight)}, molette</td><td>${ks(r.camLeft)} ${ks(r.camRight)}</td><td>Stick droit, LB/RB</td></tr>
+        <tr><td>Action</td><td>${ks(f.interact)}</td><td>${ks(r.interact)}</td><td>A</td></tr>
+        <tr><td>Courir</td><td>${ks(f.sprint)}</td><td>${ks(r.sprint)}</td><td>RT / LT</td></tr>
+        <tr><td>Zoomies / Friandise</td><td>${ks(f.special)}</td><td>${ks(r.special)}</td><td>X</td></tr>
+        <tr><td>Aboyer / Appeler</td><td>${ks(f.bark)}</td><td>${ks(r.bark)}</td><td>B</td></tr>
+        <tr><td>S'asseoir (Tofu)</td><td>${ks(f.sit)}</td><td>${ks(r.sit)}</td><td>Y</td></tr>
+        <tr><td>Vue du dessus</td><td>${ks(f.tactical)}</td><td>${ks(r.tactical)}</td><td>Select</td></tr>
+        <tr><td>Pause</td><td>${ks(f.pause)}</td><td>${ks(r.pause)}</td><td>Start</td></tr>
       </table>
       <p>📱 Sur téléphone : joystick à gauche, glisser à droite pour tourner la caméra, gros boutons à droite.</p>
       <div class="foot"><button class="big" data-back>⬅ Retour</button></div></div>`;
@@ -791,6 +797,7 @@ export class Screens {
         <span>Son</span><div class="seg" data-k="mute"><button class="${!a.muted ? 'sel' : ''}" data-v="0">Activé</button><button class="${a.muted ? 'sel' : ''}" data-v="1">Coupé</button></div>
         <span>Graphismes</span><div class="seg" data-k="quality">${[['high', 'Beaux'], ['medium', 'Moyens'], ['low', 'Rapides']].map(([v, n]) => `<button class="${q === v ? 'sel' : ''}" data-v="${v}">${n}</button>`).join('')}</div>
         <span>Caméra auto</span><div class="seg" data-k="autocam"><button class="${!this.prefs.autoCam ? 'sel' : ''}" data-v="0">Non</button><button class="${this.prefs.autoCam ? 'sel' : ''}" data-v="1">Suit le personnage</button></div>
+        ${isTouch() ? '' : '<span>Clavier</span><div class="seg" data-k="keys"><button data-v="1">⌨️ Changer les touches</button></div>'}
         <span>Astuces</span><div class="seg" data-k="tips"><button data-v="reset">Revoir les astuces</button></div>
         <span>Plein écran</span><div class="seg" data-k="fs"><button data-v="1">Basculer</button></div>
       </div>
@@ -828,6 +835,10 @@ export class Screens {
           savePrefs(this.prefs);
           this.app.session?.locals.forEach((l) => (l.rig.autoFollow = this.prefs.autoCam));
         }
+        if (k === 'keys') {
+          this.showKeys(() => this.showSettings(onBack, inGame));
+          return;
+        }
         if (k === 'tips') {
           try {
             localStorage.removeItem('tofu.tips');
@@ -848,6 +859,76 @@ export class Screens {
       if (b.hasAttribute('data-back')) onBack();
     });
     this.show(s);
+  }
+
+  /** Keyboard remapping for the three keyboard layouts (saved in this browser). */
+  showKeys(onBack: () => void, layout: KeymapName = 'full') {
+    const ACTIONS: [keyof KeyMap, string][] = [
+      ['up', 'Avancer'], ['down', 'Reculer'], ['left', 'Aller à gauche'], ['right', 'Aller à droite'],
+      ['interact', 'Action'], ['sprint', 'Courir'], ['special', 'Zoomies / Friandise'], ['bark', 'Aboyer / Appeler'],
+      ['sit', "S'asseoir (Tofu)"], ['camLeft', 'Tourner la caméra à gauche'], ['camRight', 'Tourner la caméra à droite'],
+      ['tactical', 'Vue du dessus'], ['pause', 'Pause'],
+    ];
+    const LAYOUTS: [KeymapName, string][] = [['full', 'Un seul joueur'], ['left', 'Clavier gauche'], ['right', 'Clavier droit']];
+    let waiting: keyof KeyMap | null = null;
+    const s = el('div', 'screen dim');
+    // Captures the next key while waiting; the menu navigation stays off meanwhile.
+    s.dataset.padjoin = '1';
+    const render = () => {
+      const m = KEYMAPS[layout];
+      s.innerHTML = `<div class="panel" style="max-width:640px"><h2>⌨️ Touches du clavier</h2>
+        <div class="seg" data-k="layout">${LAYOUTS.map(([v, n]) => `<button class="${layout === v ? 'sel' : ''}" data-v="${v}">${n}</button>`).join('')}</div>
+        <table class="keys remap">${ACTIONS.map(([k, label]) => `<tr><td>${label}</td><td>${waiting === k
+          ? '<b>Appuie sur une touche…</b> <small>(Échap : annuler)</small>'
+          : m[k].length ? m[k].map((c) => `<kbd>${keyLabel(c)}</kbd>`).join(' ') : '<em>aucune</em>'}</td>
+          <td><button class="mini" data-bind="${k}">Changer</button></td></tr>`).join('')}</table>
+        <p class="small">« Clavier gauche » et « Clavier droit » servent quand deux joueurs partagent le même clavier. Une touche ne peut faire qu'une seule action par disposition.</p>
+        <div class="foot"><button class="big" data-reset>↺ Touches d'origine</button><button class="big primary" data-back>✔ OK</button></div></div>`;
+    };
+    const close = () => window.removeEventListener('keydown', onKey, true);
+    const onKey = (e: KeyboardEvent) => {
+      if (!s.isConnected) {
+        close();
+        return;
+      }
+      if (!waiting) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.code !== 'Escape' && e.code) bindKey(layout, waiting, e.code);
+      waiting = null;
+      sfx.play('click');
+      render();
+    };
+    window.addEventListener('keydown', onKey, true);
+    s.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest('button') as HTMLButtonElement | null;
+      if (!b) return;
+      sfx.play('click');
+      if (b.dataset.bind) {
+        waiting = b.dataset.bind as keyof KeyMap;
+        b.blur();
+        render();
+        return;
+      }
+      const seg = b.closest('.seg') as HTMLElement | null;
+      if (seg?.dataset.k === 'layout') {
+        layout = b.dataset.v as KeymapName;
+        waiting = null;
+        render();
+        return;
+      }
+      if (b.hasAttribute('data-reset')) {
+        resetKeymaps();
+        render();
+        return;
+      }
+      if (b.hasAttribute('data-back')) {
+        close();
+        onBack();
+      }
+    });
+    render();
+    this.show(s, false);
   }
 }
 
