@@ -2,17 +2,18 @@
 
 Un jeu de fête en 3D pour toute la famille. Tofu, un labrador jaune, fait des bêtises ; les humains préparent la maison avant l'arrivée des invités. Un joueur incarne Tofu, un ou deux joueurs incarnent les humains. L'ordinateur peut tenir le rôle qui manque.
 
-Le jeu tourne dans le navigateur : sur un PC Linux (Firefox ou Chromium) et sur les téléphones Android ou iPhone reliés au même Wi-Fi. Il ne demande ni compte, ni abonnement. Après l'installation, il n'a plus besoin d'Internet.
+Le jeu tourne dans le navigateur : sur un PC Linux (Firefox ou Chromium) et sur les téléphones Android ou iPhone reliés au même Wi-Fi. On peut aussi jouer par Internet avec de la famille qui habite ailleurs. Il ne demande ni compte, ni abonnement. Après l'installation, il n'a plus besoin d'Internet, sauf pour jouer à distance.
 
 - [1. Installer le jeu sur un PC Linux](#1-installer-le-jeu-sur-un-pc-linux)
 - [2. Lancer le jeu](#2-lancer-le-jeu)
 - [3. Jouer seul](#3-jouer-seul)
 - [4. Jouer à 2 ou 3 sur le même PC](#4-jouer-à-2-ou-3-sur-le-même-pc-écran-partagé)
 - [5. Jouer avec des téléphones sur le Wi-Fi](#5-jouer-avec-des-téléphones-sur-le-wi-fi)
-- [6. Commandes](#6-commandes)
-- [7. Règles en bref](#7-règles-en-bref)
-- [8. Dépannage](#8-dépannage)
-- [9. Pour les développeurs](#9-pour-les-développeurs)
+- [6. Jouer par Internet](#6-jouer-par-internet)
+- [7. Commandes](#7-commandes)
+- [8. Règles en bref](#8-règles-en-bref)
+- [9. Dépannage](#9-dépannage)
+- [10. Pour les développeurs](#10-pour-les-développeurs)
 
 ## 1. Installer le jeu sur un PC Linux
 
@@ -38,7 +39,7 @@ Le fichier **`tofu-qui-a-fait-ca.html`** contient tout le jeu. Double-cliquez de
 
 Ce fichier se trouve à la racine de l'archive .zip ; `npm run build` le crée aussi dans `dist/`. Les fichiers `index.html` ne s'ouvrent pas d'un double clic : ils servent au serveur. Ouverts par erreur, ils affichent un bouton « Ouvrir le jeu » qui mène au bon fichier.
 
-Si le jeu ne peut pas démarrer, la page l'explique au lieu de rester blanche : 3D désactivée, fichier incomplet ou scripts bloqués. La section [Dépannage](#8-dépannage) reprend les solutions.
+Si le jeu ne peut pas démarrer, la page l'explique au lieu de rester blanche : 3D désactivée, fichier incomplet ou scripts bloqués. La section [Dépannage](#9-dépannage) reprend les solutions.
 
 ### Version téléchargée (.zip)
 
@@ -139,7 +140,64 @@ Bon à savoir :
 - Utilisez l'adresse qui commence par `192.168.` ou `10.`. Le salon liste aussi les autres adresses du PC.
 - Gardez l'adresse en `http://` : le jeu n'utilise pas `https://` sur le réseau local.
 
-## 6. Commandes
+## 6. Jouer par Internet
+
+Les joueurs n'ont pas besoin d'habiter ensemble. Un seul PC fait tourner le serveur. Chaque famille crée son **salon** et envoie son lien aux autres ; le code du salon compte 5 lettres (par exemple `KZPTM`).
+
+### Le plus simple : un lien public gratuit, sans compte
+
+1. Installez le petit programme gratuit **cloudflared** (de Cloudflare) :
+   - Windows : `winget install --id Cloudflare.cloudflared`
+   - macOS : `brew install cloudflared`
+   - Linux : le paquet `.deb` (Ubuntu, Debian) ou `.rpm` (Fedora) sur [la page des versions](https://github.com/cloudflare/cloudflared/releases/latest).
+2. Dans le dossier du jeu : `npm run build` (une seule fois), puis `npm run internet`.
+3. Le terminal affiche un lien public en `https://….trycloudflare.com`, avec un QR code. Ouvrez ce lien, choisissez **Jouer en ligne**, puis **Créer un salon**. Vous devenez l'hôte 👑.
+4. Le salon montre son code, son lien, un QR code et les boutons **Copier le lien** et **Partager**. Envoyez le lien aux autres joueurs, par message ou par e-mail : ils l'ouvrent et touchent **Rejoindre le salon**. Ils peuvent aussi ouvrir le lien public, choisir **Jouer en ligne** et taper le code.
+
+Bon à savoir :
+
+- Le lien change à chaque lancement. Gardez le terminal ouvert ; `Ctrl+C` arrête le jeu et le lien.
+- Les échanges passent par les serveurs de Cloudflare. Ce service gratuit sert surtout aux essais : Cloudflare ne garantit pas sa disponibilité, et ses conditions d'utilisation s'appliquent.
+- Dans ce mode, seul le tunnel atteint le serveur : les appareils du réseau local passent eux aussi par le lien public.
+
+### Avec votre propre serveur
+
+Sur une machine joignable depuis Internet (serveur loué, ou PC dont la box redirige un port), lancez le jeu en mode Internet derrière un serveur web qui fournit le HTTPS. Exemple avec [Caddy](https://caddyserver.com/), qui obtient tout seul un certificat gratuit :
+
+```bash
+TOFU_MODE=internet HOST=127.0.0.1 TRUST_PROXY=1 PUBLIC_URL=https://tofu.example.org npm run start
+```
+
+```
+# Caddyfile
+tofu.example.org {
+  reverse_proxy 127.0.0.1:8080
+}
+```
+
+| Réglage | Rôle |
+|---|---|
+| `TOFU_MODE=internet` (ou `npm run start -- --internet`) | un salon avec code par famille, au lieu du salon unique de la maison |
+| `PUBLIC_URL` | adresse publique du jeu, pour le lien et le QR code à partager |
+| `TRUST_PROXY=1` | lit l'adresse des joueurs dans les en-têtes du serveur web (limites par adresse) |
+| `HOST=127.0.0.1` | n'accepte que le serveur web de la même machine |
+| `TOFU_MAX_ROOMS`, `TOFU_MAX_GAMES` | nombre maximal de salons (100) et de parties en même temps (40) |
+
+Le jeu marche aussi sans HTTPS, en `http://` avec une redirection du port 8080 de la box, mais les échanges passent alors en clair.
+
+### Sécurité
+
+- Le code d'un salon compte 5 consonnes tirées au hasard, soit 3,2 millions de possibilités. Le serveur bloque une adresse qui essaie trop de codes faux.
+- L'hôte peut **retirer** un joueur (deux appuis pour confirmer) : celui-ci ne revient pas dans ce salon avec la même page. Une fois la famille au complet, **Fermer le salon aux nouveaux joueurs** bloque toute nouvelle entrée ; les joueurs déjà venus peuvent recharger leur page.
+- Le serveur limite les connexions par adresse (16), les salons créés (5 par adresse en 10 minutes), les salons (100) et les parties en même temps (40). Un salon vide disparaît après 2 minutes ; un salon sans partie se ferme après 30 minutes.
+- Le serveur ne montre jamais aux joueurs les adresses du réseau de la maison. Une page d'un autre site ne peut pas s'y connecter.
+- Comme sur le réseau local, le serveur reste l'arbitre : il vérifie chaque message et chaque action.
+
+### Latence
+
+Votre personnage répond tout de suite : le navigateur prévoit ses mouvements, puis le serveur confirme. Les autres joueurs apparaissent avec un léger retard, qui grandit un peu quand la connexion est irrégulière, pour rester fluide. Le salon affiche le temps d'aller-retour vers le serveur (📶) ; en partie, un bandeau prévient au-delà de 300 ms. Les tests simulent 140 ms d'aller-retour avec des à-coups de ± 60 ms.
+
+## 7. Commandes
 
 Les touches du clavier se changent dans **Réglages → Changer les touches**, les boutons de la manette dans **Réglages → Changer les boutons**. Les tableaux suivants montrent les réglages d'origine.
 
@@ -212,7 +270,7 @@ Le menu **Réglages** propose aussi :
 
 Le navigateur garde ces choix pour les parties suivantes.
 
-## 7. Règles en bref
+## 8. Règles en bref
 
 - Une manche dure 6 minutes (4 ou 8 au choix).
 - **Les humains** reçoivent une liste de tâches : 3 tâches pour un humain, 6 pour deux. Exemples : rentrer le linge, ranger les jouets, mettre la table, servir le goûter, sortir la poubelle, relever le courrier, faire le lit, arroser les fleurs.
@@ -225,7 +283,7 @@ Le navigateur garde ces choix pour les parties suivantes.
 
 Le fichier [GAME_DESIGN.md](GAME_DESIGN.md) détaille les règles, les points et la carte.
 
-## 8. Dépannage
+## 9. Dépannage
 
 | Problème | Solution |
 |---|---|
@@ -238,17 +296,22 @@ Le fichier [GAME_DESIGN.md](GAME_DESIGN.md) détaille les règles, les points et
 | Pas de son | Touchez l'écran ou appuyez sur une touche : les navigateurs exigent un geste avant de jouer du son. Vérifiez **Réglages → Son**. |
 | « Connexion perdue » sur un téléphone | Rapprochez-le de la box. Le jeu se reconnecte seul et rend la place au joueur. |
 | « Build introuvable » | Lancez `npm run build` avant `npm run start`. |
+| « Il manque le programme gratuit cloudflared » | Installez-le (section [Jouer par Internet](#6-jouer-par-internet)), puis relancez `npm run internet`. |
+| « Ce salon n'existe pas, ou plus » | Vérifiez le code. Les salons disparaissent quand le serveur s'arrête : l'hôte en crée un nouveau et renvoie le lien. |
+| « L'hôte a fermé ce salon aux nouveaux joueurs » | Demandez à l'hôte de toucher **Rouvrir le salon aux nouveaux joueurs**. |
+| « Connexion lente » pendant une partie par Internet | Rapprochez-vous de la box ou passez en Wi-Fi plutôt qu'en 4G. Les actions arrivent en retard, mais la partie continue. |
 | iPhone | Utilisez Safari. Le plein écran n'existe pas sur iPhone ; « Ajouter à l'écran d'accueil » donne un affichage plus grand. |
 
-## 9. Pour les développeurs
+## 10. Pour les développeurs
 
 | Commande | Rôle |
 |---|---|
 | `npm install` | installe les dépendances (versions figées dans `package-lock.json`) |
 | `npm run dev` | serveur local + Vite avec rechargement automatique |
 | `npm run build` | vérifie le TypeScript, construit le client (`dist/`) et le serveur (`dist-server/`) |
-| `npm run start` | sert le jeu construit et le salon réseau (port 8080, variable `PORT`) |
-| `npm test` | lance les tests : règles, monde, IA, instantanés réseau, serveur avec 3 clients |
+| `npm run start` | sert le jeu construit et le salon réseau (port 8080, variable `PORT`) ; `-- --internet` pour les salons avec code |
+| `npm run internet` | jeu par Internet : serveur en mode Internet + lien public Cloudflare (voir section 6) |
+| `npm test` | lance les tests : règles, monde, IA, instantanés réseau, serveur avec 3 clients, salons par Internet, latence simulée |
 | `node scripts/smoke-test.mjs` | test dans un vrai navigateur (facultatif) : parcours au clavier de la chambre au square, commandes tactiles. Il demande Playwright : `npm install --no-save playwright && npx playwright install chromium`, et un jeu lancé avec `npm run start`. |
 
 Organisation du code :
@@ -260,7 +323,7 @@ src/shared/      logique pure, commune au navigateur et au serveur
   ai/            IA de Tofu et des humains
   net/           protocole réseau et instantanés différentiels
 src/client/      rendu Three.js, interface, sons, commandes, sessions locale et réseau
-server/          serveur HTTP + WebSocket (salon, partie autoritative)
+server/          serveur HTTP + WebSocket (salons, limites, partie autoritative)
 tests/           tests Vitest
 ```
 

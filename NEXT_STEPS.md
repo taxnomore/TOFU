@@ -10,6 +10,7 @@ Les tests automatiques ont tourné dans Chromium, avec un rendu 3D logiciel (san
 2. **Firefox sur Linux** : fichier `tofu-qui-a-fait-ca.html` ouvert d'un double clic, rendu, manettes, clavier AZERTY, plein écran.
 3. **Fluidité sur PC** : vérifier 60 images/s avec une carte graphique intégrée, en solo et en écran partagé à 3 joueurs (4 vues). Si besoin, baisser l'ombre ou la résolution du niveau « Beaux », ou ajouter un niveau automatique selon les images par seconde mesurées.
 4. **Manettes réelles** : manette Xbox et PlayStation, branchées en USB et en Bluetooth, à 1, 2 et 3 joueurs.
+5. **Jeu par Internet réel** : `npm run internet` avec le vrai `cloudflared`, une partie entre deux maisons, un téléphone en 4G. Points à regarder : fluidité, bandeau « connexion lente », reconnexion après une coupure.
 
 ## Priorité 2 : confort de jeu
 
@@ -28,6 +29,6 @@ Le remappage de la manette, la taille du texte, les couleurs contrastées, l'arr
 ## Priorité 4 : technique
 
 1. Étendre `scripts/smoke-test.mjs` (aujourd'hui : parcours au clavier et commandes tactiles) aux scénarios déjà essayés pendant le développement : réseau local à 3 appareils, écran partagé, vol et retour d'une chaussette, nettoyage de la boue.
-2. Jeu par Internet : le transport réseau sépare déjà la simulation du serveur ; il faudrait un hébergement, HTTPS et un code de salon.
-3. Installation comme application (PWA hors ligne) : demande HTTPS, donc surtout utile avec le jeu par Internet.
+2. Jeu par Internet : garder les salons après un redémarrage du serveur, et une petite page d'état pour l'hébergeur (salons, parties, connexions).
+3. Installation comme application (PWA hors ligne) : demande HTTPS, désormais disponible avec le jeu par Internet.
 4. Découper le fichier JavaScript du jeu (870 ko, 250 ko compressé) pour accélérer le premier chargement sur téléphone.
