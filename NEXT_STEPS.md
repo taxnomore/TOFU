@@ -21,12 +21,13 @@ Les tests automatiques ont tourné dans Chromium, avec un rendu 3D logiciel (san
 ## Priorité 3 : contenu
 
 1. Davantage de réactions en chaîne : le chat qui fait tomber des objets de plus haut, l'arrosoir qui fuit, la balle qui rebondit sur les meubles.
-2. Nouvelles tâches et nouveaux défis secrets (ajout par les données, voir GAME_DESIGN.md, section 15).
-3. Variantes de la carte : saison (feuilles mortes, neige), jour de marché sur le square.
+2. IA : apprendre à l'ordinateur à éteindre l'aspirateur robot quand il gêne, et à l'allumer plus souvent pour nettoyer la boue.
+3. Nouvelles tâches et nouveaux défis secrets (ajout par les données, voir GAME_DESIGN.md, section 15).
+4. Variantes de la carte : saison (feuilles mortes, neige), jour de marché sur le square.
 
 ## Priorité 4 : technique
 
-1. Ajouter au dépôt les tests de navigateur utilisés pendant le développement (Playwright), pour les relancer d'une commande.
+1. Étendre `scripts/smoke-test.mjs` (aujourd'hui : parcours au clavier et commandes tactiles) aux scénarios déjà essayés pendant le développement : réseau local à 3 appareils, écran partagé, vol et retour d'une chaussette, nettoyage de la boue.
 2. Jeu par Internet : le transport réseau sépare déjà la simulation du serveur ; il faudrait un hébergement, HTTPS et un code de salon.
 3. Installation comme application (PWA hors ligne) : demande HTTPS, donc surtout utile avec le jeu par Internet.
 4. Découper le fichier JavaScript du jeu (850 ko, 250 ko compressé) pour accélérer le premier chargement sur téléphone.

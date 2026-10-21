@@ -202,6 +202,7 @@ Le fichier [GAME_DESIGN.md](GAME_DESIGN.md) détaille les règles, les points et
 | `npm run build` | vérifie le TypeScript, construit le client (`dist/`) et le serveur (`dist-server/`) |
 | `npm run start` | sert le jeu construit et le salon réseau (port 8080, variable `PORT`) |
 | `npm test` | lance les tests : règles, monde, IA, instantanés réseau, serveur avec 3 clients |
+| `node scripts/smoke-test.mjs` | test dans un vrai navigateur (facultatif) : parcours au clavier de la chambre au square, commandes tactiles. Il demande Playwright : `npm install --no-save playwright && npx playwright install chromium`, et un jeu lancé avec `npm run start`. |
 
 Organisation du code :
 

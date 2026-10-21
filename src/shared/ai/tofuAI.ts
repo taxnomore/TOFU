@@ -386,7 +386,7 @@ export class TofuAI implements AIController {
       if (S.vacuum.mode === 'dock' && S.vacuum.t <= 0) {
         const v = S.vacuum;
         const dv = dist(me.x, me.z, v.x, v.z);
-        add(20 - dv * 0.8 - this.risk(v.x, v.z), { key: 'vacuum', kind: 'act', want: { kind: 'vacuum', target: 0 }, x: v.x, z: v.z, timeout: 15 });
+        add(34 - dv * 0.8 - this.risk(v.x, v.z), { key: 'vacuum', kind: 'act', want: { kind: 'vacuum', target: 0 }, x: v.x, z: v.z, timeout: 15 });
       }
 
       // --- Stations: bed, sofa, flowerbeds, tablecloth, trash bag ---
