@@ -456,5 +456,5 @@ export const PARC: MapDef = {
   road: { z0: -27.5, z1: -22, walks: [[-22, -19]], crossings: [[-1.6, 1.6]] },
   decor: 'parc',
   // Two computer humans clear this place faster than the house: a lower goal keeps the game even.
-  chaosGoals: [250, 140],
+  chaosGoals: [250, 120, 160],
 };

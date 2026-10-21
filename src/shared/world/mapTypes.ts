@@ -165,8 +165,11 @@ export interface MapDef {
   backdrop?: [number, number, number, number, number][];
   /** Client decoration routine (signs, details). */
   decor: MapId;
-  /** Chaos goal with 1 and 2 humans, when the map needs its own (default 250 / 180). */
-  chaosGoals?: [number, number];
+  /**
+   * Chaos goal when the map needs its own (default 250 / 180): with 1 human,
+   * with 2 humans in summer, with 2 humans in autumn or winter (more mischief).
+   */
+  chaosGoals?: [number, number, number];
 }
 
 /** A map with its lookup helpers. */

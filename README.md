@@ -1,6 +1,8 @@
 # 🐶 TOFU ! QUI A FAIT ÇA ?
 
-Un jeu de fête en 3D pour toute la famille. Tofu, un labrador jaune, fait des bêtises ; les humains préparent la maison avant l'arrivée des invités. Un joueur incarne Tofu, un ou deux joueurs incarnent les humains. L'ordinateur peut tenir le rôle qui manque.
+Un jeu de fête en 3D pour toute la famille. Tofu, un labrador jaune, fait des bêtises ; les humains préparent une fête avant l'arrivée des invités. Un joueur incarne Tofu, un ou deux joueurs incarnent les humains. L'ordinateur peut tenir le rôle qui manque.
+
+La fête a lieu au choix dans **quatre lieux** : la maison du quartier, l'école primaire, le centre commercial ou le parc.
 
 Le jeu tourne dans le navigateur : sur un PC Linux (Firefox ou Chromium) et sur les téléphones Android ou iPhone reliés au même Wi-Fi. On peut aussi jouer par Internet avec de la famille qui habite ailleurs. Il ne demande ni compte, ni abonnement. Après l'installation, il n'a plus besoin d'Internet, sauf pour jouer à distance.
 
@@ -82,23 +84,34 @@ Au premier lancement, passez par « Comment jouer » : l'écran résume les règ
 
 1. Cliquez sur **Jouer seul**.
 2. Choisissez **Jouer Tofu** ou **Jouer un humain**.
-3. Réglez la difficulté de l'ordinateur (Facile, Normal, Difficile), la durée (4, 6 ou 8 minutes) et l'**ambiance** (voir plus bas).
+3. Réglez la difficulté de l'ordinateur (Facile, Normal, Difficile), la durée (4, 6 ou 8 minutes), le **lieu** et l'**ambiance** (voir plus bas).
 4. Cliquez sur **C'est parti !**
 
 L'ordinateur joue l'autre camp pour de vrai : il ouvre les portes, vole du linge, nettoie, lance des friandises et vous poursuit. En humain, vous pouvez ajouter un coéquipier joué par l'ordinateur.
 
+### Les lieux
+
+| Lieu | La fête | Ce qui le rend différent |
+|---|---|---|
+| 🏡 Le quartier | les invités arrivent à la maison | une maison pleine de portes, un jardin, la rue, la boulangerie et le square ; le linge à rentrer, la table à mettre, le lit à faire |
+| 🏫 L'école | la fête de l'école, les parents arrivent | une cour avec un préau, un long couloir, la classe, la bibliothèque, la cantine et un potager ; les objets trouvés, les fournitures, l'affiche du programme, le coin lecture |
+| 🛍️ Le centre commercial | l'inauguration, le maire arrive | une galerie avec une fontaine (Tofu y trempe ses pattes), des boutiques ouvertes, un parking et une cour de livraison ; le ruban à tendre, les vêtements, le fond de caisse, les cartons |
+| 🌳 Le parc | un pique-nique d'anniversaire | presque tout se passe dehors : le kiosque, l'aire de pique-nique, la buvette, la pataugeoire, la mare aux canards ; les cadeaux dans le coffre de la voiture, la nappe, les ballons |
+
+Chaque lieu a ses propres tâches, cachettes, objets à renverser et pièges. Les défis secrets de Tofu s'adaptent au lieu, ainsi que le robot (aspirateur, robot laveur, robot de ménage, tondeuse) et le passant à qui aboyer (la factrice, le vigile, la joggeuse).
+
 ### Les ambiances
 
-Le même quartier existe en quatre ambiances. Chacune change le décor et ajoute ses propres bêtises :
+Chaque lieu existe en été, en automne et en hiver ; le quartier a aussi son jour de marché. Chaque ambiance change le décor et ajoute ses propres bêtises :
 
 | Ambiance | Ce qui change |
 |---|---|
-| ☀️ Été | le quartier habituel : linge au soleil, fleurs à arroser |
+| ☀️ Été | le décor habituel : fleurs à arroser, flaques de boue |
 | 🍂 Automne | des feuilles partout ; Tofu éparpille les tas de feuilles et en rapporte dans la maison |
 | ❄️ Hiver | de la neige partout ; les pattes de Tofu se mouillent dehors et laissent des traces dans la maison ; deux bonshommes de neige à démolir |
 | 🧀 Jour de marché | trois étals sur le square : fromage, saucisson et poulet rôti à voler, cageot de pommes à renverser |
 
-Chaque ambiance apporte aussi un défi secret pour Tofu. Le choix se fait dans l'écran de lancement (seul, écran partagé) ou dans le salon du réseau local (par l'hôte).
+Chaque ambiance apporte aussi un défi secret pour Tofu. Le lieu et l'ambiance se choisissent dans l'écran de lancement (seul, écran partagé) ou dans le salon en réseau (par l'hôte).
 
 ## 4. Jouer à 2 ou 3 sur le même PC (écran partagé)
 
@@ -273,15 +286,15 @@ Le navigateur garde ces choix pour les parties suivantes.
 ## 8. Règles en bref
 
 - Une manche dure 6 minutes (4 ou 8 au choix).
-- **Les humains** reçoivent une liste de tâches : 3 tâches pour un humain, 6 pour deux. Exemples : rentrer le linge, ranger les jouets, mettre la table, servir le goûter, sortir la poubelle, relever le courrier, faire le lit, arroser les fleurs.
-- **Les humains gagnent** quand toutes les tâches sont faites et que la maison est propre à 70 % au moins. Les invités sonnent alors ; il faut tenir 15 secondes sans que Tofu défasse une tâche ni salisse la maison sous le seuil.
-- **Tofu gagne** quand sa barre de bêtises atteint 250 points (180 contre deux humains), ou quand le temps s'écoule avant que les humains aient fini.
+- **Les humains** reçoivent une liste de tâches propre au lieu : 3 tâches pour un humain, 6 pour deux. Exemples au quartier : rentrer le linge, ranger les jouets, mettre la table, servir le goûter, sortir la poubelle, relever le courrier, faire le lit, arroser les fleurs.
+- **Les humains gagnent** quand toutes les tâches sont faites et que le lieu est propre à 70 % au moins. Les invités arrivent alors ; il faut tenir 15 secondes sans que Tofu défasse une tâche ni salisse sous le seuil.
+- **Tofu gagne** quand sa barre de bêtises atteint son objectif, ou quand le temps s'écoule avant que les humains aient fini. L'objectif vaut 250 points contre un humain. Contre deux humains, il vaut 180 au quartier ; dans les autres lieux, plus vastes et plus faciles à tenir à deux, il vaut de 120 à 150 en été et 160 en automne ou en hiver. La barre du haut affiche toujours l'objectif.
 - **Tofu** reçoit 3 **défis secrets** (+20 points chacun). Ses bêtises : voler du linge et le cacher, renverser des objets, poursuivre le chat, rapporter de la boue dans la maison, renverser les poubelles, manger le goûter, sauter sur le lit ou le canapé, creuser les massifs, tirer la nappe, dérouler le papier toilette, allumer l'aspirateur robot, voler l'arrosoir qui fuit, aboyer sur la factrice. Les bêtises variées remplissent les **zoomies** : un sprint fou qui renverse tout sur son passage.
 - **Réactions en chaîne** : poursuivi dans la cuisine, le chat saute sur le plan de travail et fait tomber la tasse ou le pot de basilic ; l'aspirateur allumé par Tofu bouscule ce qu'il croise. Ces dégâts comptent entièrement pour Tofu. Une balle lancée par un humain peut aussi renverser un vase : c'est alors un accident humain.
 - **Les humains** reprennent ce que Tofu porte dans sa gueule, rangent, nettoient, essuient les pattes de Tofu, ferment les portes et lancent une friandise ou la balle pour l'attirer. Attention : en courant trop vite, on peut glisser sur l'eau ou bousculer un vase !
 - Rien ne se perd pour de bon : un objet mangé ou cassé revient (par exemple, la boulangerie vend de nouveaux croissants), et tout désordre se nettoie.
 
-Le fichier [GAME_DESIGN.md](GAME_DESIGN.md) détaille les règles, les points et la carte.
+Le fichier [GAME_DESIGN.md](GAME_DESIGN.md) détaille les règles, les points et les quatre lieux.
 
 ## 9. Dépannage
 
@@ -290,7 +303,7 @@ Le fichier [GAME_DESIGN.md](GAME_DESIGN.md) détaille les règles, les points et
 | « Le port 8080 est déjà utilisé » | Lancez `PORT=8081 npm run start` et utilisez les adresses affichées. |
 | « Votre navigateur n'affiche pas la 3D » | Le jeu demande WebGL 2. Firefox : ouvrez `about:config`, passez `webgl.force-enabled` à `true`, relancez. Chrome ou Chromium : Paramètres → Système → « Utiliser l'accélération graphique si disponible » ; sinon, mettez `chrome://flags/#ignore-gpu-blocklist` sur « Enabled ». Relancez le navigateur. |
 | « Ce fichier ne s'ouvre pas d'un double clic » | Vous avez ouvert un `index.html`. Cliquez sur « Ouvrir le jeu » ou ouvrez `tofu-qui-a-fait-ca.html`. |
-| « Le jeu n'a pas pu démarrer » | Vérifiez que `tofu-qui-a-fait-ca.html` pèse près de 1 Mo ; sinon, téléchargez-le à nouveau. Le « détail technique » en bas du message aide à trouver la cause. |
+| « Le jeu n'a pas pu démarrer » | Vérifiez que `tofu-qui-a-fait-ca.html` pèse un peu plus de 1 Mo ; sinon, téléchargez-le à nouveau. Le « détail technique » en bas du message aide à trouver la cause. |
 | « Chargement du jeu… » ne disparaît pas | Le navigateur bloque les scripts, souvent dans un aperçu (messagerie, stockage en ligne). Enregistrez le fichier, puis ouvrez-le d'un double clic. |
 | Le jeu saccade | **Réglages → Graphismes : Rapides** (la page se recharge). Fermez les autres onglets. |
 | Pas de son | Touchez l'écran ou appuyez sur une touche : les navigateurs exigent un geste avant de jouer du son. Vérifiez **Réglages → Son**. |
@@ -311,14 +324,15 @@ Le fichier [GAME_DESIGN.md](GAME_DESIGN.md) détaille les règles, les points et
 | `npm run build` | vérifie le TypeScript, construit le client (`dist/`) et le serveur (`dist-server/`) |
 | `npm run start` | sert le jeu construit et le salon réseau (port 8080, variable `PORT`) ; `-- --internet` pour les salons avec code |
 | `npm run internet` | jeu par Internet : serveur en mode Internet + lien public Cloudflare (voir section 6) |
-| `npm test` | lance les tests : règles, monde, IA, instantanés réseau, serveur avec 3 clients, salons par Internet, latence simulée |
+| `npm test` | lance les tests : règles, chaque lieu et chaque ambiance (accès, tâches faisables, chemins du chat), IA, instantanés réseau, serveur avec 3 clients, salons par Internet, latence simulée |
 | `node scripts/smoke-test.mjs` | test dans un vrai navigateur (facultatif) : parcours au clavier de la chambre au square, commandes tactiles. Il demande Playwright : `npm install --no-save playwright && npx playwright install chromium`, et un jeu lancé avec `npm run start`. |
 
 Organisation du code :
 
 ```
 src/shared/      logique pure, commune au navigateur et au serveur
-  world/         données de la carte, collisions, navigation
+  world/         types de carte, collisions, navigation
+    maps/        les quatre lieux (une carte = un fichier de données)
   sim/           simulation à pas fixe (60 Hz), règles, chat, interactions
   ai/            IA de Tofu et des humains
   net/           protocole réseau et instantanés différentiels

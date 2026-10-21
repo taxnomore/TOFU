@@ -45,6 +45,16 @@ describe('LAN server with three clients', () => {
     a.send({ t: 'settings', settings: { duration: 120, difficulty: 0, variant: 'pluie' } as never });
     await until(() => b.lobby?.settings.duration === 120, 2000, 'settings');
     expect(b.lobby?.settings.variant).toBe('ete');
+    // The place: unknown ones are ignored, each place offers its own ambiances.
+    expect(b.lobby?.settings.map).toBe('quartier');
+    a.send({ t: 'settings', settings: { map: 'lune' } as never });
+    a.send({ t: 'settings', settings: { map: 'ecole' } });
+    await until(() => b.lobby?.settings.map === 'ecole', 2000, 'map');
+    a.send({ t: 'settings', settings: { variant: 'marche' } });
+    await sleep(150);
+    expect(b.lobby?.settings.variant).toBe('ete');
+    a.send({ t: 'settings', settings: { map: 'quartier' } });
+    await until(() => b.lobby?.settings.map === 'quartier', 2000, 'map back');
     a.send({ t: 'settings', settings: { variant: 'hiver' } });
     await until(() => b.lobby?.settings.variant === 'hiver', 2000, 'ambiance');
     a.send({ t: 'start' });
@@ -58,6 +68,7 @@ describe('LAN server with three clients', () => {
     expect(a.start!.cfg.duration).toBe(120);
     // Winter: every client builds the same snowy world.
     expect(a.start!.cfg.variant).toBe('hiver');
+    expect(a.start!.cfg.map).toBe('quartier');
     const snowman = a.state!.items.find((it) => it.id === 'bonhomme_jardin')!;
     expect(snowman.state).toBe('home');
 

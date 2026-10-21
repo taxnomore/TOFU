@@ -1,5 +1,5 @@
-// "Ambiances": variants of the same neighborhood. Each one changes the look of
-// the world and adds its own mischief (leaf piles, snowmen, market stalls).
+// "Ambiances": variants of a map. Each one changes the look of the world and
+// adds its own mischief (leaf piles, snowmen, market stalls in the neighborhood).
 
 export type Variant = 'ete' | 'automne' | 'hiver' | 'marche';
 
@@ -12,7 +12,7 @@ export interface VariantDef {
 }
 
 export const VARIANTS: VariantDef[] = [
-  { id: 'ete', name: 'Été', icon: '☀️', desc: 'Le quartier comme d’habitude : linge au soleil et fleurs à arroser.' },
+  { id: 'ete', name: 'Été', icon: '☀️', desc: 'Grand soleil : les fleurs ont soif et les flaques de boue attendent Tofu.' },
   { id: 'automne', name: 'Automne', icon: '🍂', desc: 'Des tas de feuilles à éparpiller, et des feuilles plein les poils.' },
   { id: 'hiver', name: 'Hiver', icon: '❄️', desc: 'De la neige partout, des pattes mouillées et des bonshommes de neige.' },
   { id: 'marche', name: 'Jour de marché', icon: '🧀', desc: 'Des étals sur le square : fromage, saucisson et poulet rôti…' },

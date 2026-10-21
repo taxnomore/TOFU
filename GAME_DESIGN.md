@@ -1,16 +1,16 @@
 # TOFU ! QUI A FAIT ÇA ? Conception du jeu
 
-Ce document décrit les règles, l'équilibrage, la carte, les systèmes et la manière d'ajouter du contenu. Les valeurs citées viennent du code (`src/shared/constants.ts`, `src/shared/sim/rules.ts`, `src/shared/world/`).
+Ce document décrit les règles, l'équilibrage, les quatre lieux, les systèmes et la manière d'ajouter du contenu. Les valeurs citées viennent du code (`src/shared/constants.ts`, `src/shared/sim/rules.ts`, `src/shared/world/`, `src/shared/world/maps/`).
 
 ## 1. Intention
 
-Un jeu de fête asymétrique pour jouer en famille. Tofu, un labrador jaune, cherche les bêtises ; les humains préparent la maison avant l'arrivée des invités. Le plaisir vient des réactions en chaîne : Tofu vole une chaussette, un humain le poursuit et bouscule un vase, le chat passe, Tofu lâche la chaussette pour le chat, et la boue finit dans le salon. Les systèmes reposent donc sur l'état des objets plutôt que sur des scènes scriptées.
+Un jeu de fête asymétrique pour jouer en famille. Tofu, un labrador jaune, cherche les bêtises ; les humains préparent une fête avant l'arrivée des invités : à la maison, à l'école, au centre commercial ou au parc. Le plaisir vient des réactions en chaîne : Tofu vole une chaussette, un humain le poursuit et bouscule un vase, le chat passe, Tofu lâche la chaussette pour le chat, et la boue finit dans le salon. Les systèmes reposent donc sur l'état des objets plutôt que sur des scènes scriptées.
 
 L'humour reste doux : personne ne blesse le chien ou le chat. Un coup de patte du chat étourdit Tofu 0,6 seconde ; une glissade fait tomber un humain un peu plus d'une seconde.
 
 ## 2. Déroulement d'une manche
 
-1. Choix du mode (solo, écran partagé, réseau local) et des rôles.
+1. Choix du mode (solo, écran partagé, réseau local ou Internet), des rôles, du lieu et de l'ambiance.
 2. Cartes de rôle (4 secondes) : tâches pour les humains, défis secrets pour Tofu, rappel des commandes.
 3. Compte à rebours 3, 2, 1.
 4. Partie : 6 minutes par défaut (4 ou 8 minutes au choix).
@@ -22,15 +22,26 @@ Une revanche repart d'un monde propre, avec une nouvelle graine aléatoire. À g
 
 | Camp | Condition |
 |---|---|
-| Humains | Toutes les tâches faites **et** propreté ≥ 70 %. Les invités sonnent alors : il faut tenir 15 secondes. Si Tofu défait une tâche ou salit la maison sous le seuil pendant ce délai, le compte s'annule. |
-| Tofu | Bêtises ≥ objectif : 250 points contre un humain, 180 contre deux. |
+| Humains | Toutes les tâches faites **et** propreté ≥ 70 %. Les invités arrivent alors : il faut tenir 15 secondes. Si Tofu défait une tâche ou salit sous le seuil pendant ce délai, le compte s'annule. |
+| Tofu | Bêtises ≥ objectif : 250 points contre un humain ; contre deux, 180 au quartier, et dans les autres lieux 120 à 150 en été, 160 en automne et en hiver (voir l'équilibrage). |
 | Tofu | Fin du temps sans victoire des humains. Si le compte des invités tourne à la fin du temps, la partie attend sa fin. |
 
 Personne ne peut se retrouver bloqué : tout désordre se nettoie, un objet cassé se remet en place après nettoyage, la baguette mangée revient à la boulangerie après 45 secondes, les croissants mangés se rachètent à la boulangerie, et la carte n'a pas de cul-de-sac (tests de navigation sur toutes les zones, objets et emplacements).
 
 ## 4. Tâches des humains
 
-Le jeu tire 3 tâches pour un humain, 6 pour deux. Chaque tâche lit l'état réel du monde ; Tofu peut donc la défaire.
+Le jeu tire 3 tâches pour un humain, 6 pour deux, parmi celles du lieu. La première tâche du lieu figure toujours dans la liste. Chaque tâche lit l'état réel du monde ; Tofu peut donc la défaire.
+
+Toutes les tâches suivent quatre modèles, décrits par des données (`TaskSpec` dans `src/shared/world/mapTypes.ts`) :
+
+| Modèle | Principe | Exemples |
+|---|---|---|
+| Rassembler (`collect`) | porter plusieurs objets dans des emplacements d'un certain genre | le linge, les jouets, les objets trouvés, les cadeaux |
+| Livrer (`deliver`) | porter un objet à un emplacement ; un commerce peut en revendre un si Tofu l'a mangé | la vaisselle, le courrier, le gâteau, l'affiche, le fond de caisse |
+| Préparer (`make`) | maintenir Action à un emplacement ; Tofu le défait en sautant dessus | le lit, le coin lecture, la nappe, le ruban, les ballons |
+| Arroser (`water`) | remplir l'arrosoir au robinet, arroser des massifs | les fleurs, le potager, les jardinières |
+
+### Le quartier
 
 | Tâche | Objectif | Ce que Tofu peut faire |
 |---|---|---|
@@ -43,11 +54,48 @@ Le jeu tire 3 tâches pour un humain, 6 pour deux. Chaque tâche lit l'état ré
 | 🛏️ Faire le lit | maintenir Action au lit | sauter sur le lit (avec ou sans boue) |
 | 🌷 Arroser les fleurs | remplir l'arrosoir au robinet, arroser les 2 massifs | creuser un massif |
 
+### L'école
+
+| Tâche | Objectif | Ce que Tofu peut faire |
+|---|---|---|
+| 🧤 Ranger les objets trouvés | 5 vêtements oubliés (cour, préau, potager) dans le carton du bout du couloir | voler les vêtements avant qu'ils soient rangés ; le carton reste fermé pour lui |
+| ✏️ Ranger les fournitures | crayons, colle, peinture et cahier (classe, bibliothèque, préau, cantine) dans l'armoire de la classe | ressortir les fournitures de l'armoire |
+| 🎂 Apporter le gâteau | le gâteau de la cantine sur la table de la fête, dans la cour | le manger (la boulangerie d'en face en vend un autre) |
+| 📜 Afficher le programme | l'affiche du bureau de la maîtresse sur le panneau, près du portail | arracher l'affiche |
+| 🗑️ Sortir la poubelle | le sac de la cantine dans la grande poubelle du trottoir | renverser la poubelle ou déchirer le sac |
+| 📚 Ranger le coin lecture | maintenir Action aux coussins de la bibliothèque | sauter dans les coussins (avec ou sans boue) |
+| 🍓 Arroser le potager | l'arrosoir du potager, le robinet du mur, les fraises et les tomates | creuser le potager |
+| ⚽ Ranger les ballons | le ballon de foot (passé dans la rue) et le ballon de basket dans le bac du préau | ressortir les ballons |
+
+### Le centre commercial
+
+| Tâche | Objectif | Ce que Tofu peut faire |
+|---|---|---|
+| 👗 Ranger les vêtements | robe, jean, marinière et chapeau (tombé sur le parking) sur un portant de la boutique | décrocher les vêtements |
+| 🧸 Ranger le magasin de jouets | 4 jouets sur le rayon | les reprendre sur le rayon |
+| 🎂 Apporter le gâteau | le gâteau du café sur le buffet de la galerie | le manger (la pâtisserie en vend un autre) |
+| 📦 Jeter les cartons | la pile de cartons de la réserve dans la benne de la cour de livraison | déchiqueter les cartons, renverser la benne |
+| 💶 Installer le fond de caisse | du bureau de la réserve à la caisse du supermarché | voler le fond de caisse |
+| 🌷 Arroser les jardinières | l'arrosoir du parvis, le robinet de la façade, les 2 jardinières | creuser une jardinière |
+| 🎀 Tendre le ruban | maintenir Action au ruban de l'entrée | mordiller le ruban |
+
+### Le parc
+
+| Tâche | Objectif | Ce que Tofu peut faire |
+|---|---|---|
+| 🎁 Apporter les cadeaux | les 3 cadeaux du coffre de la voiture sur la table des cadeaux | les voler en chemin |
+| 🎂 Apporter le gâteau | le gâteau de la cuisine de la buvette sur la table du pique-nique | le manger (la buvette en vend un autre) |
+| 🧺 Étendre la nappe | maintenir Action à la nappe, sur la pelouse | se rouler dessus (avec ou sans boue) |
+| 🏖️ Ramasser les jouets | seau, pelle et ballon de plage dans le sac de plage | les voler avant qu'ils soient rangés ; le sac se ferme |
+| 🗑️ Jeter les déchets | le sac du pique-nique dans la grande poubelle de l'entrée | renverser la poubelle ou déchirer le sac |
+| 🌷 Arroser les massifs | l'arrosoir près de la fontaine, les 2 massifs | creuser un massif |
+| 🎈 Gonfler les ballons | maintenir Action au coin du pique-nique | faire éclater les ballons |
+
 Protection : un objet que les humains viennent de ranger ou de reprendre reste hors d'atteinte de Tofu pendant 25 secondes. Sans cette règle, Tofu pouvait défaire une tâche aussitôt finie, et les manches tournaient en boucle.
 
 ## 5. Défis secrets de Tofu
 
-Tofu tire 3 défis ; chacun rapporte 20 points de bêtises. L'automne, l'hiver et le jour de marché imposent leur propre défi ; les deux autres viennent du tirage commun (18 défis). Le défi « faire sursauter les humains » n'apparaît que s'il y a des humains. La factrice passe une première fois après 30 secondes, puis toutes les 75 à 110 secondes.
+Tofu tire 3 défis ; chacun rapporte 20 points de bêtises. L'automne, l'hiver et le jour de marché imposent leur propre défi ; les deux autres viennent du tirage commun, limité aux défis qui ont un sens dans le lieu (18 au quartier, 16 à 18 ailleurs). Chaque lieu adapte aussi la formulation : à l'école, « Laisse 12 traces de boue dans la classe et la bibliothèque » ; au parc, « Roule-toi sur la nappe avec les pattes pleines de boue » ; au centre commercial, « Aboie sur le vigile quand il passe ». Le défi « faire sursauter les humains » n'apparaît que s'il y a des humains. La factrice passe une première fois après 30 secondes, puis toutes les 75 à 110 secondes.
 
 | Défi | Objectif |
 |---|---|
@@ -135,7 +183,7 @@ Bonus déjà en place :
 
 ## 8 bis. Les ambiances
 
-L'ambiance se choisit avant la manche (et par l'hôte en réseau local). Le serveur et chaque appareil construisent alors le même monde : collisions, navigation, objets et emplacements dépendent de l'ambiance.
+L'ambiance se choisit avant la manche (et par l'hôte en réseau). Chaque lieu existe en été, en automne et en hiver ; seul le quartier a son jour de marché. Les tas de feuilles et les bonshommes de neige changent de place selon le lieu. Le tableau décrit le quartier. Le serveur et chaque appareil construisent alors le même monde : collisions, navigation, objets et emplacements dépendent de l'ambiance.
 
 | Ambiance | Décor | Bêtises en plus |
 |---|---|---|
@@ -159,7 +207,8 @@ Contre-jeu des humains : la friandise attire Tofu jusqu'à 9 m (la balle jusqu'�
 
 ## 10. Équilibrage
 
-- Objectif de bêtises : 250 contre un humain, 180 contre deux (deux humains nettoient plus vite mais ont 6 tâches). Les nouvelles bêtises (arrosoir, réactions en chaîne, ambiances) ont fait passer ces objectifs de 220 et 170 à 250 et 180.
+- Objectif de bêtises : 250 contre un humain, 180 contre deux au quartier (deux humains nettoient plus vite mais ont 6 tâches). Les nouvelles bêtises (arrosoir, réactions en chaîne, ambiances) ont fait passer ces objectifs de 220 et 170 à 250 et 180.
+- Dans les nouveaux lieux, deux humains se répartissent mieux un grand espace : l'objectif contre deux humains y baisse (école 135, centre commercial 150, parc 120 en été ; 160 en automne et en hiver, qui apportent plus de bêtises). Il se règle dans le champ `chaosGoals` de chaque carte.
 - 3 tâches à un humain, 6 à deux. Avec 4 tâches, un humain seul perdait 3 manches sur 4 contre l'ordinateur au niveau Normal ; avec 3 tâches, l'équilibre revient à une manche sur deux.
 - Trois niveaux d'ordinateur (réactivité, précision des friandises, insistance de Tofu à défaire les tâches).
 - Mesures automatiques, ordinateur contre ordinateur, manches de 6 minutes (script de simulation sans rendu) :
@@ -173,9 +222,24 @@ Contre-jeu des humains : la friandise attire Tofu jusqu'à 9 m (la balle jusqu'�
 | Normal, jour de marché | Tofu gagne 50 fois sur 100 | Tofu gagne 55 fois sur 100 |
 | Difficile (été) | Tofu gagne 46 fois sur 50 | Tofu gagne 44 fois sur 50 |
 
+Les quatre lieux, été, niveau Normal (40 manches par case, mesurées après le réglage des objectifs) :
+
+| Lieu | Tofu contre 1 humain | Tofu contre 2 humains |
+|---|---|---|
+| 🏡 Quartier | 26 sur 40 | 26 sur 40 |
+| 🏫 École | 17 sur 40 | 21 sur 40 |
+| 🛍️ Centre commercial | 27 sur 40 | 21 sur 40 |
+| 🌳 Parc | 24 sur 40 | 16 sur 40 |
+
+En automne et en hiver, avec l'objectif de 160 contre deux humains, Tofu gagne entre 12 et 18 manches sur 30 dans les nouveaux lieux. Les lieux restent différents à jouer : l'école sépare tout par des portes et un long couloir, le centre commercial ouvre ses boutiques sur une galerie où la fontaine mouille les pattes, le parc se joue presque entièrement dehors, où seuls le kiosque et l'aire de pique-nique gardent les traces de pattes.
+
 Dans ces mesures, l'ordinateur joue les deux camps au même niveau ; elles ne disent rien de son niveau face à de vrais joueurs. Pour les plus jeunes, commencez en « Facile ». Les manches durent de 2 à 6 minutes et se jouent souvent sur la fin.
 
-## 11. Carte
+## 11. Les lieux
+
+Chaque lieu est un monde continu d'environ 60 m sur 40 à 50 m, sans chargement, décrit dans un fichier de `src/shared/world/maps/`. Le nord (en haut de la minicarte) correspond toujours à la rue, à l'avenue ou au parking.
+
+### Le quartier
 
 Un seul monde continu d'environ 63 m sur 50 m, sans chargement. En courant, on le traverse en 20 à 35 secondes. Le nord (en haut de la minicarte) correspond à la rue.
 
@@ -199,6 +263,51 @@ Un seul monde continu d'environ 63 m sur 50 m, sans chargement. En courant, on l
 - **Maison** (rez-de-chaussée complet) : entrée, chambre, chambre des enfants, cuisine, salon (avec la base de l'aspirateur robot), salle de bain avec buanderie (et le dérouleur de papier toilette). Cinq portes intérieures (Tofu peut les pousser), la porte d'entrée, la porte du jardin avec chatière et la baie vitrée du salon.
 - **Jardin** : pelouse, dallage, terrasse, deux massifs, une flaque de boue, l'étendoir, la table du jardin, la niche, des jouets, une palissade et une haie (avec un trou réservé à Tofu vers le square).
 - **Quartier** : allée et portail, trottoirs, rue avec voitures garées, lampadaires, boîte aux lettres, poubelles, façades des voisins, petit square avec banc et arbres, boulangerie. La factrice passe de temps en temps.
+### L'école (la fête de l'école)
+
+```
+ nord   boulangerie ═════ rue de l'École ═════ trottoir
+        ── grille ──[portail]── grille ──│ haie (trou) ──
+  PRÉAU (ateliers de peinture, bac à ballons) │ COUR (marelle, platane,
+                                              │ table de la fête, panneau)
+  ═══════════════ COULOIR (porte-manteaux, objets trouvés) ═══[porte]═ POTAGER
+  CLASSE │ BIBLIOTHÈQUE (coin lecture) │ CANTINE │ WC    (carrés, cabane,
+ sud                                                      robinet, flaque)
+```
+
+Une porte d'entrée ouverte sur la cour, une porte du potager avec chatière, quatre portes intérieures. Le préau est couvert : les pattes boueuses y laissent des traces. Le robot laveur part du couloir ; la factrice passe sur le trottoir.
+
+### Le centre commercial (l'inauguration)
+
+```
+ nord   avenue du Commerce · trottoir
+        PARKING (voitures, caddies, vigile)
+        PARVIS (jardinières, abri à caddies, robinet)
+  talus │ MODE (portants,      │ GALERIE        │ CAFÉ-PÂTISSERIE      │ cour de
+        │ mannequins, cabines) │ fontaine,      │ (comptoir, bocal)    │ livraison
+        │ JOUETS (rayons)      │ buffet, ruban  │ SUPERMARCHÉ (rayons, │ (benne,
+        │                      │ WC │ réserve   │ conserves, caisses)  │ palettes)
+ sud
+```
+
+Les boutiques s'ouvrent sur la galerie par de grandes arches, sans porte. Les portes automatiques de l'entrée restent ouvertes. La fontaine de la galerie mouille les pattes de Tofu, qui laisse des traces d'eau dans les boutiques. Une porte de service mène du supermarché à la cour de livraison.
+
+### Le parc (le pique-nique d'anniversaire)
+
+```
+ nord   avenue du Parc (voiture de la famille, coffre plein de cadeaux)
+        ── grille ──[portillon]──[portail]── grille (barreau tordu) ──
+  AIRE DE JEUX │ allée, fontaine │ BUVETTE · WC
+  KIOSQUE      │ massif rond     │ PIQUE-NIQUE (tables, glacière) · nappe
+  ════════════ allée des joggeurs ════════════
+  PATAUGEOIRE     MANÈGE                 MARE    CABANE
+ sud
+```
+
+Presque tout se passe dehors. Le kiosque et l'aire de pique-nique sont des planchers : les pattes boueuses ou mouillées y laissent des traces, comme à l'intérieur. La pataugeoire mouille les pattes, les deux flaques les salissent. La joggeuse court sur l'allée ; la tondeuse robot part de la cabane.
+
+### Pour tous les lieux
+
 - **Caméra** : vue à la troisième personne qui suit en douceur, avec rotation, zoom et vue du dessus. Les murs entre la caméra et le joueur s'abaissent (effet « maison de poupée ») et le toit disparaît quand on entre : on ne perd jamais son personnage derrière un mur.
 
 ## 12. Personnages
@@ -207,7 +316,8 @@ Tous les modèles sont construits en code (formes simples assemblées, couleurs 
 
 - **Tofu** : labrador jaune avec oreilles, museau, queue et quatre pattes. Animations procédurales : marche, course, queue qui remue (plus vite quand il porte un objet), objet dans la gueule, assis, l'air innocent (auréole), aboiement, zoomies exagérées, halètement, creusement.
 - **Humains** : Maman, Papa, Léa, Hugo, chacun avec sa silhouette et ses couleurs ; marche, course, porter, nettoyer, lancer, glisser.
-- **Chat** et **factrice** : animés de la même façon.
+- **Chat** et **passants** : animés de la même façon. Le passant change selon le lieu : la factrice (quartier, école), le vigile (centre commercial), la joggeuse (parc), qui court.
+- **Robots** : l'aspirateur robot, le robot laveur, le robot de ménage et la tondeuse robot suivent les mêmes règles.
 
 ## 13. Intelligence artificielle
 
@@ -246,17 +356,19 @@ Tous les modèles sont construits en code (formes simples assemblées, couleurs 
 
 ## 15. Ajouter du contenu
 
-Les objets et lieux sont décrits par des données :
+Les objets et les lieux sont décrits par des données :
 
-- **Nouveau type d'objet** : une entrée dans `ITEM_TYPES` (`src/shared/world/itemTypes.ts`) avec son nom, sa catégorie, ses règles de transport (`carry`), de chute (`knock` : désordre produit, points, vitesse minimale) ou de nourriture (`edible`).
-- **Placer un objet** : une ligne dans `ITEMS` (`src/shared/world/map.ts`), soit à une position, soit dans un emplacement (`station`).
-- **Nouvel emplacement** (meuble où l'on range) : une ligne dans `STATIONS` avec sa forme, sa portée, sa capacité et `dogReach` (Tofu peut-il y voler ?).
+- **Nouveau lieu** : un fichier dans `src/shared/world/maps/` qui exporte une `MapDef` (zones, sols, murs et ouvertures, portes, meubles, emplacements, objets, flaques, apparitions, chemins du chat, ambiances, tâches, défis, robot, passant, indices pour l'ordinateur, toits). On l'ajoute à la liste `DEFS` de `maps/index.ts`. Les identifiants de tâches reçoivent le nom du lieu en préfixe (« ecole.poubelle »). Les détails peints à la main (enseignes, marelle, plaques) vont dans une routine de `src/client/render/decor.ts`.
+- **Nouveau type d'objet** : une entrée dans `ITEM_TYPES` (`src/shared/world/itemTypes.ts`) avec son nom, sa catégorie, ses règles de transport (`carry`), de chute (`knock` : désordre produit, points, vitesse minimale), de nourriture (`edible`), ses emplacements de rangement (`homes`) ou ce que Tofu peut déchirer (`rip`). Son modèle 3D va dans `src/client/render/itemModels.ts`.
+- **Placer un objet** : une ligne dans `items` du lieu, soit à une position, soit dans un emplacement (`station`).
+- **Nouvel emplacement** (meuble où l'on range) : une ligne dans `stations` avec sa forme, sa portée, sa capacité et `dogReach` (Tofu peut-il y voler ?). Un emplacement « à préparer » (lit, nappe, ruban…) décrit son apparence et ses textes dans `make`.
+- **Nouveau meuble** : une entrée dans `PROP_TYPES` (`src/shared/world/propTypes.ts`, taille et collision) et son modèle dans `src/client/render/props.ts`.
 - **Nouveau désordre** : une entrée dans `MESS_TYPES` (saleté, durée de nettoyage, verbe affiché).
-- **Nouvelle tâche** : une entrée dans `TASK_DEFS` (`src/shared/sim/rules.ts`) avec une fonction `eval` qui lit l'état du monde.
-- **Nouveau défi** : une entrée dans `SECRET_DEFS`, puis un appel `progressSecret` à l'endroit où l'action se produit.
-- **Équilibrage** : toutes les valeurs sont dans `src/shared/constants.ts`.
+- **Nouvelle tâche** : une entrée dans `tasks` du lieu, avec l'un des quatre modèles (rassembler, livrer, préparer, arroser).
+- **Nouveau défi** : une entrée dans `SECRET_DEFS`, puis un appel `progressSecret` à l'endroit où l'action se produit ; le lieu l'active dans `secrets` et peut le reformuler dans `secretWording`.
+- **Équilibrage** : les valeurs communes sont dans `src/shared/constants.ts` ; un lieu peut fixer son objectif de bêtises (`chaosGoals`).
 
-Les tests (`npm test`) vérifient ensuite que tout reste atteignable.
+Les tests (`npm test`) vérifient ensuite, pour chaque lieu et chaque ambiance, que tout reste atteignable, que chaque tâche peut se faire, que le chat a des chemins libres et que l'ordinateur y joue une manche animée.
 
 ## 16. Pistes
 

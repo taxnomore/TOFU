@@ -1,6 +1,6 @@
 {
   "name": "tofu-qui-a-fait-ca",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "TOFU ! QUI A FAIT ÇA ? Jeu de fête asymétrique en 3D pour navigateur (solo, écran partagé, réseau local).",

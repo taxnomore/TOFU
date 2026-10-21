@@ -78,7 +78,7 @@ function info() {
     mode: MODE,
     publicUrl: PUBLIC_URL,
     lanUrls: ips.map((ip) => `http://${ip}:${PORT}/`),
-    version: '0.2.0',
+    version: '0.3.0',
   };
 }
 

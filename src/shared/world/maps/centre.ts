@@ -481,5 +481,5 @@ export const CENTRE: MapDef = {
   road: { z0: -27.5, z1: -23, walks: [[-23, -21]], crossings: [] },
   decor: 'centre',
   // Two computer humans clear this place faster than the house: a lower goal keeps the game even.
-  chaosGoals: [250, 150],
+  chaosGoals: [250, 150, 160],
 };

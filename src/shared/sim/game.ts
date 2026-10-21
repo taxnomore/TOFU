@@ -102,7 +102,7 @@ export class Game {
     this.state = {
       phase: cfg.noCountdown ? 'play' : 'countdown',
       tick: 0, time: 0, duration: cfg.duration, countdown: cfg.countdown ?? COUNTDOWN_TIME,
-      chaos: 0, chaosGoal: cfg.chaosGoal ?? this.map.chaosGoals?.[Math.min(2, Math.max(1, humanCount)) - 1] ?? CHAOS_GOAL_BY_HUMANS[Math.min(2, humanCount)] ?? CHAOS_GOAL, cleanliness: 100, cleanGoal: cfg.cleanGoal ?? CLEAN_GOAL,
+      chaos: 0, chaosGoal: cfg.chaosGoal ?? this.mapChaosGoal(humanCount) ?? CHAOS_GOAL_BY_HUMANS[Math.min(2, humanCount)] ?? CHAOS_GOAL, cleanliness: 100, cleanGoal: cfg.cleanGoal ?? CLEAN_GOAL,
       guestsT: 0, winner: null, endReason: '',
       chars, items, messes: [], stations,
       doors: DOORS.map((d, idx) => ({ idx, open: d.open, push: 0, rev: 0 })),
@@ -1400,6 +1400,14 @@ export class Game {
     this.bump(it);
     this.say(h.id, r.thanks);
     this.emit({ t: 'pickup', id: h.id, item: it.idx });
+  }
+
+  /** Chaos goal set by the map (1 human; 2 humans in summer; 2 humans in another season). */
+  private mapChaosGoal(humanCount: number): number | undefined {
+    const g = this.map.chaosGoals;
+    if (!g) return undefined;
+    if (humanCount <= 1) return g[0];
+    return this.variant === 'ete' ? g[1] : g[2];
   }
 
   /** A dirty-paws mess lies on this "make" station (it must be cleaned first). */
