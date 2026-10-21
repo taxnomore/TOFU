@@ -9,7 +9,9 @@ import { DOG } from '../shared/constants';
 import { sfx } from './audio/sfx';
 import { endFrame } from './input/devices';
 import { CameraRig } from './render/camera';
-import { Effects } from './render/effects';
+import { Effects, Weather } from './render/effects';
+import type { Variant } from '../shared/world/variants';
+import { SNOWY_ZONES } from '../shared/world/variants';
 import { GameView } from './render/gameView';
 import { GameRenderer, Quality, ViewRect, detectQuality } from './render/renderer';
 import type { LocalPlayer, Session } from './runtime/session';
@@ -34,6 +36,7 @@ export class App {
   session: Session | null = null;
   view: GameView | null = null;
   effects: Effects;
+  private weather: Weather;
   /** Game instance used for read-only helpers (prompts, objectives). */
   helper: Game | null = null;
   private huds: PlayerHud[] = [];
@@ -62,6 +65,7 @@ export class App {
     if (pq === 'high' || pq === 'medium' || pq === 'low') q = pq;
     this.gr = new GameRenderer(this.canvas, q);
     this.effects = new Effects(this.gr.scene);
+    this.weather = new Weather(this.gr.scene, q);
     window.addEventListener('resize', () => this.resize());
     this.resize();
     requestAnimationFrame((t) => this.frame(t));
@@ -78,6 +82,7 @@ export class App {
     this.session = session;
     this.helper = helper;
     this.attract = attract;
+    this.applyVariant(helper.variant);
     this.view = new GameView(this.gr.scene, session.state);
     this.endNotified = false;
     this.lastPhase = '';
@@ -93,6 +98,7 @@ export class App {
   rebuildView(helper: Game) {
     if (!this.session) return;
     this.helper = helper;
+    this.applyVariant(helper.variant);
     if (this.view) this.gr.scene.remove(this.view.root);
     this.view = new GameView(this.gr.scene, this.session.state);
     for (const h of this.huds) h.dispose();
@@ -101,6 +107,12 @@ export class App {
     this.lastPhase = '';
     this.lastCountdown = 4;
     this.layout();
+  }
+
+  /** Seasonal world, sky and weather of the ambiance. */
+  applyVariant(v: Variant) {
+    this.gr.setVariant(v);
+    this.weather.set(v === 'hiver' ? 'snow' : v === 'automne' ? 'leaves' : 'none');
   }
 
   stop() {
@@ -209,6 +221,9 @@ export class App {
     const S = s.state;
     this.view.sync(S, dt, s.alpha, s.prev);
     this.effects.update(dt);
+    const lp0 = s.locals[0];
+    if (lp0) this.weather.update(dt, lp0.rig.focus.x, lp0.rig.focus.z);
+    else this.weather.update(dt, S.chars[0].x, S.chars[0].z);
     this.handleEvents(s.drainEvents(), S);
     this.ambientEffects(S, dt);
 
@@ -346,15 +361,27 @@ export class App {
         case 'store':
           if (!quiet) sfx.play('store', this.vol(S.chars[e.id].x, S.chars[e.id].z));
           break;
-        case 'knock':
-          fx.burst('dust', e.x, 0.2, e.z, 8);
+        case 'knock': {
+          const t = S.items[e.item] ? ITEM_TYPES[S.items[e.item].type] : null;
+          if (t?.knock?.mess === 'leaves') {
+            fx.burst('leaves', e.x, 0.1, e.z, 22);
+            if (!quiet) sfx.play('rustle', this.vol(e.x, e.z));
+          } else if (t?.knock?.mess === 'snow') {
+            fx.burst('snow', e.x, 0.6, e.z, 24);
+            if (!quiet) sfx.play('snowThud', this.vol(e.x, e.z));
+          } else {
+            fx.burst('dust', e.x, 0.2, e.z, 8);
+          }
           break;
+        }
         case 'land': {
           const it = S.items[e.item];
           if (e.hard) {
-            if (!quiet) sfx.play('crash', this.vol(e.x, e.z));
             const t = ITEM_TYPES[it.type];
-            const kind = t.knock?.mess === 'water' ? 'water' : t.knock?.mess === 'soil' ? 'dirt' : t.knock?.mess === 'trash' ? 'paper' : 'crash';
+            const soft = t.knock?.mess === 'leaves' || t.knock?.mess === 'snow';
+            if (!quiet) sfx.play(soft ? 'thud' : 'crash', this.vol(e.x, e.z) * (soft ? 0.5 : 1));
+            const m = t.knock?.mess;
+            const kind = m === 'water' || m === 'coffee' ? 'water' : m === 'soil' ? 'dirt' : m === 'trash' ? 'paper' : m === 'leaves' ? 'leaves' : m === 'snow' ? 'snow' : 'crash';
             fx.burst(kind, e.x, 0.1, e.z, 14);
             this.shakeNear(e.x, e.z, 0.12);
           } else if (!quiet) sfx.play('thud', this.vol(e.x, e.z) * 0.5);
@@ -496,7 +523,8 @@ export class App {
       const v = (d < 4 ? 1 : 1 - (d - 4) / 10) * Math.min(1, 0.5 + c.speed / 8);
       const zone = zoneAt(c.x, c.z);
       const soft = !!zone && (zone.id === 'jardin' || zone.id === 'square');
-      if (dog) sfx.play(c.mud > 0.3 && zone?.indoor ? 'pawMud' : soft ? 'pawGrass' : 'paw', v);
+      const snowy = this.helper?.variant === 'hiver' && !!zone && SNOWY_ZONES.includes(zone.id);
+      if (dog) sfx.play(c.mud > 0.3 && zone?.indoor ? 'pawMud' : snowy ? 'pawSnow' : soft ? 'pawGrass' : 'paw', v);
       else sfx.play(soft ? 'stepGrass' : 'step', v);
     }
   }
@@ -511,7 +539,16 @@ export class App {
       if (c.role === 'tofu') {
         if (c.zoomT > 0) this.effects.burst('zoom', c.x, 0.1, c.z, 2, Math.sin(c.facing), Math.cos(c.facing));
         if ((c.anim === Anim.Run || c.zoomT > 0) && c.speed > 3) this.effects.burst('dust', c.x, 0, c.z, 1, Math.sin(c.facing), Math.cos(c.facing));
-        if (c.mud > 0.3 && c.speed > 1 && Math.random() < 0.3) this.effects.burst('mud', c.x, 0.05, c.z, 1);
+        if (c.mud > 0.3 && c.speed > 1 && Math.random() < 0.3) {
+          const kind = c.pawKind === 'snow' ? 'snow' : c.pawKind === 'leaves' ? 'leaves' : 'mud';
+          if (kind === 'mud' || Math.random() < 0.4) this.effects.burst(kind, c.x, 0.05, c.z, 1);
+        }
+        // The stolen watering can drips.
+        const can = c.hold.map((i) => S.items[i]).find((it) => it?.type === 'watering_can' && it.charge > 0);
+        if (can && c.speed > 0.5 && Math.random() < 0.5) {
+          this.effects.burst('water', c.x - Math.sin(c.facing) * 0.3, 0.2, c.z - Math.cos(c.facing) * 0.3, 1);
+          if (!this.attract && this.nearestListener(c.x, c.z) < 9) sfx.play('drip', 0.6);
+        }
         if (c.anim === Anim.Dig) this.effects.burst('dirt', c.x + Math.sin(c.facing) * 0.5, 0.05, c.z + Math.cos(c.facing) * 0.5, 2);
       } else if (c.anim === Anim.Run && c.speed > 4) {
         this.effects.burst('dust', c.x, 0, c.z, 1, Math.sin(c.facing), Math.cos(c.facing));

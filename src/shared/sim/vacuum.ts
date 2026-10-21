@@ -1,6 +1,6 @@
 // "L'aspirateur robot": a small autonomous vacuum in the living room. Tofu (or a
 // human) switches it on; it wanders, bounces off furniture, knocks small things
-// over, scares the cat and sucks up mud prints, paper strips and crumbs.
+// over, scares the cat and sucks up mud prints, paper strips, leaves and crumbs.
 import { CHAOS, VACUUM } from '../constants';
 import { approachAngle, dist } from '../math';
 import { ITEM_TYPES, MESS_TYPES } from '../world/itemTypes';
@@ -104,7 +104,7 @@ export function updateVacuum(g: Game, dt: number): void {
 
   // Sucks up prints, paper and crumbs on its way.
   for (const m of [...S.messes]) {
-    if (m.kind !== 'mud' && m.kind !== 'paper' && m.kind !== 'crumbs') continue;
+    if (m.kind !== 'mud' && m.kind !== 'paper' && m.kind !== 'leaf_trail' && m.kind !== 'crumbs') continue;
     if (dist(m.x, m.z, v.x, v.z) > m.r + 0.6) continue;
     if (m.kind === 'crumbs') {
       if (dist(m.x, m.z, v.x, v.z) < m.r) {

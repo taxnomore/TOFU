@@ -9,7 +9,7 @@ import { CatModel, DogModel, HumanModel } from './characters';
 import { GeoBuilder } from './geo';
 import { buildItemGeometry, buildMessGeometry, buildSetTableGeometry, treatGeometry, waterGeometry } from './itemModels';
 import { materials } from './materials';
-import { pawTexture, paperTexture } from './textures';
+import { dotTexture, leafTexture, pawTexture, paperTexture } from './textures';
 
 /** Positions captured before the latest simulation step (for render interpolation). */
 export interface PrevSnapshot {
@@ -31,6 +31,9 @@ export function captureSnapshot(S: GameState, out?: PrevSnapshot): PrevSnapshot 
 const HIDDEN_KINDS = new Set(['hamper', 'dresser', 'toybox', 'mailbox', 'cupboard', 'street_bin']);
 const MAX_PRINTS = 900;
 const MAX_PAPER = 400;
+const MAX_DROPS = 500;
+const MAX_LEAVES = 400;
+const LEAF_COLORS = [0xd35400, 0xe67e22, 0xeba524, 0xc0392b, 0xd4a017, 0xb5651d].map((c) => new THREE.Color(c));
 
 interface DoorVis {
   pivots: THREE.Group[];
@@ -56,6 +59,11 @@ export class GameView {
   private printsKey = '';
   private paper: THREE.InstancedMesh;
   private paperKey = '';
+  /** Water drops and wet paw marks; leaves shed indoors. */
+  private drops: THREE.InstancedMesh;
+  private dropsKey = '';
+  private leaves: THREE.InstancedMesh;
+  private leavesKey = '';
   private treats: THREE.Mesh[] = [];
   private duvet: THREE.Mesh;
   private duvetT = 0;
@@ -127,6 +135,26 @@ export class GameView {
     this.paper.frustumCulled = false;
     this.paper.renderOrder = 1;
     this.root.add(this.paper);
+
+    // Water drops (leaking can, wet paws).
+    const dg = new THREE.PlaneGeometry(0.24, 0.24);
+    dg.rotateX(-Math.PI / 2);
+    const dm = new THREE.MeshPhongMaterial({ color: 0x3d8fd1, map: dotTexture(), transparent: true, opacity: 0.7, shininess: 100, specular: 0xffffff, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+    this.drops = new THREE.InstancedMesh(dg, dm, MAX_DROPS);
+    this.drops.count = 0;
+    this.drops.frustumCulled = false;
+    this.drops.renderOrder = 1;
+    this.root.add(this.drops);
+    // Leaves Tofu brings inside.
+    const lg = new THREE.PlaneGeometry(0.13, 0.08);
+    lg.rotateX(-Math.PI / 2);
+    const lm = new THREE.MeshLambertMaterial({ map: leafTexture(), transparent: true, alphaTest: 0.3, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2 });
+    this.leaves = new THREE.InstancedMesh(lg, lm, MAX_LEAVES);
+    this.leaves.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAX_LEAVES * 3), 3);
+    this.leaves.count = 0;
+    this.leaves.frustumCulled = false;
+    this.leaves.renderOrder = 1;
+    this.root.add(this.leaves);
 
     // Treats pool.
     const tg = treatGeometry();
@@ -468,6 +496,8 @@ export class GameView {
     let printCount = 0;
     let key = '';
     let paperKey = '';
+    let dropsKey = '';
+    let leavesKey = '';
     for (const m of S.messes) {
       alive.add(m.id);
       if (m.kind === 'mud') {
@@ -477,6 +507,14 @@ export class GameView {
       }
       if (m.kind === 'paper') {
         paperKey += m.id + ':' + m.prints.length + ',';
+        continue;
+      }
+      if (m.kind === 'wet') {
+        dropsKey += m.id + ':' + m.prints.length + ':' + m.prints[0] + ',';
+        continue;
+      }
+      if (m.kind === 'leaf_trail') {
+        leavesKey += m.id + ':' + m.prints.length + ',';
         continue;
       }
       if (this.messes.has(m.id)) continue;
@@ -544,6 +582,43 @@ export class GameView {
       }
       this.paper.count = n;
       this.paper.instanceMatrix.needsUpdate = true;
+    }
+    if (dropsKey !== this.dropsKey) {
+      this.dropsKey = dropsKey;
+      let n = 0;
+      const up = new THREE.Vector3(0, 1, 0);
+      const scale = new THREE.Vector3();
+      for (const m of S.messes) {
+        if (m.kind !== 'wet') continue;
+        for (let i = 0; i < m.prints.length && n < MAX_DROPS; i += 3) {
+          this.tmpQ.setFromAxisAngle(up, m.prints[i + 2]);
+          const k = 0.75 + ((n * 41) % 9) / 14;
+          scale.set(k, 1, k * (0.8 + ((n * 17) % 5) / 12));
+          this.tmpM.compose(this.tmpV.set(m.prints[i], 0.028 + (n % 5) * 0.0004, m.prints[i + 1]), this.tmpQ, scale);
+          this.drops.setMatrixAt(n++, this.tmpM);
+        }
+      }
+      this.drops.count = n;
+      this.drops.instanceMatrix.needsUpdate = true;
+    }
+    if (leavesKey !== this.leavesKey) {
+      this.leavesKey = leavesKey;
+      let n = 0;
+      const up = new THREE.Vector3(0, 1, 0);
+      const one = new THREE.Vector3(1, 1, 1);
+      for (const m of S.messes) {
+        if (m.kind !== 'leaf_trail') continue;
+        for (let i = 0; i < m.prints.length && n < MAX_LEAVES; i += 3) {
+          this.tmpQ.setFromAxisAngle(up, m.prints[i + 2]);
+          this.tmpM.compose(this.tmpV.set(m.prints[i], 0.026 + (n % 5) * 0.0005, m.prints[i + 1]), this.tmpQ, one);
+          this.leaves.setMatrixAt(n, this.tmpM);
+          this.leaves.setColorAt(n, LEAF_COLORS[(n * 7) % LEAF_COLORS.length]);
+          n++;
+        }
+      }
+      this.leaves.count = n;
+      this.leaves.instanceMatrix.needsUpdate = true;
+      if (this.leaves.instanceColor) this.leaves.instanceColor.needsUpdate = true;
     }
   }
 

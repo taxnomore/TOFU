@@ -2,6 +2,7 @@
 // uses scissor rectangles). Shadows are computed once per frame.
 import * as THREE from 'three';
 import { inHouse } from '../../shared/world/map';
+import { DEFAULT_VARIANT, Variant } from '../../shared/world/variants';
 import { cutUniforms, materials } from './materials';
 import { skyTexture } from './textures';
 import { WorldMeshes, buildWorld } from './worldView';
@@ -22,6 +23,8 @@ export class GameRenderer {
   readonly hemi: THREE.HemisphereLight;
   world!: WorldMeshes;
   quality: Quality;
+  /** Ambiance the world is currently built for. */
+  variant: Variant = DEFAULT_VARIANT;
   private shadowsDirty = true;
 
   constructor(readonly canvas: HTMLCanvasElement, quality: Quality) {
@@ -61,14 +64,37 @@ export class GameRenderer {
       s.radius = 2;
     }
     this.scene.add(this.sun);
+    this.buildWorld();
+  }
+
+  private buildWorld() {
     const mats = materials(this.renderer.capabilities.getMaxAnisotropy());
-    this.world = buildWorld(mats, quality);
+    this.world = buildWorld(mats, this.quality, this.variant);
     this.scene.add(this.world.root);
-    if (quality === 'low') {
+    if (this.quality === 'low') {
       this.world.root.traverse((o) => {
         (o as THREE.Mesh).castShadow = false;
       });
     }
+    this.shadowsDirty = true;
+  }
+
+  /** Switches the ambiance: seasonal world, sky, fog and light. */
+  setVariant(v: Variant) {
+    if (v === this.variant) return;
+    this.variant = v;
+    this.scene.remove(this.world.root);
+    this.world.root.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
+    this.buildWorld();
+    (this.scene.background as THREE.Texture | null)?.dispose();
+    this.scene.background = skyTexture(v);
+    const look = LOOKS[v];
+    (this.scene.fog as THREE.Fog).color.setHex(look.fog);
+    this.sun.color.setHex(look.sun);
+    this.sun.intensity = look.sunI;
+    this.hemi.color.setHex(look.sky);
+    this.hemi.groundColor.setHex(look.ground);
+    this.hemi.intensity = look.hemiI;
   }
 
   setSize(w: number, h: number) {
@@ -100,6 +126,14 @@ export class GameRenderer {
     r.render(this.scene, cam);
   }
 }
+
+/** Light and fog of each ambiance. */
+const LOOKS: Record<Variant, { fog: number; sun: number; sunI: number; sky: number; ground: number; hemiI: number }> = {
+  ete: { fog: 0xd9e9f0, sun: 0xfff1dc, sunI: 2.4, sky: 0xe6f3ff, ground: 0xb59b74, hemiI: 1.55 },
+  marche: { fog: 0xd9e9f0, sun: 0xfff1dc, sunI: 2.4, sky: 0xe6f3ff, ground: 0xb59b74, hemiI: 1.55 },
+  automne: { fog: 0xeadcc2, sun: 0xffd2a0, sunI: 2.25, sky: 0xf2e6d0, ground: 0xb08860, hemiI: 1.5 },
+  hiver: { fog: 0xe8eef3, sun: 0xeaf2ff, sunI: 1.9, sky: 0xeef4fb, ground: 0xc9d2dc, hemiI: 1.75 },
+};
 
 export function detectQuality(): Quality {
   try {

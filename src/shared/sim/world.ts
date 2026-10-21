@@ -1,8 +1,10 @@
-// Static world built once from the map data and shared by simulation and AI.
+// Static world built once per ambiance from the map data, shared by the
+// simulation and the AI.
 import { Box, StaticColliders, doorBox } from '../world/colliders';
 import { CAT_EDGES, CAT_NODES, DOORS, ITEMS, STATIONS } from '../world/map';
 import { NavGrid } from '../world/nav';
 import { MASK_DOG, MASK_HUMAN } from '../world/types';
+import { DEFAULT_VARIANT, Variant } from '../world/variants';
 import { DOG, HUMAN } from '../constants';
 
 export interface CatLink {
@@ -14,7 +16,7 @@ export interface CatLink {
 }
 
 export class World {
-  readonly cols = new StaticColliders();
+  readonly cols: StaticColliders;
   readonly humanNav: NavGrid;
   readonly dogNav: NavGrid;
   readonly doorBoxes: Box[];
@@ -24,7 +26,8 @@ export class World {
   readonly catNodeIndex = new Map<string, number>();
   readonly catAdj: CatLink[][];
 
-  constructor() {
+  constructor(readonly variant: Variant = DEFAULT_VARIANT) {
+    this.cols = new StaticColliders(variant);
     this.humanNav = new NavGrid(this.cols, MASK_HUMAN, HUMAN.radius);
     this.dogNav = new NavGrid(this.cols, MASK_DOG, DOG.radius);
     this.doorBoxes = DOORS.map(doorBox);
@@ -47,9 +50,13 @@ export class World {
   }
 }
 
-let shared: World | null = null;
+const shared = new Map<Variant, World>();
 
-export function getWorld(): World {
-  if (!shared) shared = new World();
-  return shared;
+export function getWorld(variant: Variant = DEFAULT_VARIANT): World {
+  let w = shared.get(variant);
+  if (!w) {
+    w = new World(variant);
+    shared.set(variant, w);
+  }
+  return w;
 }

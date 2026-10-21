@@ -1,5 +1,6 @@
 // Data types describing the static world. The map is pure data: colliders,
 // navigation grids and 3D meshes are all derived from it.
+import type { Variant } from './variants';
 
 /** Collision masks: a collider blocks an agent if (collider.mask & agentMask) != 0. */
 export const MASK_HUMAN = 1;
@@ -107,7 +108,8 @@ export type PropType =
   | 'fruit_tree' | 'bush' | 'car' | 'streetlamp' | 'plane_tree' | 'bench' | 'bollard' | 'barrier' | 'spring_rider'
   | 'planter' | 'veg_patch' | 'flowerbed' | 'bike' | 'roadsign' | 'cafe_table' | 'awning' | 'mailbox_post'
   | 'dog_bowl' | 'pot_decor' | 'swing_set' | 'hydrant' | 'bus_shelter' | 'kennel'
-  | 'toybox' | 'hamper' | 'dog_basket' | 'bakery_stand' | 'clothesline_basket' | 'roll_holder' | 'vacuum_dock';
+  | 'toybox' | 'hamper' | 'dog_basket' | 'bakery_stand' | 'clothesline_basket' | 'roll_holder' | 'vacuum_dock'
+  | 'market_stall';
 
 export interface PropDef {
   type: PropType;
@@ -123,12 +125,14 @@ export interface PropDef {
   color2?: number;
   /** Arbitrary variant index for visual variety. */
   v?: number;
+  /** Only in these ambiances (market stalls). */
+  only?: Variant[];
 }
 
 export type StationKind =
   | 'hamper' | 'dresser' | 'clothesline' | 'toybox' | 'dining_table' | 'garden_table' | 'console'
   | 'street_bin' | 'mailbox' | 'cupboard' | 'counter' | 'treat_jar' | 'bakery' | 'bed' | 'sofa'
-  | 'flowerbed' | 'dog_basket' | 'tap' | 'shoe_rack' | 'bedside' | 'roll_holder';
+  | 'flowerbed' | 'dog_basket' | 'tap' | 'shoe_rack' | 'bedside' | 'roll_holder' | 'market';
 
 export interface StationDef {
   id: string;
@@ -151,6 +155,8 @@ export interface StationDef {
   linkedItem?: string;
   /** Maximum stored items. */
   capacity?: number;
+  /** Only in these ambiances (disabled otherwise). */
+  only?: Variant[];
 }
 
 export interface BuildingDef {
@@ -179,6 +185,8 @@ export interface ItemPlacement {
   z?: number;
   y?: number;
   rot?: number;
+  /** Only in these ambiances (the item is absent otherwise). */
+  only?: Variant[];
 }
 
 export interface Puddle {

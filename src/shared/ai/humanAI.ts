@@ -232,8 +232,8 @@ export class HumanAI implements AIController {
         track: () => (tofu.hold.length ? { x: tofu.x + tofu.vx * 0.35, z: tofu.z + tofu.vz * 0.35 } : null),
       });
     }
-    // 2. Muddy paws inside the house.
-    if (tofu.mud > 0.25 && dT < 9 && (inHouse(tofu.x, tofu.z) || dT < 4)) {
+    // 2. Dirty paws inside the house (outside in winter, they get snowy again at once).
+    if (tofu.mud > 0.25 && dT < 9 && (inHouse(tofu.x, tofu.z) || (dT < 4 && tofu.pawKind !== 'snow'))) {
       add(70 - dT * 2, {
         key: 'paws', want: { kind: 'paws', target: tofu.id }, x: tofu.x, z: tofu.z, sprint: dT > 3, timeout: 8,
         track: () => (tofu.mud > 0.08 ? { x: tofu.x + tofu.vx * 0.3, z: tofu.z + tofu.vz * 0.3 } : null),
@@ -248,7 +248,9 @@ export class HumanAI implements AIController {
     for (const m of S.messes) {
       const d = dist(me.x, me.z, m.x, m.z);
       const dirt = MESS_TYPES[m.kind].dirt;
-      add(48 + dirt * 1.5 - d * 1.1 + cleanUrgency + (allTasks ? 15 : 0), {
+      // Water marks dry up by themselves: better spend the time elsewhere.
+      const dries = m.kind === 'wet' ? 16 : 0;
+      add(48 + dirt * 1.5 - d * 1.1 + cleanUrgency + (allTasks ? 15 : 0) - dries, {
         key: `mess:${m.id}`, want: { kind: 'clean', target: m.id }, x: m.x, z: m.z, timeout: 18,
       });
     }
@@ -395,6 +397,10 @@ export class HumanAI implements AIController {
         if (!ids.length) return { key: 'drop', want: { kind: 'drop', target: it.idx }, x: me.x, z: me.z, timeout: 3 };
         break;
       }
+      case 'market':
+        // Back to its own stall.
+        ids = t.respawnAt ? [t.respawnAt] : [];
+        break;
       case 'ball':
         return null; // kept to lure Tofu
     }

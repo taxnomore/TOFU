@@ -47,7 +47,7 @@ export class Room {
   clients = new Map<string, Client>();
   order: string[] = [];
   hostId = '';
-  settings: LobbySettings = { duration: DEFAULT_DURATION, fillAI: true, difficulty: 1 };
+  settings: LobbySettings = { duration: DEFAULT_DURATION, fillAI: true, difficulty: 1, variant: 'ete' };
   private assigned = new Map<string, 'tofu' | 'human'>();
   phase: 'lobby' | 'game' = 'lobby';
   game: Game | null = null;
@@ -378,7 +378,7 @@ export class Room {
     if (!tofuP && !humansP.length) return;
     this.cfg = {
       seed: randomBytes(4).readUInt32LE(0), duration: this.settings.duration, players, difficulty: this.settings.difficulty,
-      countdown: this.opts.countdown ?? COUNTDOWN_TIME + INTRO_TIME,
+      countdown: this.opts.countdown ?? COUNTDOWN_TIME + INTRO_TIME, variant: this.settings.variant,
     };
     this.game = new Game(this.cfg);
     this.ais.clear();

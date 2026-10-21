@@ -3,8 +3,9 @@
 // what is really in the house (a job can be undone by Tofu and redone).
 import { CLEANLINESS, TASKS_PER_HUMANS, PAPER } from '../constants';
 import { Rng } from '../math';
-import { ITEM_TYPES, MESS_TYPES } from '../world/itemTypes';
+import { ITEM_TYPES, MESS_TYPES, isTrail } from '../world/itemTypes';
 import { OUTSIDE_PROPERTY_ZONES, STATIONS, zoneById } from '../world/map';
+import type { Variant } from '../world/variants';
 import type { Game } from './game';
 import type { GameState, SecretState, TaskKind, TaskState } from './types';
 
@@ -117,6 +118,8 @@ export interface SecretDef {
   icon: string;
   /** Requires the carrier NPC or another feature. */
   needs?: string;
+  /** Only offered in this ambiance (and always offered there). */
+  variant?: Variant;
 }
 
 export const SECRET_DEFS: SecretDef[] = [
@@ -136,16 +139,23 @@ export const SECRET_DEFS: SecretDef[] = [
   { id: 'aboie', text: 'Fais sursauter les humains 3 fois en aboyant', goal: 3, icon: '📢' },
   { id: 'facteur', text: 'Aboie sur la factrice quand elle passe', goal: 1, icon: '📮', needs: 'carrier' },
   { id: 'papier', text: 'Déroule 25 feuilles de papier toilette', goal: 25, icon: '🧻' },
+  { id: 'chaine', text: "Fais renverser 2 objets par le chat ou par l'aspirateur", goal: 2, icon: '⛓️' },
+  { id: 'arrosoir', text: "Vole l'arrosoir et laisse 15 gouttes dans la maison", goal: 15, icon: '🚿' },
+  { id: 'feuilles', text: 'Éparpille 4 tas de feuilles', goal: 4, icon: '🍂', variant: 'automne' },
+  { id: 'bonhomme', text: 'Démolis les 2 bonshommes de neige', goal: 2, icon: '⛄', variant: 'hiver' },
+  { id: 'marche', text: 'Mange 2 bonnes choses volées au marché', goal: 2, icon: '🧀', variant: 'marche' },
 ];
 
 export function secretDef(id: string): SecretDef {
   return SECRET_DEFS.find((s) => s.id === id)!;
 }
 
-export function chooseSecrets(rng: Rng, humanCount: number): SecretState[] {
-  let pool = SECRET_DEFS.filter((s) => s.id !== 'aboie' || humanCount > 0);
+export function chooseSecrets(rng: Rng, humanCount: number, variant: Variant = 'ete'): SecretState[] {
+  let pool = SECRET_DEFS.filter((s) => !s.variant && (s.id !== 'aboie' || humanCount > 0));
   pool = rng.shuffle([...pool]);
-  return pool.slice(0, 3).map((s) => ({ id: s.id, progress: 0, goal: s.goal, done: false }));
+  // The ambiance always brings its own challenge.
+  const own = SECRET_DEFS.filter((s) => s.variant === variant);
+  return [...own, ...pool].slice(0, 3).map((s) => ({ id: s.id, progress: 0, goal: s.goal, done: false }));
 }
 
 /** Cleanliness in percent, computed from messes and misplaced objects. */
@@ -155,8 +165,8 @@ export function computeCleanliness(g: Game): number {
   for (const m of S.messes) {
     const def = MESS_TYPES[m.kind];
     let d = def.dirt;
-    if (m.kind === 'mud') d *= Math.min(1, m.prints.length / 3 / CLEANLINESS.mudFullPrints);
-    if (m.kind === 'paper') d *= Math.min(1, m.prints.length / 3 / PAPER.fullStrips);
+    // A trail is fully dirty once it holds a few marks.
+    if (isTrail(m.kind)) d *= Math.min(1, m.prints.length / 3 / (m.kind === 'paper' ? PAPER.fullStrips : CLEANLINESS.mudFullPrints));
     dirt += d * zoneFactor(m.zone);
   }
   for (const it of S.items) {

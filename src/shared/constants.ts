@@ -9,7 +9,7 @@ export const GUESTS_COUNTDOWN = 15;
 
 export const CHAOS_GOAL = 200;
 /** Chaos goal by number of humans (2 humans clean up faster). */
-export const CHAOS_GOAL_BY_HUMANS = [220, 220, 170];
+export const CHAOS_GOAL_BY_HUMANS = [250, 250, 180];
 export const CLEAN_GOAL = 70;
 
 export const BTN_INTERACT = 1;
@@ -72,6 +72,14 @@ export const DOG = {
   boopStun: 0.6,
   bedJumpCd: 6,
   carrySlow: 0.14,
+  /** Highest object Tofu can knock over on purpose (higher up: only the cat). */
+  knockReachY: 0.9,
+  /** Paw dirt from walking in the snow (winter). */
+  snowPaws: 0.3,
+  /** Paw dirt from jumping into a pile of leaves (autumn). */
+  leafPaws: 0.55,
+  /** Dirt lost per leaf dropped indoors (leaves fall off faster than mud). */
+  leafPerPrint: 0.05,
 };
 
 export const CAT = {
@@ -102,6 +110,8 @@ export const CHAOS = {
   dig: 4,
   tablecloth: 7,
   print: 0.15,
+  /** Wet print of snowy paws (winter): they dry up anyway. */
+  wetPrint: 0.06,
   chasePerSec: 1.2,
   chaseCapPerFlee: 6,
   barkCat: 2,
@@ -121,6 +131,26 @@ export const CHAOS = {
   paper: 0.15,
   /** Tofu switches the robot vacuum on. */
   vacuum: 1.5,
+  /** Goods stolen from a market stall (instead of `steal`). */
+  marketSteal: 3,
+};
+
+/** Watering can stolen by Tofu: it leaks behind him. */
+export const CAN = {
+  /** Distance between two drops (m). */
+  dripSpacing: 0.4,
+  /** Water used per drop (a full can holds 2: 20 drops). */
+  perDrip: 0.1,
+  /** Chaos per drop left on a floor. */
+  dripChaos: 0.08,
+};
+
+/** Water marks (leaking can, snowy paws) dry up on their own. */
+export const WET = {
+  /** Age (s) of a trail cell before it starts drying. */
+  dryAfter: 25,
+  /** One mark dries every this many seconds. */
+  dryEvery: 2.5,
 };
 
 /** Robot vacuum of the living room. */
@@ -167,6 +197,8 @@ export const ZOOM_GAIN: Record<string, number> = {
   street: 0.1,
   paper: 0.1,
   vacuum: 0.12,
+  leaves: 0.12,
+  drip: 0.1,
 };
 
 export const CLEANLINESS = {

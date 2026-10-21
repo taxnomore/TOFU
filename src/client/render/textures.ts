@@ -1,6 +1,7 @@
 // Procedural canvas textures (no external image files, no licensing issues).
 import * as THREE from 'three';
 import type { FloorKind } from '../../shared/world/types';
+import type { Variant } from '../../shared/world/variants';
 
 function rng(seed: number) {
   let s = seed >>> 0 || 1;
@@ -315,17 +316,72 @@ const painters: Record<FloorKind, { size: number; tile: number; paint: Painter }
 
 const cache = new Map<string, THREE.Texture>();
 
-export function floorTexture(kind: FloorKind, maxAniso = 4): { tex: THREE.Texture; tile: number } {
+/** Ground mostly hidden under snow; hard floors only partly (swept paths). */
+const SNOWED: Partial<Record<FloorKind, number>> = { grass: 0.92, soil: 0.85, sand: 0.88, gravel: 0.8, terrace: 0.55, pavers: 0.5, sidewalk: 0.35 };
+/** Outdoor floors where fallen leaves gather. */
+const LEAFY: Partial<Record<FloorKind, number>> = { grass: 70, gravel: 35, pavers: 30, terrace: 22, sidewalk: 26, sand: 12 };
+
+const LEAF_COLORS = ['#d35400', '#e67e22', '#f39c12', '#c0392b', '#d4a017', '#9c5a2e'];
+
+/** Paints the season over a floor texture (snow cover, fallen leaves). */
+function seasonOverlay(ctx: CanvasRenderingContext2D, w: number, h: number, kind: FloorKind, season: Variant) {
+  if (season === 'hiver' && SNOWED[kind]) {
+    const cover = SNOWED[kind]!;
+    const r = rng(101);
+    // Big soft drifts, then sparkles and a few blue shadows.
+    for (let i = 0; i < 70; i++) {
+      const x = r() * w;
+      const y = r() * h;
+      const rad = (0.12 + r() * 0.2) * w * cover;
+      const g = ctx.createRadialGradient(x, y, rad * 0.2, x, y, rad);
+      g.addColorStop(0, `rgba(246,249,252,${0.95 * cover})`);
+      g.addColorStop(1, 'rgba(246,249,252,0)');
+      ctx.fillStyle = g;
+      for (const dx of [-w, 0, w]) for (const dy of [-h, 0, h]) ctx.fillRect(x + dx - rad, y + dy - rad, rad * 2, rad * 2);
+    }
+    ctx.fillStyle = `rgba(240,245,250,${cover * 0.75})`;
+    ctx.fillRect(0, 0, w, h);
+    for (let i = 0; i < 900; i++) {
+      ctx.fillStyle = r() > 0.5 ? 'rgba(255,255,255,0.9)' : 'rgba(170,190,215,0.35)';
+      ctx.fillRect(r() * w, r() * h, 1 + r() * 2, 1 + r() * 2);
+    }
+    return;
+  }
+  if (season === 'automne' && LEAFY[kind]) {
+    const r = rng(202);
+    if (kind === 'grass') {
+      ctx.fillStyle = 'rgba(190,150,60,0.22)';
+      ctx.fillRect(0, 0, w, h);
+    }
+    const n = LEAFY[kind]!;
+    for (let i = 0; i < n; i++) {
+      const x = r() * w;
+      const y = r() * h;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(r() * Math.PI * 2);
+      ctx.fillStyle = LEAF_COLORS[Math.floor(r() * LEAF_COLORS.length)];
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 3 + r() * 3, 1.6 + r() * 1.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+}
+
+export function floorTexture(kind: FloorKind, maxAniso = 4, season: Variant = 'ete'): { tex: THREE.Texture; tile: number } {
   const p = painters[kind];
-  let tex = cache.get(kind);
+  const key = `${kind}|${season}`;
+  let tex = cache.get(key);
   if (!tex) {
     const [c, ctx] = canvas(p.size, p.size);
     p.paint(ctx, p.size, p.size);
+    seasonOverlay(ctx, p.size, p.size, kind, season);
     tex = new THREE.CanvasTexture(c);
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = maxAniso;
-    cache.set(kind, tex);
+    cache.set(key, tex);
   }
   return { tex, tile: p.tile };
 }
@@ -352,13 +408,21 @@ export function textTexture(text: string, opts: { w?: number; h?: number; bg?: s
   return tex;
 }
 
+const SKIES: Record<Variant, [string, string, string]> = {
+  ete: ['#6fb2e6', '#a9d4f0', '#f3e6cf'],
+  marche: ['#6fb2e6', '#a9d4f0', '#f3e6cf'],
+  automne: ['#8fb3cf', '#d8c9a8', '#f2d3a2'],
+  hiver: ['#a9bccd', '#d9e2ea', '#f4f6f8'],
+};
+
 /** Vertical sky gradient used as scene background. */
-export function skyTexture(): THREE.Texture {
+export function skyTexture(season: Variant = 'ete'): THREE.Texture {
   const [c, ctx] = canvas(4, 256);
   const g = ctx.createLinearGradient(0, 0, 0, 256);
-  g.addColorStop(0, '#6fb2e6');
-  g.addColorStop(0.55, '#a9d4f0');
-  g.addColorStop(1, '#f3e6cf');
+  const [top, mid, low] = SKIES[season];
+  g.addColorStop(0, top);
+  g.addColorStop(0.55, mid);
+  g.addColorStop(1, low);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 4, 256);
   const tex = new THREE.CanvasTexture(c);
@@ -404,6 +468,22 @@ export function paperTexture(): THREE.Texture {
   for (const y of [31, 63]) for (let x = 4; x < 28; x += 4) ctx.fillRect(x, y, 2, 2);
   ctx.fillStyle = 'rgba(0,0,0,0.05)';
   for (let x = 6; x < 28; x += 5) ctx.fillRect(x, 0, 1, 96);
+  return new THREE.CanvasTexture(c);
+}
+
+/** A leaf (white, tinted per instance) with a central vein. */
+export function leafTexture(): THREE.Texture {
+  const [c, ctx] = canvas(32, 20);
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.ellipse(16, 10, 14, 7.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(80,40,10,0.55)';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(2, 10);
+  ctx.lineTo(30, 10);
+  ctx.stroke();
   return new THREE.CanvasTexture(c);
 }
 

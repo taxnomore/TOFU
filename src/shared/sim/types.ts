@@ -1,5 +1,6 @@
 // Game state shapes. Plain JSON-friendly objects so snapshots serialize easily.
 import type { MessKind } from '../world/itemTypes';
+import type { Variant } from '../world/variants';
 
 export type Role = 'tofu' | 'human';
 export type Winner = 'tofu' | 'humans';
@@ -24,6 +25,8 @@ export interface GameConfig {
   noCountdown?: boolean;
   /** Countdown length in seconds (network games add time for the role cards). */
   countdown?: number;
+  /** Ambiance (season or market day). Default: summer. */
+  variant?: Variant;
 }
 
 export interface InputFrame {
@@ -92,7 +95,12 @@ export interface Character {
   /** One-shot animation lock (bark, throw, eat...). */
   lockT: number;
   // Dog
+  /** Dirty paws (0..1), whatever the dirt: see pawKind. */
   mud: number;
+  /** What the paws leave behind indoors: mud prints, wet prints (snow) or leaves. */
+  pawKind: PawKind;
+  /** Distance since the last drop of the leaking watering can. */
+  dripAcc: number;
   zoom: number;
   zoomT: number;
   pantT: number;
@@ -122,6 +130,8 @@ export interface Character {
   say: string;
   sayT: number;
 }
+
+export type PawKind = 'mud' | 'snow' | 'leaves';
 
 export type ItemState = 'home' | 'free' | 'held' | 'stored' | 'air' | 'knocked' | 'gone';
 
@@ -303,6 +313,13 @@ export interface Stats {
   tasksDone: number;
   startles: number;
   paperUnrolled: number;
+  /** Drops left by the leaking watering can. */
+  drops: number;
+  leavesScattered: number;
+  snowmen: number;
+  marketStolen: number;
+  /** Things the cat or the vacuum knocked over while Tofu was behind it. */
+  chains: number;
 }
 
 export type Phase = 'countdown' | 'play' | 'end';

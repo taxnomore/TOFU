@@ -156,6 +156,25 @@ class Sfx {
         this.tone(140, 0.15, 'sine', 0.3 * vol, 0, 70);
         this.noise(0.08, 0.12 * vol, 'lowpass', 800);
         break;
+      // Leaves scattered: a dry crackling rustle.
+      case 'rustle':
+        if (!this.throttle('rustle', 200)) return;
+        this.noise(0.5, 0.18 * vol, 'highpass', 2500, 0, 0.8, 5000);
+        this.noise(0.35, 0.1 * vol, 'bandpass', 4200, 0.08, 2);
+        break;
+      // A snowman falling apart: muffled "pouf".
+      case 'snowThud':
+        this.noise(0.4, 0.3 * vol, 'lowpass', 900, 0, 0.7, 200);
+        this.tone(90, 0.3, 'sine', 0.25 * vol, 0, 50);
+        break;
+      // One drop of the leaking watering can.
+      case 'drip':
+        if (!this.throttle('drip', 300)) return;
+        this.tone(1500 + Math.random() * 500, 0.06, 'sine', 0.05 * vol, 0, 700);
+        break;
+      case 'pawSnow':
+        this.noise(0.06, 0.06 * vol, 'lowpass', 1600 + Math.random() * 300, 0, 1.2, 600);
+        break;
       case 'splash':
         if (!this.throttle('splash', 250)) return;
         this.noise(0.4, 0.35 * vol, 'bandpass', 1400, 0, 1.2, 400);

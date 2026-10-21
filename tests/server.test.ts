@@ -130,8 +130,11 @@ describe('LAN server with three clients', () => {
     expect(a.start).toBeNull();
     expect(a.lobby?.settings.duration).not.toBe(900);
 
-    a.send({ t: 'settings', settings: { duration: 120, difficulty: 0 } });
+    a.send({ t: 'settings', settings: { duration: 120, difficulty: 0, variant: 'pluie' } as never });
     await until(() => b.lobby?.settings.duration === 120, 2000, 'settings');
+    expect(b.lobby?.settings.variant).toBe('ete');
+    a.send({ t: 'settings', settings: { variant: 'hiver' } });
+    await until(() => b.lobby?.settings.variant === 'hiver', 2000, 'ambiance');
     a.send({ t: 'start' });
     await until(() => a.start && b.start && c.start, 4000, 'start');
     expect(a.start!.you).toEqual([{ seat: 0, charId: 0 }]);
@@ -141,6 +144,10 @@ describe('LAN server with three clients', () => {
       ['tofu', 'Alice', false], ['human', 'Bruno', false], ['human', 'Chloé', false],
     ]);
     expect(a.start!.cfg.duration).toBe(120);
+    // Winter: every client builds the same snowy world.
+    expect(a.start!.cfg.variant).toBe('hiver');
+    const snowman = a.state!.items.find((it) => it.id === 'bonhomme_jardin')!;
+    expect(snowman.state).toBe('home');
 
     // Play: Bruno walks along -z (free corridor) for one second.
     await until(() => b.state?.phase === 'play', 3000, 'play phase');

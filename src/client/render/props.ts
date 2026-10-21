@@ -4,7 +4,8 @@
 import * as THREE from 'three';
 import { PROP_TYPES, propExtents } from '../../shared/world/propTypes';
 import type { PropDef, PropType } from '../../shared/world/types';
-import { ColorLike, GeoBuilder, hash, shade } from './geo';
+import type { Variant } from '../../shared/world/variants';
+import { ColorLike, GeoBuilder, hash, mix, shade } from './geo';
 
 export interface PropCtx {
   /** Opaque, never cut. */
@@ -54,7 +55,44 @@ function lamp(b: GeoBuilder, x: number, y: number, z: number, shadeColor = 0xf6e
   b.cyl(0.07, 0.11, 0.14, { x, y: y + 0.3, z }, shadeColor, 10);
 }
 
-function foliage(b: GeoBuilder, cx: number, cy: number, cz: number, r: number, base: number, seed: number, n = 6) {
+let season: Variant = 'ete';
+
+/** The season the next props are built for (set by the world builder). */
+export function setPropSeason(v: Variant): void {
+  season = v;
+}
+
+const AUTUMN_LEAVES = [0xd35400, 0xe67e22, 0xeba524, 0xc0392b, 0xd4a017, 0xb5651d];
+const SNOW = 0xf3f7fb;
+
+/** A soft layer of snow on a flat top (winter only). */
+function snowCap(b: GeoBuilder, w: number, d: number, y: number, x = 0, z = 0) {
+  if (season === 'hiver') b.rbox(w, 0.07, d, 0.03, { x, y: y + 0.03, z }, SNOW);
+}
+
+/**
+ * Leafy crown. Deciduous trees turn red and gold in autumn and lose their
+ * leaves in winter; evergreen bushes only warm up, or get a snow cap.
+ */
+function foliage(b: GeoBuilder, cx: number, cy: number, cz: number, r: number, base: number, seed: number, n = 6, evergreen = false) {
+  if (season === 'hiver' && !evergreen) {
+    // Bare branches with a little snow on them.
+    const y0 = cy - r * 0.55;
+    for (let i = 0; i < 6; i++) {
+      const a = hash(i, seed) * Math.PI * 2;
+      const t = 0.45 + hash(i + 10, seed) * 0.55;
+      const L = r * (0.9 + hash(i + 20, seed) * 0.5);
+      const dx = -Math.sin(t) * Math.cos(a);
+      const dy = Math.cos(t);
+      const dz = Math.sin(t) * Math.sin(a);
+      b.cyl(r * 0.025, r * 0.06, L, { x: cx + (dx * L) / 2, y: y0 + (dy * L) / 2, z: cz + (dz * L) / 2, rz: t, ry: a }, 0x6d5443, 5);
+      if (hash(i + 30, seed) > 0.35) b.ico(r * 0.13, { x: cx + dx * L * 0.75, y: y0 + dy * L * 0.75 + r * 0.06, z: cz + dz * L * 0.75, sy: 0.5 }, SNOW);
+    }
+    return;
+  }
+  const autumn = season === 'automne';
+  const tint = (col: number) => (autumn && evergreen ? mix(col, 0xb8913a, 0.35).getHex() : col);
+  const pick = (i: number) => (autumn && !evergreen ? AUTUMN_LEAVES[Math.floor(hash(i + 77, seed) * AUTUMN_LEAVES.length)] : tint(base));
   for (let i = 0; i < n; i++) {
     const a = hash(i, seed) * Math.PI * 2;
     const rr = r * (0.35 + hash(i + 10, seed) * 0.45);
@@ -62,13 +100,17 @@ function foliage(b: GeoBuilder, cx: number, cy: number, cz: number, r: number, b
     b.ico(r * (0.5 + hash(i + 30, seed) * 0.35), {
       x: cx + Math.cos(a) * rr, y: cy + (hash(i + 40, seed) - 0.3) * r * 0.7, z: cz + Math.sin(a) * rr,
       ry: hash(i + 60, seed) * 3,
-    }, shade(base, k), 0.12);
+    }, shade(pick(i), k), 0.12);
   }
-  b.ico(r * 0.75, { x: cx, y: cy + r * 0.25, z: cz }, shade(base, 1.08), 0.12);
+  b.ico(r * 0.75, { x: cx, y: cy + r * 0.25, z: cz }, shade(pick(99), 1.08), 0.12);
+  if (season === 'hiver') b.ico(r * 0.62, { x: cx, y: cy + r * 0.62, z: cz, sy: 0.42 }, SNOW, 0.08);
 }
 
 function flowers(b: GeoBuilder, x0: number, z0: number, x1: number, z1: number, y: number, seed: number, density = 18) {
-  const cols = [0xe74c3c, 0xf5b7b1, 0xf7dc6f, 0xffffff, 0xaf7ac5, 0xf0932b, 0xff8fab];
+  // Winter: nothing above the snow. Autumn: a few chrysanthemums.
+  if (season === 'hiver') return;
+  const cols = season === 'automne' ? [0xe67e22, 0xf1c40f, 0x8e2b3c, 0xd35400] : [0xe74c3c, 0xf5b7b1, 0xf7dc6f, 0xffffff, 0xaf7ac5, 0xf0932b, 0xff8fab];
+  if (season === 'automne') density *= 0.6;
   const n = Math.max(3, Math.floor((x1 - x0) * (z1 - z0) * density));
   for (let i = 0; i < n; i++) {
     const x = x0 + hash(i, seed) * (x1 - x0);
@@ -385,6 +427,7 @@ const B: Partial<Record<PropType, Builder>> = {
   },
   garden_table({ b, h }) {
     b.cylU(0.6, 0.03, { y: h - 0.015 }, 0xf5f6fa, 16);
+    if (season === 'hiver') b.cylU(0.56, 0.06, { y: h + 0.03 }, SNOW, 16);
     b.cylU(0.03, h, { y: h / 2 }, METAL, 8);
     b.cyl(0.04, 0.3, 0.05, { y: 0.025 }, METAL, 12);
   },
@@ -436,8 +479,9 @@ const B: Partial<Record<PropType, Builder>> = {
     const y0 = h - 0.3;
     const W = w / 2 + 0.25;
     const D = d / 2 + 0.25;
-    c.tris([-W, y0, -D, -W, y0 + rh, 0, W, y0 + rh, 0, -W, y0, -D, W, y0 + rh, 0, W, y0, -D], 0x4a5a50);
-    c.tris([-W, y0, D, W, y0 + rh, 0, -W, y0 + rh, 0, -W, y0, D, W, y0, D, W, y0 + rh, 0], 0x55675b);
+    const snowy = season === 'hiver';
+    c.tris([-W, y0, -D, -W, y0 + rh, 0, W, y0 + rh, 0, -W, y0, -D, W, y0 + rh, 0, W, y0, -D], snowy ? 0xe3eaf1 : 0x4a5a50);
+    c.tris([-W, y0, D, W, y0 + rh, 0, -W, y0 + rh, 0, -W, y0, D, W, y0, D, W, y0 + rh, 0], snowy ? SNOW : 0x55675b);
     c.tris([-w / 2, y0, -d / 2, -w / 2, y0, d / 2, -w / 2, y0 + rh, 0], wood);
     c.tris([w / 2, y0, d / 2, w / 2, y0, -d / 2, w / 2, y0 + rh, 0], wood);
     // Tools leaning on the side.
@@ -484,13 +528,14 @@ const B: Partial<Record<PropType, Builder>> = {
     c.cyl(0.1, 0.16, trunkH, { y: trunkH / 2 }, 0x8a6a50, 8);
     const base = v === 1 ? 0xf3b6c8 : v === 2 ? 0x7cb342 : 0x6ab04c;
     foliage(c, 0, trunkH + 0.75, 0, 1.15, base, 33 + v, 6);
+    if (season === 'hiver') return;
     if (v === 0) {
       for (let i = 0; i < 10; i++) {
         const a = hash(i, 9) * Math.PI * 2;
         c.sphere(0.07, { x: Math.cos(a) * 0.9, y: trunkH + 0.5 + hash(i, 4) * 0.8, z: Math.sin(a) * 0.9 }, 0xd63031, 'lo');
       }
     }
-    if (v === 1) {
+    if (v === 1 && season !== 'automne') {
       for (let i = 0; i < 14; i++) {
         const a = hash(i, 19) * Math.PI * 2;
         c.sphere(0.06, { x: Math.cos(a) * 0.95, y: trunkH + 0.5 + hash(i, 14) * 0.9, z: Math.sin(a) * 0.95 }, 0xffffff, 'lo');
@@ -499,8 +544,8 @@ const B: Partial<Record<PropType, Builder>> = {
   },
   bush({ b, p, w }) {
     const v = p.v ?? 0;
-    foliage(b, 0, 0.45, 0, w * 0.5, v === 1 ? 0x4f9a46 : 0x5fae4a, 71 + Math.round(p.x * 3 + p.z), 5);
-    if (v === 1) {
+    foliage(b, 0, 0.45, 0, w * 0.5, v === 1 ? 0x4f9a46 : 0x5fae4a, 71 + Math.round(p.x * 3 + p.z), 5, true);
+    if (v === 1 && season === 'ete') {
       for (let i = 0; i < 9; i++) {
         const a = hash(i, 3 + Math.round(p.x)) * Math.PI * 2;
         b.sphere(0.06, { x: Math.cos(a) * 0.45, y: 0.5 + hash(i, 8) * 0.4, z: Math.sin(a) * 0.45 }, i % 2 ? 0xff8fab : 0xffffff, 'lo');
@@ -528,6 +573,10 @@ const B: Partial<Record<PropType, Builder>> = {
     for (const sx of [-1, 1]) {
       c.sphere(0.1, { x: sx * (w / 2 - 0.3), y: 0.72, z: d / 2 - 0.02, sz: 0.4 }, 0xfff6c8);
       c.sphere(0.09, { x: sx * (w / 2 - 0.3), y: 0.72, z: -d / 2 + 0.02, sz: 0.4 }, 0xe74c3c);
+    }
+    if (season === 'hiver') {
+      c.rbox(w - 0.22, 0.08, cabL - 0.12, 0.04, { y: 0.3 + bodyH + 0.55, z: cabZ }, SNOW);
+      c.rbox(w - 0.1, 0.06, (d - cabL) / 2 - 0.15, 0.03, { y: 0.3 + bodyH + 0.02, z: cabZ + cabL / 2 + (d - cabL) / 4 }, SNOW);
     }
     c.rbox(w + 0.04, 0.16, 0.14, 0.06, { y: 0.4, z: d / 2 }, 0xdfe6e9);
     c.rbox(w + 0.04, 0.16, 0.14, 0.06, { y: 0.4, z: -d / 2 }, 0xdfe6e9);
@@ -557,6 +606,7 @@ const B: Partial<Record<PropType, Builder>> = {
       b.box(0.06, 0.5, 0.06, { x: sx * (w / 2 - 0.12), y: 0.65, z: -0.22, rx: -0.15 }, GREEN_IRON);
     }
     for (let i = 0; i < 4; i++) b.box(w, 0.04, 0.1, { y: 0.46, z: -0.18 + i * 0.12 }, 0xb5835a);
+    snowCap(b, w - 0.1, 0.42, 0.48, 0, -0.0);
     for (let i = 0; i < 3; i++) b.box(w, 0.1, 0.035, { y: 0.62 + i * 0.13, z: -0.25 - i * 0.02, rx: -0.15 }, 0xb5835a);
   },
   bollard({ b }) {
@@ -594,14 +644,28 @@ const B: Partial<Record<PropType, Builder>> = {
     b.box(w, h, d, { y: h / 2 }, 0xc0703f);
     b.box(w - 0.08, 0.04, d - 0.08, { y: h - 0.02 }, 0x6b4a32);
     flowers(b, -w / 2 + 0.08, -d / 2 + 0.08, w / 2 - 0.08, d / 2 - 0.08, h, 3 + Math.round(Math.abs(w * 10)), 30);
+    snowCap(b, w - 0.04, d - 0.04, h);
   },
   veg_patch({ b, p, w, d }) {
     b.box(w, 0.12, d, { y: 0.06 }, 0x5d4030);
     for (const sx of [-1, 1]) b.box(w + 0.1, 0.18, 0.06, { y: 0.09, z: sx * (d / 2 + 0.03) }, 0x9a7650);
     for (const sx of [-1, 1]) b.box(0.06, 0.18, d + 0.1, { x: sx * (w / 2 + 0.03), y: 0.09 }, 0x9a7650);
+    if (season === 'hiver') {
+      snowCap(b, w, d, 0.12);
+      return;
+    }
     const rows = 4;
     for (let r = 0; r < rows; r++) {
       const z = -d / 2 + (r + 0.5) * (d / rows);
+      if (season === 'automne' && r >= 2) {
+        // Pumpkins and squashes.
+        for (let i = 0; i < 4; i++) {
+          const x = -w / 2 + 0.45 + i * ((w - 0.9) / 3) + (hash(i + r * 7, 5) - 0.5) * 0.2;
+          b.sphere(0.17 + hash(i, r) * 0.06, { x, y: 0.22, z, sy: 0.7 }, r === 2 ? 0xe67e22 : 0xd35400, 'mid');
+          b.cylU(0.02, 0.07, { x, y: 0.36, z }, 0x5d7c3a, 6);
+        }
+        continue;
+      }
       for (let i = 0; i < 7; i++) {
         const x = -w / 2 + 0.3 + i * ((w - 0.6) / 6);
         if (r === 0) {
@@ -633,6 +697,7 @@ const B: Partial<Record<PropType, Builder>> = {
       b.ico(0.1, { x, y: 0.08, z, sy: 0.6 }, 0xbdb7a8, 0.2);
     }
     flowers(b, -w / 2 + 0.15, -d / 2 + 0.15, w / 2 - 0.15, d / 2 - 0.15, 0.1, 51 + Math.round(p.x), 14);
+    snowCap(b, w - 0.1, d - 0.1, 0.1);
   },
   bike({ b, d }) {
     for (const sz of [-1, 1]) {
@@ -680,7 +745,7 @@ const B: Partial<Record<PropType, Builder>> = {
   pot_decor({ b, p }) {
     b.cyl(0.24, 0.17, 0.4, { y: 0.2 }, 0xc0703f, 12);
     b.cylU(0.25, 0.05, { y: 0.4 }, 0xa85f33, 12);
-    foliage(b, 0, 0.62, 0, 0.3, 0x4f9a46, 13 + Math.round(p.x), 4);
+    foliage(b, 0, 0.62, 0, 0.3, 0x4f9a46, 13 + Math.round(p.x), 4, true);
     flowers(b, -0.15, -0.15, 0.15, 0.15, 0.6, 7, 40);
   },
   hydrant({ b }) {
@@ -698,8 +763,9 @@ const B: Partial<Record<PropType, Builder>> = {
     const rh = 0.45;
     const W = w / 2 + 0.12;
     const D = d / 2 + 0.12;
-    b.tris([-W, y0, -D, W, y0, -D, W, y0 + rh, 0, -W, y0, -D, W, y0 + rh, 0, -W, y0 + rh, 0], 0xc0392b);
-    b.tris([-W, y0, D, W, y0 + rh, 0, W, y0, D, -W, y0, D, -W, y0 + rh, 0, W, y0 + rh, 0], 0xd35400);
+    const snowy = season === 'hiver';
+    b.tris([-W, y0, -D, W, y0, -D, W, y0 + rh, 0, -W, y0, -D, W, y0 + rh, 0, -W, y0 + rh, 0], snowy ? 0xe3eaf1 : 0xc0392b);
+    b.tris([-W, y0, D, W, y0 + rh, 0, W, y0, D, -W, y0, D, -W, y0 + rh, 0, W, y0 + rh, 0], snowy ? SNOW : 0xd35400);
     b.tris([-w / 2, y0, -d / 2, -w / 2, y0 + rh, 0, -w / 2, y0, d / 2], body);
     b.tris([w / 2, y0, d / 2, w / 2, y0 + rh, 0, w / 2, y0, -d / 2], body);
     b.box(0.5, 0.14, 0.02, { y: y0 - 0.12, z: d / 2 + 0.012 }, 0xffffff);
@@ -737,6 +803,36 @@ const B: Partial<Record<PropType, Builder>> = {
     for (let i = 0; i < 5; i++) {
       b.cylU(0.035, 0.7, { x: w / 2 + 0.25 + (i - 2) * 0.05, y: 0.55, z: (i % 2) * 0.05, rz: (i - 2) * 0.08 }, 0xd9a35b, 8);
     }
+  },
+  market_stall({ b, c, p, w, d }) {
+    const stripe = p.color ?? 0xe74c3c;
+    const y = 0.88;
+    // Trestle table and its cloth.
+    b.box(w, 0.05, d, { y }, 0xc49a6c);
+    b.box(w + 0.04, 0.55, 0.02, { y: y - 0.3, z: d / 2 + 0.01 }, stripe);
+    b.box(w + 0.04, 0.08, 0.025, { y: y - 0.04, z: d / 2 + 0.015 }, 0xffffff);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) b.box(0.05, y, 0.05, { x: sx * (w / 2 - 0.08), y: y / 2, z: sz * (d / 2 - 0.08) }, 0x7a5235);
+    // Crates of produce under the table, a scale on the corner.
+    b.box(0.5, 0.25, 0.35, { x: -w / 2 + 0.45, y: 0.13, z: -0.1 }, 0xb08850);
+    b.box(0.5, 0.25, 0.35, { x: w / 2 - 0.45, y: 0.13, z: -0.1 }, 0xb08850);
+    for (let i = 0; i < 6; i++) {
+      b.sphere(0.06, { x: -w / 2 + 0.28 + (i % 3) * 0.16, y: 0.28, z: -0.18 + Math.floor(i / 3) * 0.14 }, i % 2 ? 0x27ae60 : 0xe74c3c, 'lo');
+      b.sphere(0.06, { x: w / 2 - 0.62 + (i % 3) * 0.16, y: 0.28, z: -0.18 + Math.floor(i / 3) * 0.14 }, i % 2 ? 0xf1c40f : 0xe67e22, 'lo');
+    }
+    b.cylU(0.09, 0.02, { x: w / 2 - 0.2, y: y + 0.05, z: -0.25 }, 0xbdc3c7, 12);
+    b.box(0.12, 0.08, 0.1, { x: w / 2 - 0.2, y: y + 0.08, z: -0.25 }, 0x7f8c8d);
+    // Posts and striped awning, sloping toward the customers.
+    const top = 2.25;
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) c.cylU(0.03, top, { x: sx * (w / 2 - 0.04), y: top / 2, z: sz * (d / 2 - 0.04) }, 0x6d4c33, 8);
+    const n = 7;
+    const slope = Math.atan2(0.35, d + 0.5);
+    for (let i = 0; i < n; i++) {
+      const x = -w / 2 - 0.1 + (i + 0.5) * ((w + 0.2) / n);
+      const col = i % 2 ? 0xffffff : stripe;
+      c.box((w + 0.2) / n, 0.03, d + 0.55, { x, y: top + 0.05, z: 0.1, rx: slope }, col);
+      c.box((w + 0.2) / n, 0.2, 0.02, { x, y: top - 0.22, z: d / 2 + 0.38 }, col);
+    }
+    snowCap(c, w + 0.1, d + 0.4, top + 0.12, 0, 0.1);
   },
   swing_set() {},
   bus_shelter() {},

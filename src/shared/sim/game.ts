@@ -2,13 +2,14 @@
 // split screen) and on the Node LAN server. Fixed 60 Hz steps, deterministic
 // for a given seed and input sequence.
 import {
-  BAGUETTE_RESPAWN, BTN_BARK, CHAOS_GOAL_BY_HUMANS, BTN_INTERACT, BTN_SPECIAL, CHAOS, CHAOS_GOAL, CLEAN_GOAL,
+  BAGUETTE_RESPAWN, BTN_BARK, CAN, WET, CHAOS_GOAL_BY_HUMANS, BTN_INTERACT, BTN_SPECIAL, CHAOS, CHAOS_GOAL, CLEAN_GOAL,
   COUNTDOWN_TIME, DOG, GUARD_TIME, GUESTS_COUNTDOWN, HUMAN, KNOCK_RESTORE_CD, SIM_DT, ZOOM_GAIN, PAPER,
 } from '../constants';
 import { Rng, clamp, dist } from '../math';
-import { ITEM_TYPES, MESS_TYPES, MessKind } from '../world/itemTypes';
+import { ITEM_TYPES, MESS_TYPES, MessKind, isTrail } from '../world/itemTypes';
 import { DOORS, ITEMS, PUDDLES, SPAWNS, STATIONS, STREET_ZONES, OUTSIDE_PROPERTY_ZONES, WORLD_BOUNDS, zoneAt } from '../world/map';
-import { MASK_ITEM } from '../world/types';
+import { MASK_ITEM, Zone } from '../world/types';
+import { DEFAULT_VARIANT, SNOWY_ZONES, Variant, presentIn } from '../world/variants';
 import { catHearsBark, initialCat, updateCat } from './cat';
 import { carrierHearsBark, initialCarrier, updateCarrier } from './carrier';
 import { initialVacuum, updateVacuum } from './vacuum';
@@ -28,6 +29,7 @@ function newStats(): Stats {
     laundryStolen: 0, itemsStolen: 0, knocks: 0, binsTipped: 0, mudPrints: 0, catChase: 0, barks: 0, eaten: 0,
     stashed: 0, messesCleaned: 0, recovered: 0, pawsWiped: 0, treatsThrown: 0, slips: 0, doorsClosed: 0, zoomies: 0,
     tofuDistance: 0, humanAccidents: 0, tasksDone: 0, startles: 0, paperUnrolled: 0,
+    drops: 0, leavesScattered: 0, snowmen: 0, marketStolen: 0, chains: 0,
   };
 }
 
@@ -36,7 +38,7 @@ function newCharacter(id: number, slot: PlayerSlot, x: number, z: number, facing
     id, role: slot.role, name: slot.name, avatar: slot.avatar, ai: slot.ai,
     x, z, vx: 0, vz: 0, facing, speed: 0, stamina: 1, sprinting: false, exhausted: false,
     hold: [], act: null, anim: Anim.Idle, animT: 0, lastButtons: 0, idleT: 0, lockT: 0,
-    mud: 0, zoom: 0, zoomT: 0, pantT: 0, barkCd: 0, sitT: 0, lureKind: '', lureIdx: -1, lureT: 0, lureImmune: 0,
+    mud: 0, pawKind: 'mud', dripAcc: 0, zoom: 0, zoomT: 0, pantT: 0, barkCd: 0, sitT: 0, lureKind: '', lureIdx: -1, lureT: 0, lureImmune: 0,
     noPickup: 0, stun: 0, printAcc: 0, printSide: 1, paperAcc: 0, bedCd: 0, innocentDone: [], recentMischief: [],
     treats: HUMAN.treatsStart, throwCd: 0, treatJarCd: 0, slipCd: 0, startleCd: 0, takeCd: 0, say: '', sayT: 0,
   };
@@ -44,9 +46,15 @@ function newCharacter(id: number, slot: PlayerSlot, x: number, z: number, facing
 
 const HIDDEN_STORAGE = new Set(['hamper', 'dresser', 'toybox', 'mailbox', 'cupboard', 'street_bin']);
 
+type TrailKind = 'mud' | 'paper' | 'wet' | 'leaf_trail';
+
+/** Trail left indoors by each kind of dirty paws. */
+const PAW_TRAIL: Record<Character['pawKind'], TrailKind> = { mud: 'mud', snow: 'wet', leaves: 'leaf_trail' };
+
 export class Game {
   readonly world: World;
   readonly cfg: GameConfig;
+  readonly variant: Variant;
   state: GameState;
   rng: Rng;
   readonly tofuId: number;
@@ -57,7 +65,8 @@ export class Game {
   private chaosText = 0;
 
   constructor(cfg: GameConfig) {
-    this.world = getWorld();
+    this.variant = cfg.variant ?? DEFAULT_VARIANT;
+    this.world = getWorld(this.variant);
     this.cfg = cfg;
     this.rng = new Rng(cfg.seed);
     const tofuIdx = cfg.players.findIndex((p) => p.role === 'tofu');
@@ -70,7 +79,10 @@ export class Game {
       return newCharacter(i, p, s.x, s.z, s.facing);
     });
     const humanCount = chars.filter((c) => c.role === 'human').length;
-    const stations: StationState[] = STATIONS.map((_, idx) => ({ idx, items: [], made: false, watered: false, dug: false, disabled: false, rev: 0 }));
+    // Stations of another ambiance (market stalls) stay closed.
+    const stations: StationState[] = STATIONS.map((sd, idx) => ({
+      idx, items: [], made: false, watered: false, dug: false, disabled: !presentIn(sd.only, this.variant), rev: 0,
+    }));
     const items: Item[] = ITEMS.map((p, idx) => {
       const t = ITEM_TYPES[p.type];
       const st = p.station ? this.world.stationIndex.get(p.station)! : -1;
@@ -95,6 +107,13 @@ export class Game {
       treats: [], cat: null as never, carrier: initialCarrier(), vacuum: initialVacuum(),
       tasks: [], secrets: [], stats: newStats(), charStats: {}, nextMessId: 1, nextTreatId: 1, rngState: 0,
     };
+    items.forEach((it, idx) => {
+      // Objects of another ambiance (leaf piles, snowmen, market goods) are absent.
+      if (!presentIn(ITEMS[idx].only, this.variant)) {
+        it.state = 'gone';
+        it.station = -1;
+      }
+    });
     for (const it of items) {
       if (it.station >= 0) this.putInStation(it, it.station);
     }
@@ -102,7 +121,7 @@ export class Game {
     this.state.cat = initialCat(this);
     const kinds = chooseTasks(this.rng, humanCount);
     this.state.tasks = kinds.map((k) => ({ kind: k, done: false, progress: 0, total: 1 }));
-    this.state.secrets = chooseSecrets(this.rng, humanCount);
+    this.state.secrets = chooseSecrets(this.rng, humanCount, this.variant);
     this.prepareNonTaskState(new Set(kinds));
     for (const c of chars) this.state.charStats[c.id] = {};
     evaluateTasks(this);
@@ -405,14 +424,20 @@ export class Game {
       // Puddles make Tofu muddy.
       for (const p of PUDDLES) {
         if (dist(c.x, c.z, p.x, p.z) < p.r) {
-          if (c.mud < 0.5) {
+          if (c.mud < 0.5 || c.pawKind !== 'mud') {
             this.emit({ t: 'muddy', id: c.id });
             this.addZoom(c, 'mud');
           }
           c.mud = 1;
+          c.pawKind = 'mud';
         }
       }
       const zn = zoneAt(c.x, c.z);
+      // Winter: the snow wets the paws everywhere outside (the street is cleared).
+      if (this.variant === 'hiver' && zn && SNOWY_ZONES.includes(zn.id) && c.mud <= DOG.snowPaws) {
+        c.mud = DOG.snowPaws;
+        c.pawKind = 'snow';
+      }
       if (c.mud > 0.02 && c.speed > 0.3) {
         if (zn && zn.indoor) {
           c.printAcc += c.speed * dt;
@@ -422,6 +447,15 @@ export class Game {
           }
         } else {
           c.mud = Math.max(0, c.mud - DOG.mudDecayOutdoor * dt);
+        }
+      }
+      // The stolen watering can leaks behind Tofu.
+      const can = c.hold.map((i) => S.items[i]).find((it) => it.type === 'watering_can' && it.charge > 0);
+      if (can && c.speed > 0.5) {
+        c.dripAcc += c.speed * dt;
+        if (c.dripAcc >= CAN.dripSpacing) {
+          c.dripAcc = 0;
+          this.addDrip(c, can, zn);
         }
       }
       // A carried toilet roll unrolls behind Tofu.
@@ -480,7 +514,7 @@ export class Game {
           let slip = false;
           for (const m of S.messes) {
             if (!MESS_TYPES[m.kind].slippery) continue;
-            if (m.kind === 'mud' && m.prints.length < 9) continue;
+            if (isTrail(m.kind) && m.prints.length < 9) continue;
             if (dist(c.x, c.z, m.x, m.z) < m.r * 0.8) slip = true;
           }
           for (const it of S.items) {
@@ -777,6 +811,7 @@ export class Game {
     else it.vz *= -0.3;
     it.x = clamp(it.x, WORLD_BOUNDS.x0 + 0.5, WORLD_BOUNDS.x1 - 0.5);
     it.z = clamp(it.z, WORLD_BOUNDS.z0 + 0.5, WORLD_BOUNDS.z1 - 0.5);
+    if (it.type === 'ball' && it.by >= 0) this.ballHits(it);
     it.y += it.vy * dt;
     it.rot += it.spin * dt;
     this.bump(it);
@@ -805,6 +840,23 @@ export class Game {
         }
       }
       this.landItem(it);
+    }
+  }
+
+  /** A thrown ball knocks over what it hits on its way (a clumsy throw: a human accident). */
+  private ballHits(ball: Item) {
+    const sp = Math.hypot(ball.vx, ball.vz);
+    if (sp < 2) return;
+    for (const k of this.state.items) {
+      if (k === ball || k.state !== 'home' || k.knockCd > 0) continue;
+      const t = ITEM_TYPES[k.type];
+      if (!t.knock || t.knock.push > 0) continue;
+      if (ball.y < k.y - 0.05 || ball.y > k.y + t.knock.height + 0.1) continue;
+      if (dist(ball.x, ball.z, k.x, k.z) > t.size + 0.12) continue;
+      this.knock(k.idx, ball.vx / sp, ball.vz / sp, sp * 0.5, ball.by);
+      ball.vx *= -0.35;
+      ball.vz *= -0.35;
+      return;
     }
   }
 
@@ -913,17 +965,29 @@ export class Game {
       }
     }
     let amount = t.knock.chaos;
-    let reason = `${capitalize(t.short)} renversé${feminine(t.name) ? 'e' : ''} !`;
+    let reason = t.knock.text ?? `${capitalize(t.short)} renversé${feminine(t.name) ? 'e' : ''} !`;
+    if (it.type === 'leaf_pile') S.stats.leavesScattered++;
     if (by === this.tofuId) {
-      this.addZoom(this.tofu, isBin ? 'bin' : 'knock');
+      this.addZoom(this.tofu, isBin ? 'bin' : it.type === 'leaf_pile' ? 'leaves' : 'knock');
       this.progressSecret('casse', 1);
       if (isBin) this.progressSecret('poubelles', 1);
-    } else if (by === -2) {
-      amount *= CHAOS.catAccidentMul;
-      reason = 'Le chat a tout renversé !';
-    } else if (by === -4) {
-      amount *= CHAOS.catAccidentMul;
-      reason = "L'aspirateur a tout renversé !";
+      this.onTofuKnock(it);
+    } else if (by === -2 || by === -4) {
+      // The cat or the robot vacuum. Chased by Tofu, or switched on by him: a
+      // chain reaction, worth full points.
+      const chain = by === -2
+        ? S.cat.mode === 'flee' && dist(S.cat.x, S.cat.z, this.tofu.x, this.tofu.z) < 9
+        : S.vacuum.by === this.tofuId;
+      if (chain) {
+        reason = by === -2 ? 'Réaction en chaîne : le chat a tout renversé !' : "Réaction en chaîne : l'aspirateur a tout renversé !";
+        S.stats.chains++;
+        this.addZoom(this.tofu, 'knock');
+        this.progressSecret('chaine', 1);
+        this.progressSecret('casse', 1);
+      } else {
+        amount *= CHAOS.catAccidentMul;
+        reason = by === -2 ? 'Le chat a tout renversé !' : "L'aspirateur a tout renversé !";
+      }
     } else {
       amount *= CHAOS.accidentMul;
       reason = 'Oups ! Accident humain !';
@@ -933,6 +997,22 @@ export class Game {
     this.addChaos(amount, reason, it.x, it.z);
     this.emit({ t: 'knock', item: idx, by, x: it.x, z: it.z });
     return true;
+  }
+
+  /** Seasonal mischief done on purpose by Tofu. */
+  private onTofuKnock(it: Item) {
+    const c = this.tofu;
+    if (it.type === 'leaf_pile') {
+      // Leaves stuck in the fur: he brings them inside.
+      if (c.mud <= DOG.leafPaws || c.pawKind !== 'mud') {
+        c.mud = Math.max(c.mud, DOG.leafPaws);
+        c.pawKind = 'leaves';
+      }
+      this.progressSecret('feuilles', 1);
+    } else if (it.type === 'snowman') {
+      this.state.stats.snowmen++;
+      this.progressSecret('bonhomme', 1);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -1037,6 +1117,9 @@ export class Game {
       case 'shoe_rack':
       case 'bedside':
         return it.type === 'slipper';
+      case 'market':
+        // Each stall takes back its own goods.
+        return ITEM_TYPES[it.type].respawnAt === s.id;
       default:
         return false;
     }
@@ -1066,7 +1149,12 @@ export class Game {
         S.stats.laundryStolen++;
         this.progressSecret('voleur', 1);
       }
-      this.addChaos(CHAOS.steal, `${capitalize(t.short)} volé${feminine(t.name) ? 'e' : ''} !`, it.x, it.z);
+      if (t.category === 'market') {
+        S.stats.marketStolen++;
+        this.addChaos(CHAOS.marketSteal, `Vol au marché : ${t.short} !`, it.x, it.z);
+      } else {
+        this.addChaos(CHAOS.steal, `${capitalize(t.short)} volé${feminine(t.name) ? 'e' : ''} !`, it.x, it.z);
+      }
       this.addZoom(c, 'steal');
       this.emit({ t: 'steal', id: c.id, item: it.idx, x: it.x, z: it.z });
     }
@@ -1243,7 +1331,7 @@ export class Game {
     const st = this.state.stations[si];
     const can = h.hold.map((i) => this.state.items[i]).find((it) => it.type === 'watering_can');
     if (!can || can.charge <= 0) return;
-    can.charge--;
+    can.charge = Math.max(0, can.charge - 1);
     this.bump(can);
     st.watered = true;
     this.bump(st);
@@ -1294,7 +1382,8 @@ export class Game {
     if (c.mud > 0.15 && !this.state.messes.some((m) => m.kind === 'muddy_bed')) {
       const s = STATIONS[si];
       this.createMess('muddy_bed', s.x, s.z, { station: si, byTofu: true, r: 1.1 });
-      this.addChaos(CHAOS.muddyBed, 'Des draps pleins de boue !', s.x, s.z);
+      const text = c.pawKind === 'snow' ? 'Des draps tout mouillés !' : c.pawKind === 'leaves' ? 'Des feuilles plein les draps !' : 'Des draps pleins de boue !';
+      this.addChaos(CHAOS.muddyBed, text, s.x, s.z);
       this.progressSecret('lit_sale', 1);
     }
     this.evaluate();
@@ -1316,7 +1405,8 @@ export class Game {
     if (c.mud > 0.15 && !S.messes.some((m) => m.kind === 'muddy_sofa')) {
       const s = STATIONS[si];
       this.createMess('muddy_sofa', s.x, s.z, { station: si, byTofu: true, r: 1.0 });
-      this.addChaos(CHAOS.muddySofa, 'Canapé tout boueux !', s.x, s.z);
+      const text = c.pawKind === 'snow' ? 'Canapé tout mouillé !' : c.pawKind === 'leaves' ? 'Des feuilles sur le canapé !' : 'Canapé tout boueux !';
+      this.addChaos(CHAOS.muddySofa, text, s.x, s.z);
     }
   }
 
@@ -1361,12 +1451,14 @@ export class Game {
     it.holder = -1;
     it.disturbed = false;
     this.bump(it);
-    if (it.type === 'baguette') it.respawnT = BAGUETTE_RESPAWN;
+    // Bakery and market goods come back on their stall a little later.
+    if (ITEM_TYPES[it.type].respawnAt) it.respawnT = BAGUETTE_RESPAWN;
     this.createMess('crumbs', c.x + Math.sin(c.facing) * 0.4, c.z + Math.cos(c.facing) * 0.4, { byTofu: true, r: 0.7 });
     S.stats.eaten++;
     this.addChaos(CHAOS.eat, 'Miam ! Tout mangé !', c.x, c.z);
     this.addZoom(c, 'eat');
     this.progressSecret('gourmand', 1);
+    if (ITEM_TYPES[it.type].category === 'market') this.progressSecret('marche', 1);
     this.oneShot(c, Anim.Eat, 0.6);
     this.emit({ t: 'eat', id: c.id, item: i });
     this.evaluate();
@@ -1453,13 +1545,13 @@ export class Game {
     return m;
   }
 
-  /** Removes a mess and restores whatever it was linked to. */
-  removeMess(id: number, by: number): void {
+  /** Removes a mess and restores whatever it was linked to (`cleaned`: by someone, not dried up). */
+  removeMess(id: number, by: number, cleaned = true): void {
     const S = this.state;
     const m = this.messById(id);
     if (!m) return;
     S.messes = S.messes.filter((x) => x.id !== id);
-    if (m.kind === 'mud' || m.kind === 'paper') {
+    if (isTrail(m.kind)) {
       for (const [k, v] of this.trailCells) if (v === id) this.trailCells.delete(k);
     }
     if (m.item >= 0) {
@@ -1492,8 +1584,10 @@ export class Game {
       S.stations[m.station].dug = false;
       this.bump(S.stations[m.station]);
     }
-    S.stats.messesCleaned++;
-    if (by >= 0) this.stat(by, 'cleaned');
+    if (cleaned) {
+      S.stats.messesCleaned++;
+      if (by >= 0) this.stat(by, 'cleaned');
+    }
     this.emit({ t: 'cleaned', mess: id, kind: m.kind, by, x: m.x, z: m.z });
     this.evaluate();
   }
@@ -1503,7 +1597,7 @@ export class Game {
   }
 
   /** Adds a mark (paw print, paper strip) to the trail mess of its 2 m cell. */
-  private addTrailMark(kind: 'mud' | 'paper', px: number, pz: number, rot: number): Mess {
+  private addTrailMark(kind: TrailKind, px: number, pz: number, rot: number): Mess {
     const key = `${kind}:${Math.floor(px / 2)},${Math.floor(pz / 2)}`;
     const mid = this.trailCells.get(key);
     let m = mid !== undefined ? this.messById(mid) : undefined;
@@ -1546,25 +1640,54 @@ export class Game {
     void zoneId;
   }
 
+  /** A print of the dirty paws indoors: mud, wet snow or a few leaves. */
   private addMudPrint(c: Character, zoneId: string) {
     const S = this.state;
     const side = c.printSide;
     c.printSide = -side;
+    const leaves = c.pawKind === 'leaves';
     const px = c.x + Math.cos(c.facing) * 0.11 * side;
     const pz = c.z - Math.sin(c.facing) * 0.11 * side;
-    this.addTrailMark('mud', px, pz, c.facing);
-    c.mud = Math.max(0, c.mud - DOG.mudPerPrint);
+    this.addTrailMark(PAW_TRAIL[c.pawKind], px, pz, leaves ? c.facing + (this.rng.next() - 0.5) * 2 : c.facing);
+    c.mud = Math.max(0, c.mud - (leaves ? DOG.leafPerPrint : DOG.mudPerPrint));
     S.stats.mudPrints++;
-    this.addChaos(CHAOS.print, '', px, pz, true);
-    if (zoneId === 'chambre' || zoneId === 'enfants') this.progressSecret('boue_chambre', 1);
+    this.addChaos(c.pawKind === 'snow' ? CHAOS.wetPrint : CHAOS.print, '', px, pz, true);
+    if (c.pawKind === 'mud' && (zoneId === 'chambre' || zoneId === 'enfants')) this.progressSecret('boue_chambre', 1);
     if (S.stats.mudPrints % 6 === 1) this.addZoom(c, 'mud');
+  }
+
+  /** One drop of the stolen watering can: a wet mark on hard floors, water lost anyway. */
+  private addDrip(c: Character, can: Item, zn: Zone | null) {
+    const S = this.state;
+    can.charge = Math.max(0, can.charge - CAN.perDrip);
+    this.bump(can);
+    if (zn && (zn.indoor || zn.id === 'terrasse')) {
+      const px = c.x - Math.sin(c.facing) * 0.3 + (this.rng.next() - 0.5) * 0.16;
+      const pz = c.z - Math.cos(c.facing) * 0.3 + (this.rng.next() - 0.5) * 0.16;
+      this.addTrailMark('wet', px, pz, this.rng.next() * Math.PI * 2);
+      S.stats.drops++;
+      this.addChaos(CAN.dripChaos, '', px, pz, true);
+      if (zn.indoor) this.progressSecret('arrosoir', 1);
+      if (S.stats.drops % 8 === 1) this.addZoom(c, 'drip');
+    }
+    if (can.charge <= 0) this.addChaos(1, "L'arrosoir est vide !", c.x, c.z);
   }
 
   private updateMesses(dt: number) {
     const S = this.state;
     if (!S.messes.length) return;
     for (const m of S.messes) m.age += dt;
-    const drip = Math.min(CHAOS.messDripCap, S.messes.length * CHAOS.messDrip) * dt;
+    // Water marks dry up by themselves, oldest first.
+    for (const m of [...S.messes]) {
+      if (m.kind !== 'wet' || m.age < WET.dryAfter) continue;
+      if (Math.floor(m.age / WET.dryEvery) === Math.floor((m.age - dt) / WET.dryEvery)) continue;
+      m.prints.splice(0, 3);
+      this.bump(m);
+      if (!m.prints.length) this.removeMess(m.id, -1, false);
+    }
+    // Water marks dry up anyway: they do not feed the passive chaos.
+    const lasting = S.messes.reduce((n, m) => n + (m.kind === 'wet' ? 0 : 1), 0);
+    const drip = Math.min(CHAOS.messDripCap, lasting * CHAOS.messDrip) * dt;
     this.addChaos(drip, '', 0, 0, true);
   }
 

@@ -81,10 +81,23 @@ Au premier lancement, passez par « Comment jouer » : l'écran résume les règ
 
 1. Cliquez sur **Jouer seul**.
 2. Choisissez **Jouer Tofu** ou **Jouer un humain**.
-3. Réglez la difficulté de l'ordinateur (Facile, Normal, Difficile) et la durée (4, 6 ou 8 minutes).
+3. Réglez la difficulté de l'ordinateur (Facile, Normal, Difficile), la durée (4, 6 ou 8 minutes) et l'**ambiance** (voir plus bas).
 4. Cliquez sur **C'est parti !**
 
 L'ordinateur joue l'autre camp pour de vrai : il ouvre les portes, vole du linge, nettoie, lance des friandises et vous poursuit. En humain, vous pouvez ajouter un coéquipier joué par l'ordinateur.
+
+### Les ambiances
+
+Le même quartier existe en quatre ambiances. Chacune change le décor et ajoute ses propres bêtises :
+
+| Ambiance | Ce qui change |
+|---|---|
+| ☀️ Été | le quartier habituel : linge au soleil, fleurs à arroser |
+| 🍂 Automne | des feuilles partout ; Tofu éparpille les tas de feuilles et en rapporte dans la maison |
+| ❄️ Hiver | de la neige partout ; les pattes de Tofu se mouillent dehors et laissent des traces dans la maison ; deux bonshommes de neige à démolir |
+| 🧀 Jour de marché | trois étals sur le square : fromage, saucisson et poulet rôti à voler, cageot de pommes à renverser |
+
+Chaque ambiance apporte aussi un défi secret pour Tofu. Le choix se fait dans l'écran de lancement (seul, écran partagé) ou dans le salon du réseau local (par l'hôte).
 
 ## 4. Jouer à 2 ou 3 sur le même PC (écran partagé)
 
@@ -188,8 +201,9 @@ Certaines actions demandent de **maintenir** le bouton (nettoyer, faire le lit, 
 - Une manche dure 6 minutes (4 ou 8 au choix).
 - **Les humains** reçoivent une liste de tâches : 3 tâches pour un humain, 6 pour deux. Exemples : rentrer le linge, ranger les jouets, mettre la table, servir le goûter, sortir la poubelle, relever le courrier, faire le lit, arroser les fleurs.
 - **Les humains gagnent** quand toutes les tâches sont faites et que la maison est propre à 70 % au moins. Les invités sonnent alors ; il faut tenir 15 secondes sans que Tofu défasse une tâche ni salisse la maison sous le seuil.
-- **Tofu gagne** quand sa barre de bêtises atteint 220 points (170 contre deux humains), ou quand le temps s'écoule avant que les humains aient fini.
-- **Tofu** reçoit 3 **défis secrets** (+20 points chacun). Ses bêtises : voler du linge et le cacher, renverser des objets, poursuivre le chat, rapporter de la boue dans la maison, renverser les poubelles, manger le goûter, sauter sur le lit ou le canapé, creuser les massifs, tirer la nappe, dérouler le papier toilette, allumer l'aspirateur robot, aboyer sur la factrice. Les bêtises variées remplissent les **zoomies** : un sprint fou qui renverse tout sur son passage.
+- **Tofu gagne** quand sa barre de bêtises atteint 250 points (180 contre deux humains), ou quand le temps s'écoule avant que les humains aient fini.
+- **Tofu** reçoit 3 **défis secrets** (+20 points chacun). Ses bêtises : voler du linge et le cacher, renverser des objets, poursuivre le chat, rapporter de la boue dans la maison, renverser les poubelles, manger le goûter, sauter sur le lit ou le canapé, creuser les massifs, tirer la nappe, dérouler le papier toilette, allumer l'aspirateur robot, voler l'arrosoir qui fuit, aboyer sur la factrice. Les bêtises variées remplissent les **zoomies** : un sprint fou qui renverse tout sur son passage.
+- **Réactions en chaîne** : poursuivi dans la cuisine, le chat saute sur le plan de travail et fait tomber la tasse ou le pot de basilic ; l'aspirateur allumé par Tofu bouscule ce qu'il croise. Ces dégâts comptent entièrement pour Tofu. Une balle lancée par un humain peut aussi renverser un vase : c'est alors un accident humain.
 - **Les humains** reprennent ce que Tofu porte dans sa gueule, rangent, nettoient, essuient les pattes de Tofu, ferment les portes et lancent une friandise ou la balle pour l'attirer. Attention : en courant trop vite, on peut glisser sur l'eau ou bousculer un vase !
 - Rien ne se perd pour de bon : un objet mangé ou cassé revient (par exemple, la boulangerie vend de nouveaux croissants), et tout désordre se nettoie.
 

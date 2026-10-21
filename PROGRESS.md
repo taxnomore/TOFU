@@ -34,10 +34,11 @@ Depuis un clone neuf du dépôt (Node 22.22, npm 10.9, Linux) :
 
 | Fichier | Tests | Ce qui est vérifié |
 |---|---|---|
-| `tests/world.test.ts` | 13 | carte : apparitions libres, toutes les zones, emplacements et objets atteignables, chemin chambre → square et boulangerie, portes, chatière, trou de la haie réservé à Tofu, graphe du chat sans obstacle |
+| `tests/world.test.ts` | 29 | carte : apparitions libres, toutes les zones, emplacements et objets atteignables, chemin chambre → square et boulangerie, portes, chatière, trou de la haie réservé à Tofu, graphe du chat sans obstacle ; pour chacune des 4 ambiances : apparitions libres, objets et emplacements atteignables, objets posés hors des meubles, chemins du chat libres |
 | `tests/rules.test.ts` | 19 | vol et retour du linge, reprise dans la gueule de Tofu, linge de l'étendoir, boue et nettoyage, pattes essuyées, plante renversée puis remise, poubelle de rue, chat, zoomies, friandise, endurance, papier toilette, aspirateur robot, priorité des portes, victoires de Tofu (bêtises, temps) et des humains, revanche identique à graine égale |
 | `tests/ai.test.ts` | 3 | manches complètes ordinateur contre ordinateur (1 et 2 humains), bêtises variées de l'IA |
 | `tests/net.test.ts` | 3 | instantanés différentiels : l'état reconstruit chez le client égale celui du serveur pendant une manche complète ; validation des messages ; prédiction identique au serveur |
+| `tests/mischief.test.ts` | 16 | arrosoir qui fuit (gouttes, glissade, remplissage), réactions en chaîne (chat sur le plan de travail, balle, aspirateur), automne (tas de feuilles, feuilles dans la maison, ratissage), hiver (pattes mouillées, rue déneigée, bonhomme de neige), jour de marché (étals, vol, repas, retour au bon étal, cageot), défis propres à chaque ambiance, objets absents hors de leur ambiance |
 | `tests/server.test.ts` | 2 | vrai serveur HTTP + WebSocket avec 3 clients : salon, rôles, droits de l'hôte, départ, déplacements identiques chez tous, accusés de réception, entrées refusées pour un siège d'un autre, déconnexion reprise par l'ordinateur, reconnexion, fin, revanche avec rotation de Tofu, retour au salon, spectateurs, client trop bavard coupé, message trop gros refusé |
 
 ## Tests dans un navigateur
@@ -55,6 +56,7 @@ Outil : Chromium sans écran piloté par Playwright, rendu 3D logiciel (SwiftSha
 | Téléphone : joystick, bouton Action, rotation de caméra par glissement, écran de fin, carte de rôle | réussi après corrections de mise en page |
 | Remappage du clavier | touche changée, conflit retiré, réglage gardé après rechargement, retour aux touches d'origine |
 | Fichier unique `tofu-qui-a-fait-ca.html` ouvert depuis le disque (file://), seul dans un dossier | menus, solo et écran partagé fonctionnent, sans aucune autre requête |
+| Ambiances dans le navigateur : écran de lancement avec le choix d'ambiance, décor de chaque ambiance, tas de feuilles éparpillé puis feuilles dans le salon, bonhomme de neige démoli puis traces mouillées, arrosoir volé qui goutte (repris par l'humain ordinateur), fromage volé sur un étal | réussi, sans erreur dans la console |
 | Écran de chargement dans 10 situations : normale, 3D coupée (`--disable-3d-apis`), fichier tronqué à 500 Ko, `index.html` du code source et de `dist/` ouverts d'un double clic, scripts bloqués par une politique de sécurité, JavaScript coupé, page dans une iframe isolée (comme un aperçu), rendu qui ne démarre pas, version servie par `npm run start` | jamais de page blanche : le jeu démarre, ou un message dit pourquoi et quoi faire ; le bouton « Ouvrir le jeu » mène au fichier unique, qui démarre ; le jeu tourne aussi dans l'iframe isolée |
 
 Le script `scripts/smoke-test.mjs` reprend le parcours et les commandes tactiles ; il passe contre `npm run start`.

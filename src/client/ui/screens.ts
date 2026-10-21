@@ -15,6 +15,7 @@ import {
 } from '../input/devices';
 import { el, fmtTime, glyph } from './hud';
 import { BTN_BARK, BTN_INTERACT, BTN_SIT, BTN_SPECIAL, BTN_SPRINT } from '../../shared/constants';
+import { VARIANTS, Variant, isVariant, variantDef } from '../../shared/world/variants';
 
 export const isTouch = () => matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 1;
 
@@ -24,15 +25,24 @@ interface Prefs {
   avatar: number;
   name: string;
   autoCam: boolean;
+  variant: Variant;
 }
 
 export function loadPrefs(): Prefs {
-  const d: Prefs = { duration: DEFAULT_DURATION, difficulty: 1, avatar: 0, name: '', autoCam: false };
+  const d: Prefs = { duration: DEFAULT_DURATION, difficulty: 1, avatar: 0, name: '', autoCam: false, variant: 'ete' };
   try {
-    return { ...d, ...JSON.parse(localStorage.getItem('tofu.prefs') ?? '{}') };
+    const p = { ...d, ...JSON.parse(localStorage.getItem('tofu.prefs') ?? '{}') } as Prefs;
+    if (!isVariant(p.variant)) p.variant = 'ete';
+    return p;
   } catch {
     return d;
   }
+}
+
+/** "Ambiance" selector (season or market day) for the setup screens. */
+function variantRow(cur: Variant): string {
+  const btns = VARIANTS.map((d) => `<button class="${cur === d.id ? 'sel' : ''}" data-v="${d.id}" title="${d.desc}">${d.icon} ${d.id === 'marche' ? 'Marché' : d.name}</button>`).join('');
+  return `<span>Ambiance</span><div class="seg" data-k="variant">${btns}</div><small class="vdesc">${variantDef(cur).desc}</small>`;
 }
 
 export function savePrefs(p: Prefs) {
@@ -191,7 +201,7 @@ export class Screens {
       { role: 'human', name: 'Maman', avatar: 0, ai: true },
       { role: 'human', name: 'Léa', avatar: 2, ai: true },
     ];
-    const sess = new LocalSession({ seed: Math.floor(Math.random() * 1e9), duration: 100000, players, noCountdown: true, difficulty: 1 }, []);
+    const sess = new LocalSession({ seed: Math.floor(Math.random() * 1e9), duration: 100000, players, noCountdown: true, difficulty: 1, variant: this.prefs.variant }, []);
     sess.maxFrameDt = this.app.maxDt;
     this.app.start(sess, sess.game, true);
   }
@@ -233,6 +243,7 @@ export class Screens {
           <span>Coéquipier</span><div class="seg" data-k="mate"><button class="${!teammate ? 'sel' : ''}" data-v="0">Seul</button><button class="${teammate ? 'sel' : ''}" data-v="1">+ 1 humain ordinateur</button></div>`}
           <span>Difficulté</span><div class="seg" data-k="diff">${['Facile', 'Normal', 'Difficile'].map((n, i) => `<button class="${p.difficulty === i ? 'sel' : ''}" data-v="${i}">${n}</button>`).join('')}</div>
           <span>Durée</span><div class="seg" data-k="dur">${[240, 360, 480].map((d) => `<button class="${p.duration === d ? 'sel' : ''}" data-v="${d}">${d / 60} min</button>`).join('')}</div>
+          ${variantRow(p.variant)}
         </div>
         <div class="foot">
           <button class="big" data-back>⬅ Retour</button>
@@ -255,6 +266,11 @@ export class Screens {
       sfx.play('click');
       const seg = b.closest('.seg') as HTMLElement | null;
       if (seg) {
+        if (seg.dataset.k === 'variant') {
+          this.setVariant(b.dataset.v);
+          render();
+          return;
+        }
         const v = Number(b.dataset.v);
         if (seg.dataset.k === 'humans') humansAI = v;
         if (seg.dataset.k === 'avatar') p.avatar = v;
@@ -280,7 +296,7 @@ export class Screens {
         const myId = role === 'tofu' ? 0 : 1;
         const dev = this.primaryDevice(role);
         this.startLocal(
-          { seed: Math.floor(Math.random() * 1e9), duration: p.duration, players, difficulty: p.difficulty },
+          { seed: Math.floor(Math.random() * 1e9), duration: p.duration, players, difficulty: p.difficulty, variant: p.variant },
           [{ slot: 0, charId: myId, device: dev, rig: this.newRig(), rect: { x: 0, y: 0, w: 1, h: 1 }, raw: null, name: 'Moi' }],
         );
       }
@@ -290,6 +306,14 @@ export class Screens {
       if (ch && (e.code === 'Enter' || e.code === 'Space')) ch.click();
     });
     this.show(s);
+  }
+
+  /** Remembers the chosen ambiance and shows it behind the menus. */
+  setVariant(v: string | undefined) {
+    if (!isVariant(v) || v === this.prefs.variant) return;
+    this.prefs.variant = v;
+    savePrefs(this.prefs);
+    this.startAttract();
   }
 
   /** Best input device for a single local player. */
@@ -344,7 +368,8 @@ export class Screens {
         <p>Chaque joueur appuie sur son bouton pour rejoindre (1 à 3 joueurs). L'écran se partage automatiquement.</p>
         <div class="slots">${slots}</div>${err}
         <div class="opts"><span>Rôles manquants</span><div class="seg" data-k="fill"><button class="${fillAI ? 'sel' : ''}" data-v="1">Complétés par l'ordinateur</button><button class="${!fillAI ? 'sel' : ''}" data-v="0">Non</button></div>
-        <span>Durée</span><div class="seg" data-k="dur">${[240, 360, 480].map((d) => `<button class="${this.prefs.duration === d ? 'sel' : ''}" data-v="${d}">${d / 60} min</button>`).join('')}</div></div>
+        <span>Durée</span><div class="seg" data-k="dur">${[240, 360, 480].map((d) => `<button class="${this.prefs.duration === d ? 'sel' : ''}" data-v="${d}">${d / 60} min</button>`).join('')}</div>
+        ${variantRow(this.prefs.variant)}</div>
         <p class="small">Pour lancer : bouton « Jouer », ou la touche pause d'un joueur (${keyLabel('Escape')} · ⌫ · Start).</p>
         <div class="foot"><button class="big" data-back>⬅ Retour</button><button class="big primary" data-go ${joined.length < 1 || tofus > 1 ? 'disabled' : ''}>Jouer ▶</button></div></div>`;
     };
@@ -469,7 +494,7 @@ export class Screens {
       if (!players.some((p) => p.role === 'human')) players.push({ role: 'human', name: 'Maman', avatar: 0, ai: true });
       locals.sort((a, b) => a.slot - b.slot);
       locals.forEach((l, i) => (l.slot = i));
-      this.startLocal({ seed: Math.floor(Math.random() * 1e9), duration: this.prefs.duration, players, difficulty: this.prefs.difficulty }, locals);
+      this.startLocal({ seed: Math.floor(Math.random() * 1e9), duration: this.prefs.duration, players, difficulty: this.prefs.difficulty, variant: this.prefs.variant }, locals);
     };
     s.addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest('button') as HTMLButtonElement | null;
@@ -479,6 +504,7 @@ export class Screens {
       if (seg) {
         const k = seg.dataset.k;
         if (k === 'fill') fillAI = b.dataset.v === '1';
+        else if (k === 'variant') this.setVariant(b.dataset.v);
         else if (k === 'dur') {
           this.prefs.duration = Number(b.dataset.v);
           savePrefs(this.prefs);
@@ -674,6 +700,11 @@ export class Screens {
     if (st.catChase > 8) awards.push('🐈 Tofu, chasseur de chat');
     if (st.mudPrints > 30) awards.push('🐾 Tofu, artiste de la boue');
     if ((st.paperUnrolled ?? 0) >= 20) awards.push('🧻 Tofu, champion du papier toilette');
+    if ((st.drops ?? 0) >= 12) awards.push("🚿 Tofu, l'arroseur de parquet");
+    if ((st.chains ?? 0) >= 1) awards.push('⛓️ Tofu, roi de la réaction en chaîne');
+    if ((st.leavesScattered ?? 0) >= 3) awards.push('🍂 Tofu, tornade d’automne');
+    if ((st.snowmen ?? 0) >= 1) awards.push('⛄ Tofu, démolisseur de bonshommes');
+    if ((st.marketStolen ?? 0) >= 2) awards.push('🧀 Tofu, terreur du marché');
     const o = el('div', 'screen dim');
     o.innerHTML = `<div class="end-banner ${tofuWon ? '' : 'humans'}">${tofuWon ? '😈 TOFU A GAGNÉ\u00a0!' : '🎉 LES HUMAINS ONT GAGNÉ\u00a0!'}</div>
       <div class="panel">
@@ -684,7 +715,12 @@ export class Screens {
           <div>🎁 Objets chipés <b>${st.itemsStolen}</b></div>
           <div>💥 Objets renversés <b>${st.knocks}</b></div>
           <div>🗑️ Poubelles renversées <b>${st.binsTipped}</b></div>
-          <div>🐾 Traces de boue <b>${st.mudPrints}</b></div>
+          <div>🐾 Traces de pattes <b>${st.mudPrints}</b></div>
+          ${st.drops ? `<div>💧 Gouttes d'arrosoir <b>${st.drops}</b></div>` : ''}
+          ${st.leavesScattered ? `<div>🍂 Tas de feuilles éparpillés <b>${st.leavesScattered}</b></div>` : ''}
+          ${st.snowmen ? `<div>⛄ Bonshommes démolis <b>${st.snowmen}</b></div>` : ''}
+          ${st.marketStolen ? `<div>🧀 Vols au marché <b>${st.marketStolen}</b></div>` : ''}
+          ${st.chains ? `<div>⛓️ Réactions en chaîne <b>${st.chains}</b></div>` : ''}
           <div>🐈 Chat poursuivi <b>${Math.round(st.catChase)} s</b></div>
           <div>🗯️ Aboiements <b>${st.barks}</b></div>
           <div>😋 Choses mangées <b>${st.eaten}</b></div>
@@ -760,7 +796,8 @@ export class Screens {
       <div class="cols">
         <div><h3>🐶 Tofu, le labrador</h3>
           <p>Remplis la barre de <b>bêtises</b> (${CHAOS_GOAL_BY_HUMANS[1]} points, ${CHAOS_GOAL_BY_HUMANS[2]} contre deux humains) ou empêche les humains de finir avant la fin du temps.</p>
-          <p>Vole des chaussettes et cache-les dans ton panier, renverse les pots, poursuis le chat, roule-toi dans la boue puis cours dans la maison, renverse les poubelles, mange le goûter, déroule le papier toilette, allume l'aspirateur robot… Tu as 3 <b>défis secrets</b> qui rapportent gros !</p>
+          <p>Vole des chaussettes et cache-les dans ton panier, renverse les pots, poursuis le chat, roule-toi dans la boue puis cours dans la maison, renverse les poubelles, mange le goûter, déroule le papier toilette, allume l'aspirateur robot, vole l'arrosoir qui fuit… Tu as 3 <b>défis secrets</b> qui rapportent gros !</p>
+          <p><b>Réactions en chaîne</b> : poursuivi dans la cuisine, le chat saute sur le plan de travail et fait tout tomber. Ça compte pour toi !</p>
           <p>Les bêtises variées remplissent les <b>zoomies</b> : un sprint fou qui renverse tout.</p>
           <p>Tu passes par la chatière et par le trou de la haie, et sous les tables. Les portes fermées se poussent (maintenir Action).</p></div>
         <div><h3>🧹 Les humains</h3>
@@ -769,6 +806,8 @@ export class Screens {
           <p>Lancez une <b>friandise</b> : Tofu ne résiste pas et lâche tout. Fermez les portes pour le ralentir. Attention : en courant, on peut glisser ou renverser des choses !</p>
           <p>L'<b>aspirateur robot</b> du salon aspire la boue et le papier… mais bouscule tout sur son passage. On l'allume et on l'éteint avec Action.</p></div>
       </div>
+      <h3>🗓️ Ambiances</h3>
+      <p>${VARIANTS.map((d) => `${d.icon} <b>${d.name}</b> : ${d.desc}`).join('<br>')}</p>
       <h3>🎮 Commandes</h3>
       <table class="keys">
         <tr><td></td><td><b>Clavier</b></td><td><b>Clavier droit</b></td><td><b>Manette</b></td></tr>

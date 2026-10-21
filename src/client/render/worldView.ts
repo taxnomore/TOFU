@@ -5,9 +5,10 @@ import { BUILDINGS, FLOORS, HOUSE_RECT, PROPS, PUDDLES, WALLS, WORLD_BOUNDS, zon
 import { PROP_TYPES } from '../../shared/world/propTypes';
 import { wallHeight, wallThickness } from '../../shared/world/colliders';
 import type { BuildingDef, FloorKind, Opening, WallDef } from '../../shared/world/types';
-import { FaceColors, GeoBuilder, hash, shade } from './geo';
+import { DEFAULT_VARIANT, Variant, presentIn } from '../../shared/world/variants';
+import { FaceColors, GeoBuilder, hash, mix, shade } from './geo';
 import { Materials } from './materials';
-import { buildProp } from './props';
+import { buildProp, setPropSeason } from './props';
 import { floorTexture, textTexture } from './textures';
 
 const EXT_WALL = 0xf1e2c2;
@@ -18,6 +19,17 @@ const PLINTH = 0xc9bca2;
 const WALL_TOP = 0x8f8475;
 const TRIM = 0xf7f4ee;
 const DOOR_TOP = 2.15;
+const SNOW = 0xf3f7fb;
+
+/** Ambiance the world is being built for (seasonal colors, snow). */
+let season: Variant = DEFAULT_VARIANT;
+
+/** Leaves of the distant trees and hedges for the season. */
+function leafColor(base: number, i = 0): number {
+  if (season === 'automne') return [0xd35400, 0xe67e22, 0xd4a017, 0xb5651d][Math.abs(i) % 4];
+  if (season === 'hiver') return mix(base, 0xdfe7ee, 0.75).getHex();
+  return base;
+}
 
 export interface WorldMeshes {
   root: THREE.Group;
@@ -32,13 +44,15 @@ function sideColor(x: number, z: number, style: WallDef['style'], wall: WallDef)
   switch (style) {
     case 'stone': return 0xcfc3a5;
     case 'low_wall': return 0xeee6d5;
-    case 'hedge': return 0x4f8f3e;
+    case 'hedge': return season === 'automne' ? 0x6b8a3a : 0x4f8f3e;
     case 'garden_fence': return 0xb48a5c;
     default: return wall.color ?? EXT_WALL;
   }
 }
 
-export function buildWorld(mats: Materials, quality: 'high' | 'medium' | 'low'): WorldMeshes {
+export function buildWorld(mats: Materials, quality: 'high' | 'medium' | 'low', variant: Variant = DEFAULT_VARIANT): WorldMeshes {
+  season = variant;
+  setPropSeason(variant);
   const root = new THREE.Group();
   root.name = 'world';
   const opaque = new GeoBuilder();
@@ -54,6 +68,7 @@ export function buildWorld(mats: Materials, quality: 'high' | 'medium' | 'low'):
   buildRoof(roofG);
   for (const b of BUILDINGS) buildBuilding(b, occl, glassG, root, mats);
   for (const p of PROPS) {
+    if (!presentIn(p.only, variant)) continue;
     const t = PROP_TYPES[p.type];
     buildProp(p, opaque, t.tall ? occl : opaque);
   }
@@ -85,7 +100,7 @@ export function buildWorld(mats: Materials, quality: 'high' | 'medium' | 'low'):
 // ---------------------------------------------------------------------------
 
 function buildGround(root: THREE.Group, mats: Materials) {
-  const { tile } = floorTexture('grass');
+  const { tile } = floorTexture('grass', 4, season);
   const x0 = -90;
   const x1 = 95;
   const z0 = -85;
@@ -96,7 +111,7 @@ function buildGround(root: THREE.Group, mats: Materials) {
   const uv = g.getAttribute('uv') as THREE.BufferAttribute;
   const pos = g.getAttribute('position') as THREE.BufferAttribute;
   for (let i = 0; i < uv.count; i++) uv.setXY(i, pos.getX(i) / tile, -pos.getZ(i) / tile);
-  const m = new THREE.Mesh(g, mats.floor('grass'));
+  const m = new THREE.Mesh(g, mats.floor('grass', season));
   m.receiveShadow = true;
   m.name = 'ground';
   root.add(m);
@@ -113,7 +128,7 @@ function buildFloors(root: THREE.Group, mats: Materials) {
   byKind.get('asphalt')!.push([-90, -23, -30.5, -16, 0.011, 0], [32.5, -23, 95, -16, 0.011, 0]);
   byKind.get('sidewalk')!.push([-90, -16, -30.5, -13, 0.012, 0], [32.5, -16, 95, -13, 0.012, 0], [-90, -27.5, -30.5, -23, 0.012, 0], [32.5, -27.5, 95, -23, 0.012, 0]);
   for (const [kind, rects] of byKind) {
-    const { tile } = floorTexture(kind);
+    const { tile } = floorTexture(kind, 4, season);
     const pos: number[] = [];
     const uvs: number[] = [];
     const nrm: number[] = [];
@@ -135,7 +150,7 @@ function buildFloors(root: THREE.Group, mats: Materials) {
     g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
     g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
     g.setIndex(idx);
-    const m = new THREE.Mesh(g, mats.floor(kind));
+    const m = new THREE.Mesh(g, mats.floor(kind, season));
     m.receiveShadow = true;
     m.name = 'floor:' + kind;
     if (kind === 'crosswalk') m.renderOrder = 1;
@@ -195,7 +210,7 @@ function buildWall(w: WallDef, opaque: GeoBuilder, occl: GeoBuilder, glass: GeoB
       faces = [cPlus, cMinus, top, top, reveal, reveal];
     }
     if (w.style === 'hedge') {
-      target.box(x1 - x0, y1 - y0, z1 - z0, { x: (x0 + x1) / 2, y: (y0 + y1) / 2, z: (z0 + z1) / 2 }, 0x4f8f3e, 0.18);
+      target.box(x1 - x0, y1 - y0, z1 - z0, { x: (x0 + x1) / 2, y: (y0 + y1) / 2, z: (z0 + z1) / 2 }, season === 'automne' ? 0x6b8a3a : 0x4f8f3e, 0.18);
     } else {
       target.boxFaces(x0, y0, z0, x1, y1, z1, faces);
     }
@@ -388,11 +403,12 @@ function hedgeTop(w: WallDef, occl: GeoBuilder, h: number, t: number, L: number)
   for (let s = 0.3; s < L - 0.2; s += 0.75) {
     const x = w.x0 + ux * s;
     const z = w.z0 + uz * s;
+    const green = season === 'hiver' ? SNOW : season === 'automne' ? 0x7a8a3a : 0x4f8f3e;
     if ((w.openings ?? []).some((o) => o.kind === 'doghole' && Math.abs(o.at - s) < o.width / 2 + 0.2)) {
-      occl.ico(t * 0.5, { x, y: h - 0.05, z }, shade(0x4f8f3e, 0.95 + hash(Math.round(s * 10), seed) * 0.2), 0.15);
+      occl.ico(t * 0.5, { x, y: h - 0.05, z }, shade(green, 0.95 + hash(Math.round(s * 10), seed) * 0.2), 0.15);
       continue;
     }
-    occl.ico(t * 0.55, { x: x + (hash(Math.round(s * 10), seed) - 0.5) * 0.2, y: h - 0.05 + hash(Math.round(s * 10) + 3, seed) * 0.15, z }, shade(0x4f8f3e, 0.92 + hash(Math.round(s * 10) + 5, seed) * 0.25), 0.15);
+    occl.ico(t * 0.55, { x: x + (hash(Math.round(s * 10), seed) - 0.5) * 0.2, y: h - 0.05 + hash(Math.round(s * 10) + 3, seed) * 0.15, z }, shade(green, 0.92 + hash(Math.round(s * 10) + 5, seed) * 0.25), 0.15);
   }
 }
 
@@ -413,7 +429,8 @@ function wallCap(w: WallDef, opaque: GeoBuilder, h: number, t: number, L: number
     const z = w.z0 + uz * m;
     const len = b - a + (a <= 0 ? t / 2 : 0) + (b >= L ? t / 2 : 0);
     const alongX = Math.abs(uz) < 1e-6;
-    opaque.box(alongX ? len : t + 0.08, 0.07, alongX ? t + 0.08 : len, { x, y: h + 0.035, z }, w.style === 'stone' ? 0xb7ab8d : 0xd8ccb5);
+    const cap = season === 'hiver' ? SNOW : w.style === 'stone' ? 0xb7ab8d : 0xd8ccb5;
+    opaque.box(alongX ? len : t + 0.08, season === 'hiver' ? 0.1 : 0.07, alongX ? t + 0.08 : len, { x, y: h + 0.035, z }, cap);
   }
 }
 
@@ -511,8 +528,9 @@ function buildRoof(g: GeoBuilder) {
   const rx1 = x1 - halfD;
   const zm = (z0 + z1) / 2;
   const bands = 9;
-  const c1 = 0xc4613a;
-  const c2 = 0xb4552f;
+  const snowy = season === 'hiver';
+  const c1 = snowy ? 0xf1f5f9 : 0xc4613a;
+  const c2 = snowy ? 0xe2e9f0 : 0xb4552f;
   const lerp = (a: number[], b: number[], t: number) => a.map((v, i) => v + (b[i] - v) * t);
   // Two trapezoids (north/south) split into bands for a tiled look.
   for (const side of [-1, 1]) {
@@ -541,7 +559,7 @@ function buildRoof(g: GeoBuilder) {
     }
   }
   // Ridge and gutters.
-  g.box(rx1 - rx0 + 0.1, 0.12, 0.18, { x: (rx0 + rx1) / 2, y: ridgeY + 0.04, z: zm }, 0xa04a2a);
+  g.box(rx1 - rx0 + 0.1, 0.12, 0.18, { x: (rx0 + rx1) / 2, y: ridgeY + 0.04, z: zm }, snowy ? 0xf7fafc : 0xa04a2a);
   for (const z of [z0, z1]) g.box(x1 - x0, 0.1, 0.12, { x: (x0 + x1) / 2, y: y0 - 0.03, z }, 0xdfe6e9);
   for (const x of [x0, x1]) g.box(0.12, 0.1, z1 - z0, { x, y: y0 - 0.03, z: zm }, 0xdfe6e9);
   // Soffit (underside) so the roof looks solid from below.
@@ -575,7 +593,7 @@ function buildBuilding(b: BuildingDef, occl: GeoBuilder, glass: GeoBuilder, root
   const B2 = [b.x1 + o, y0, b.z0 - o];
   const C = [b.x1 + o, y0 + rise, cz];
   const Dd = [b.x0 - o, y0 + rise, cz];
-  const roofCol = b.shop ? 0x8a8d91 : 0xbf5d36;
+  const roofCol = season === 'hiver' ? 0xeef2f6 : b.shop ? 0x8a8d91 : 0xbf5d36;
   occl.quad4(A, B2, C, Dd, roofCol);
   occl.quad4([b.x0 - o, y0, b.z1 + o], [b.x1 + o, y0, b.z1 + o], C, Dd, shade(roofCol, 0.9));
   occl.tris([b.x0, y0, b.z0, b.x0, y0, b.z1, b.x0, y0 + rise, cz], b.color);
@@ -719,8 +737,9 @@ function buildBackdrop(occl: GeoBuilder, quality: string) {
   for (const [x, z] of seedTrees) {
     const r = 1.6 + hash(Math.round(x * 3), Math.round(z)) * 1.4;
     occl.cyl(0.2, 0.3, 2.4, { x, y: 1.2, z }, 0x7b5e45, 6);
-    occl.ico(r, { x, y: 2.6 + r * 0.6, z }, shade(0x5c9a48, 0.85 + hash(Math.round(x), Math.round(z)) * 0.3), 0.1);
-    if (quality !== 'low') occl.ico(r * 0.7, { x: x + r * 0.4, y: 2.4 + r * 0.4, z: z - r * 0.3 }, shade(0x5c9a48, 0.95), 0.1);
+    const leaf = leafColor(0x5c9a48, Math.round(x * 3 + z));
+    occl.ico(r, { x, y: 2.6 + r * 0.6, z }, shade(leaf, 0.85 + hash(Math.round(x), Math.round(z)) * 0.3), 0.1);
+    if (quality !== 'low') occl.ico(r * 0.7, { x: x + r * 0.4, y: 2.4 + r * 0.4, z: z - r * 0.3 }, shade(leafColor(0x5c9a48, Math.round(x * 3 + z) + 1), 0.95), 0.1);
   }
   // Distant houses (simple volumes) behind the gardens.
   const houses: [number, number, number, number, number][] = [
@@ -733,8 +752,9 @@ function buildBackdrop(occl: GeoBuilder, quality: string) {
     occl.box(w, h, d, { x, y: h / 2, z }, col);
     const o = 0.3;
     const rise = 2.4;
-    occl.quad4([x - w / 2 - o, h, z - d / 2 - o], [x + w / 2 + o, h, z - d / 2 - o], [x + w / 2 + o, h + rise, z], [x - w / 2 - o, h + rise, z], 0xbf5d36);
-    occl.quad4([x - w / 2 - o, h, z + d / 2 + o], [x + w / 2 + o, h, z + d / 2 + o], [x + w / 2 + o, h + rise, z], [x - w / 2 - o, h + rise, z], 0xb05532);
+    const snowy = season === 'hiver';
+    occl.quad4([x - w / 2 - o, h, z - d / 2 - o], [x + w / 2 + o, h, z - d / 2 - o], [x + w / 2 + o, h + rise, z], [x - w / 2 - o, h + rise, z], snowy ? 0xeef2f6 : 0xbf5d36);
+    occl.quad4([x - w / 2 - o, h, z + d / 2 + o], [x + w / 2 + o, h, z + d / 2 + o], [x + w / 2 + o, h + rise, z], [x - w / 2 - o, h + rise, z], snowy ? 0xe2e9f0 : 0xb05532);
     occl.tris([x - w / 2, h, z - d / 2, x - w / 2, h, z + d / 2, x - w / 2, h + rise, z], col);
     occl.tris([x + w / 2, h, z - d / 2, x + w / 2, h, z + d / 2, x + w / 2, h + rise, z], col);
     for (let i = 0; i < 3; i++) {
@@ -742,5 +762,5 @@ function buildBackdrop(occl: GeoBuilder, quality: string) {
     }
   }
   // Hedge/fence lines beyond the boundary (visual only).
-  occl.box(80, 1.6, 0.8, { x: 0, y: 0.8, z: B.z1 + 12 }, 0x4f8f3e, 0.15);
+  occl.box(80, 1.6, 0.8, { x: 0, y: 0.8, z: B.z1 + 12 }, leafColor(0x4f8f3e), 0.15);
 }

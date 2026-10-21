@@ -85,6 +85,7 @@ export const PROP_TYPES: Record<PropType, PropTypeDef> = {
   hamper: { w: 0.56, d: 0.56, h: 0.6, col: 'circle', r: 0.27, mask: MASK_SOLID },
   dog_basket: { w: 1.1, d: 1.1, h: 0.25, col: 'none', mask: 0 },
   bakery_stand: { w: 2.4, d: 0.7, h: 0.95, col: 'box', mask: MASK_SOLID },
+  market_stall: { w: 2.2, d: 0.9, h: 0.9, col: 'box', mask: MASK_SOLID, tall: true },
   clothesline_basket: { w: 0.6, d: 0.45, h: 0.35, col: 'none', mask: 0 },
 };
 

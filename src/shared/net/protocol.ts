@@ -2,6 +2,7 @@
 // send inputs and lobby choices; everything else is validated server-side.
 import { BTN_ALL } from '../constants';
 import type { GameConfig, GameEvent, GameState } from '../sim/types';
+import { Variant, isVariant } from '../world/variants';
 
 export const PROTOCOL_VERSION = 1;
 export const MAX_PLAYERS = 3;
@@ -34,6 +35,8 @@ export interface LobbySettings {
   duration: number;
   fillAI: boolean;
   difficulty: number;
+  /** Ambiance (season or market day). */
+  variant: Variant;
 }
 
 // ---- Client -> server ----
@@ -142,6 +145,7 @@ export function parseClientMsg(raw: string): ClientMsg | null {
       if (isNum(s.duration)) out.duration = Math.max(60, Math.min(900, Math.round(s.duration)));
       if (typeof s.fillAI === 'boolean') out.fillAI = s.fillAI;
       if (isNum(s.difficulty)) out.difficulty = Math.max(0, Math.min(2, Math.round(s.difficulty)));
+      if (isVariant(s.variant)) out.variant = s.variant;
       return { t: 'settings', settings: out };
     }
     case 'assign':

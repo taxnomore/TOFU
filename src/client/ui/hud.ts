@@ -7,7 +7,8 @@ import { objectivesFor } from '../../shared/sim/objectives';
 import { SECRET_DEFS, TASK_DEFS } from '../../shared/sim/rules';
 import type { Character, GameEvent, GameState } from '../../shared/sim/types';
 import { ITEM_TYPES, MESS_TYPES } from '../../shared/world/itemTypes';
-import { BUILDINGS, DOORS, STATIONS, WALLS, ZONES, WORLD_BOUNDS, zoneAt } from '../../shared/world/map';
+import { BUILDINGS, DOORS, PROPS, STATIONS, WALLS, ZONES, WORLD_BOUNDS, zoneAt } from '../../shared/world/map';
+import { Variant, presentIn } from '../../shared/world/variants';
 import type { InputDevice } from '../input/devices';
 import { KEYMAPS, keyLabel } from '../input/devices';
 import { HUMAN_LOOKS } from '../render/characters';
@@ -165,11 +166,16 @@ export class TopBar {
 // Minimap
 // ---------------------------------------------------------------------------
 
-let mapCanvas: HTMLCanvasElement | null = null;
+const mapCanvas = new Map<Variant, HTMLCanvasElement>();
 const MAP_SCALE = 4;
+/** Lawn color of the minimap per ambiance. */
+const MAP_LAWN: Record<Variant, [string, string]> = {
+  ete: ['#86b867', '#5d8a4a'], marche: ['#86b867', '#5d8a4a'], automne: ['#a7a95a', '#7d7d44'], hiver: ['#e9eef3', '#c9d3dc'],
+};
 
-function mapBase(): HTMLCanvasElement {
-  if (mapCanvas) return mapCanvas;
+function mapBase(variant: Variant): HTMLCanvasElement {
+  const cached = mapCanvas.get(variant);
+  if (cached) return cached;
   const B = WORLD_BOUNDS;
   const w = Math.ceil((B.x1 - B.x0) * MAP_SCALE);
   const h = Math.ceil((B.z1 - B.z0) * MAP_SCALE);
@@ -177,7 +183,7 @@ function mapBase(): HTMLCanvasElement {
   c.width = w;
   c.height = h;
   const ctx = c.getContext('2d')!;
-  ctx.fillStyle = '#86b867';
+  ctx.fillStyle = MAP_LAWN[variant][0];
   ctx.fillRect(0, 0, w, h);
   const P = (x: number, z: number) => [(x - B.x0) * MAP_SCALE, (z - B.z0) * MAP_SCALE] as const;
   const rect = (x0: number, z0: number, x1: number, z1: number, col: string) => {
@@ -192,6 +198,11 @@ function mapBase(): HTMLCanvasElement {
     else if (floorCol[z.id]) rect(z.x0, z.z0, z.x1, z.z1, floorCol[z.id]);
   }
   for (const b of BUILDINGS) rect(b.x0, b.z0, b.x1, b.z1, '#b9a88f');
+  // Market stalls.
+  for (const p of PROPS) {
+    if (p.type !== 'market_stall' || !presentIn(p.only, variant)) continue;
+    rect(p.x - 1.1, p.z - 0.45, p.x + 1.1, p.z + 0.45, '#e2a03f');
+  }
   ctx.strokeStyle = '#4b3b2e';
   for (const wdef of WALLS) {
     const t = wallThickness(wdef);
@@ -215,7 +226,7 @@ function mapBase(): HTMLCanvasElement {
     ctx.lineTo(cc, dd);
     ctx.stroke();
   }
-  mapCanvas = c;
+  mapCanvas.set(variant, c);
   return c;
 }
 
@@ -229,7 +240,7 @@ export class Minimap {
     parent.appendChild(this.canvas);
   }
 
-  draw(S: GameState, me: Character, yaw: number, objectives: { x: number; z: number }[], size: number) {
+  draw(S: GameState, me: Character, yaw: number, objectives: { x: number; z: number }[], size: number, variant: Variant = 'ete') {
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     if (this.size !== size || this.canvas.width !== Math.round(size * dpr)) {
       this.size = size;
@@ -240,7 +251,7 @@ export class Minimap {
     }
     const ctx = this.ctx;
     const W = this.canvas.width;
-    const base = mapBase();
+    const base = mapBase(variant);
     const B = WORLD_BOUNDS;
     const viewMeters = 34;
     const k = W / viewMeters;
@@ -249,7 +260,7 @@ export class Minimap {
     ctx.beginPath();
     ctx.arc(W / 2, W / 2, W / 2 - 1, 0, Math.PI * 2);
     ctx.clip();
-    ctx.fillStyle = '#5d8a4a';
+    ctx.fillStyle = MAP_LAWN[variant][1];
     ctx.fillRect(0, 0, W, W);
     ctx.translate(W / 2, W / 2);
     // Camera forward is "up": rotate so that the yaw direction points up.
@@ -499,7 +510,10 @@ export class PlayerHud {
     let status = '';
     if (me.lureKind) status = me.lureKind === 'treat' ? '🦴 Trop tentant…' : '🎾 La balle !';
     else if (me.stun > 0) status = dog ? '💫 Aïe…' : '💫 Oups…';
-    else if (dog && me.mud > 0.05) status = `🐾 Boue : ${Math.round(me.mud * 100)} %`;
+    else if (dog && me.mud > 0.05) {
+      const what = me.pawKind === 'snow' ? '❄️ Pattes mouillées' : me.pawKind === 'leaves' ? '🍂 Feuilles dans les poils' : '🐾 Boue';
+      status = `${what} : ${Math.round(me.mud * 100)} %`;
+    }
     else if (!dog && me.hold.length) status = '🧺 ' + me.hold.map((i) => ITEM_TYPES[S.items[i].type].short).join(', ');
     if (this.status.textContent !== status) this.status.textContent = status;
     this.status.style.display = status ? '' : 'none';
@@ -507,7 +521,7 @@ export class PlayerHud {
     // Objectives (humans) for arrows + minimap.
     const objectives = dog ? [] : objectivesFor(g, me);
     const mm = compact ? Math.max(90, Math.min(130, rect.h * 0.26)) : 150;
-    this.minimap.draw(S, me, this.lp.rig.yaw, objectives, mm);
+    this.minimap.draw(S, me, this.lp.rig.yaw, objectives, mm, g.variant);
 
     // Off-screen arrows.
     const targets: { x: number; z: number; cls: string; icon: string }[] = [];
@@ -629,7 +643,13 @@ export class PlayerHud {
     if (me.role === 'tofu') {
       this.tipOnce('tofu-start', `Tu es <b>Tofu</b> ! Fais des bêtises pour remplir la barre 😈. Vole des chaussettes, renverse des pots, poursuis le chat… Bouton <kbd>${A}</kbd> pour agir.`);
       if (interKind === 'take' || interKind === 'pickup') this.tipOnce('tofu-take', `Appuie sur <kbd>${A}</kbd> pour l'attraper dans ta gueule, puis va le cacher dans ton panier ou dans la rue !`);
-      if (me.mud > 0.5) this.tipOnce('tofu-mud', 'Pattes boueuses ! Cours dans la maison pour laisser des traces 🐾.');
+      if (me.mud > 0.5 && me.pawKind === 'mud') this.tipOnce('tofu-mud', 'Pattes boueuses ! Cours dans la maison pour laisser des traces 🐾.');
+      if (me.mud > 0.2 && me.pawKind === 'snow') this.tipOnce('tofu-snow', 'Pattes pleines de neige ! Dans la maison, elles laissent des traces mouillées 💧.');
+      if (me.mud > 0.3 && me.pawKind === 'leaves') this.tipOnce('tofu-leaves', 'Des feuilles plein les poils ! Rentre vite les semer dans la maison 🍂.');
+      if (me.hold.some((i) => S.items[i]?.type === 'watering_can')) this.tipOnce('tofu-can', "L'arrosoir fuit ! Cours dans la maison pour mettre de l'eau partout 💧.");
+      if (S.items.some((it) => it.type === 'leaf_pile' && it.state === 'home')) this.tipOnce('tofu-pile', 'Automne : fonce dans les tas de feuilles pour les éparpiller 🍂.');
+      if (S.items.some((it) => it.type === 'snowman' && it.state === 'home')) this.tipOnce('tofu-snowman', `Hiver : maintiens <kbd>${A}</kbd> contre un bonhomme de neige pour le démolir ⛄.`);
+      if (S.stations.some((st) => !st.disabled && STATIONS[st.idx].kind === 'market')) this.tipOnce('tofu-market', 'Jour de marché sur le square : fromage, saucisson et poulet rôti t\'attendent 🧀. Passe par le trou de la haie !');
       if (me.zoom >= 1) this.tipOnce('tofu-zoom', `Zoomies prêts ! Appuie sur <kbd>${glyph(dev, BTN_SPECIAL)}</kbd> pour foncer et tout renverser 🌀.`);
       if (interKind === 'push_door') this.tipOnce('tofu-door', `Porte fermée : maintiens <kbd>${A}</kbd> pour la pousser.`);
       if (S.time > 25) this.tipOnce('tofu-sit', `Astuce : reste immobile ou appuie sur <kbd>${glyph(dev, BTN_SIT)}</kbd> pour t'asseoir l'air innocent 😇. <kbd>${glyph(dev, BTN_BARK)}</kbd> pour aboyer !`);
@@ -639,6 +659,8 @@ export class PlayerHud {
       if (S.messes.length) this.tipOnce('human-mess', `Un désordre ! Maintiens <kbd>${A}</kbd> à côté pour nettoyer 🧹.`);
       if (S.time > 20) this.tipOnce('human-treat', `Lance une friandise avec <kbd>${glyph(dev, BTN_SPECIAL)}</kbd> : Tofu ne peut pas résister et lâche ce qu'il porte 🦴.`);
       if (interKind === 'door') this.tipOnce('human-door', 'Ferme les portes ! Tofu doit les pousser longtemps pour passer.');
+      if (S.chars.some((c) => c.role === 'tofu' && c.hold.some((i) => S.items[i]?.type === 'watering_can'))) this.tipOnce('human-can', "Tofu a pris l'arrosoir et il fuit ! Les traces d'eau sèchent toutes seules, mais attention, ça glisse.");
+      if (S.stations.some((st) => !st.disabled && STATIONS[st.idx].kind === 'market') && S.time > 30) this.tipOnce('human-market', 'Jour de marché : si Tofu vole sur un étal, rapportez la marchandise au bon marchand.');
       if (S.time > 60) this.tipOnce('human-sprint', `Maintiens <kbd>${glyph(dev, BTN_SPRINT)}</kbd> pour courir… mais attention aux flaques et aux jouets par terre !`);
     }
   }

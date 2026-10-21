@@ -23,7 +23,7 @@ Une revanche repart d'un monde propre, avec une nouvelle graine aléatoire. À g
 | Camp | Condition |
 |---|---|
 | Humains | Toutes les tâches faites **et** propreté ≥ 70 %. Les invités sonnent alors : il faut tenir 15 secondes. Si Tofu défait une tâche ou salit la maison sous le seuil pendant ce délai, le compte s'annule. |
-| Tofu | Bêtises ≥ objectif : 220 points contre un humain, 170 contre deux. |
+| Tofu | Bêtises ≥ objectif : 250 points contre un humain, 180 contre deux. |
 | Tofu | Fin du temps sans victoire des humains. Si le compte des invités tourne à la fin du temps, la partie attend sa fin. |
 
 Personne ne peut se retrouver bloqué : tout désordre se nettoie, un objet cassé se remet en place après nettoyage, la baguette mangée revient à la boulangerie après 45 secondes, les croissants mangés se rachètent à la boulangerie, et la carte n'a pas de cul-de-sac (tests de navigation sur toutes les zones, objets et emplacements).
@@ -47,7 +47,7 @@ Protection : un objet que les humains viennent de ranger ou de reprendre reste h
 
 ## 5. Défis secrets de Tofu
 
-Tofu tire 3 défis parmi 16 ; chacun rapporte 20 points de bêtises. Le défi « faire sursauter les humains » n'apparaît que s'il y a des humains. La factrice passe une première fois après 30 secondes, puis toutes les 75 à 110 secondes.
+Tofu tire 3 défis ; chacun rapporte 20 points de bêtises. L'automne, l'hiver et le jour de marché imposent leur propre défi ; les deux autres viennent du tirage commun (18 défis). Le défi « faire sursauter les humains » n'apparaît que s'il y a des humains. La factrice passe une première fois après 30 secondes, puis toutes les 75 à 110 secondes.
 
 | Défi | Objectif |
 |---|---|
@@ -67,6 +67,11 @@ Tofu tire 3 défis parmi 16 ; chacun rapporte 20 points de bêtises. Le défi «
 | 📢 Sursaut | faire sursauter les humains 3 fois en aboyant |
 | 📮 Factrice | aboyer sur la factrice |
 | 🧻 Papier | dérouler 25 feuilles de papier toilette |
+| ⛓️ Réaction en chaîne | faire renverser 2 objets par le chat ou par l'aspirateur |
+| 🚿 Arrosoir | voler l'arrosoir et laisser 15 gouttes dans la maison |
+| 🍂 Feuilles (automne) | éparpiller 4 tas de feuilles |
+| ⛄ Bonshommes (hiver) | démolir les 2 bonshommes de neige |
+| 🧀 Marché (jour de marché) | manger 2 bonnes choses volées au marché |
 
 ## 6. Barème des bêtises
 
@@ -82,15 +87,21 @@ Tofu tire 3 défis parmi 16 ; chacun rapporte 20 points de bêtises. Le défi «
 | Sauter sur le canapé / le canapé boueux | 1,5 / 4 |
 | Creuser un massif | 4 |
 | Tirer la nappe | 7 |
-| Une trace de boue dans la maison | 0,15 |
+| Une trace de boue (ou une feuille morte) dans la maison | 0,15 |
+| Une trace mouillée de pattes enneigées (hiver) | 0,06 |
+| Une goutte de l'arrosoir sur un sol de la maison ou de la terrasse | 0,08 (arrosoir vide : +1) |
+| Voler sur un étal du marché | 3 |
+| Démolir un bonhomme de neige / éparpiller un tas de feuilles | 5 / 2,5 |
+| Faire tomber la tasse de café / le cageot de pommes | 3 / 4 |
+| Réaction en chaîne (le chat poursuivi par Tofu, ou l'aspirateur qu'il a allumé, renverse un objet) | les points entiers de l'objet |
 | Une feuille de papier toilette déroulée | 0,15 (rouleau vide : +2) |
-| Allumer l'aspirateur robot | 3 ; ce qu'il renverse compte ensuite pour Tofu |
+| Allumer l'aspirateur robot | 1,5 ; ce qu'il renverse compte ensuite pour Tofu |
 | Poursuivre le chat | 1,2 par seconde (6 au plus par fuite) |
 | Aboyer sur le chat perché / la factrice | 2 / 3 |
 | Glissade d'un humain | 1,5 |
 | Défi secret | 20 |
 | S'asseoir l'air innocent près d'une bêtise | 2 (une fois par bêtise) |
-| Désordre laissé par terre | 0,012 point par seconde et par désordre (0,12 par seconde au plus) |
+| Désordre laissé par terre | 0,012 point par seconde et par désordre (0,12 par seconde au plus) ; les traces d'eau, qui sèchent seules, ne comptent pas |
 
 **Zoomies** : chaque bêtise remplit la jauge (de 2 % pour un aboiement à 16 % pour la nappe ; une bêtise répétée rapporte moins). Jauge pleine : 6 secondes à 8,6 m/s, Tofu renverse ce qu'il touche ; il halète ensuite 1,4 seconde.
 
@@ -102,7 +113,7 @@ La propreté part de 100 % et baisse selon :
 - chaque objet qui n'est pas à sa place : 2,5 points ;
 - un désordre dehors compte moins : × 0,7 dans le jardin, × 0,45 dans la rue et le square.
 
-Les empreintes et les feuilles de papier sont regroupées par zones de nettoyage de 2 m (12 marques au plus par zone ; 900 empreintes et 400 feuilles au plus affichées) : aucune accumulation sans limite.
+Les empreintes, les feuilles de papier, les gouttes et les feuilles mortes sont regroupées par zones de nettoyage de 2 m (12 marques au plus par zone ; 900 empreintes, 400 feuilles de papier, 500 gouttes et 400 feuilles mortes au plus affichées) : aucune accumulation sans limite. Les traces d'eau sèchent seules : une zone commence à sécher 25 secondes après sa création, puis perd une marque toutes les 2,5 secondes.
 
 ## 8. Les bêtises : systèmes de jeu
 
@@ -119,6 +130,19 @@ Bonus déjà en place :
 - **Papier toilette** : Tofu prend le rouleau sur son dérouleur (salle de bain). Tant qu'il le porte en courant, le papier se déroule derrière lui, une feuille tous les 34 cm, dans la maison comme dehors. Un rouleau compte 30 feuilles ; vide, il disparaît et un rouleau neuf revient sur le dérouleur 40 secondes plus tard. Les humains ramassent le papier (maintenir Action), reprennent le rouleau dans la gueule de Tofu ou le remettent sur son dérouleur (il redevient neuf).
 - **Aspirateur robot** : il attend sur sa base dans le salon. Tofu l'allume (les humains aussi) ; il roule 25 secondes au hasard, rebondit sur les meubles, renverse les petits objets posés par terre, fait fuir le chat, et aspire au passage les empreintes de boue, les feuilles de papier et les miettes. Un humain peut l'éteindre : il rentre alors à sa base. Il se recharge 20 secondes avant de repartir.
 - Sauter sur le lit et le canapé (coussins par terre, draps boueux), creuser les massifs, tirer la nappe, aboyer sur la factrice qui passe dans la rue, s'asseoir l'air innocent (« Qui, moi ? »), zoomies.
+- **Arrosoir qui fuit** : Tofu peut voler l'arrosoir de la terrasse (il le ralentit). En courant, il en perd une goutte tous les 40 cm : 20 gouttes pour un arrosoir plein. Sur les sols de la maison et de la terrasse, chaque goutte laisse une trace qui glisse sous les pas d'un humain qui court, et qui sèche toute seule. Vide, l'arrosoir doit être rempli au robinet avant d'arroser les fleurs.
+- **Réactions en chaîne** : en fuyant, le chat renverse ce qu'il touche, au sol comme en hauteur (la tasse de café sur le plan de travail, le pot de basilic sur le rebord de la fenêtre, hors de portée de Tofu). Si Tofu le poursuit à moins de 9 m, ou si l'aspirateur renverse un objet après que Tofu l'a allumé, les points comptent en entier pour Tofu. Une balle lancée renverse aussi ce qu'elle percute (accident humain).
+
+## 8 bis. Les ambiances
+
+L'ambiance se choisit avant la manche (et par l'hôte en réseau local). Le serveur et chaque appareil construisent alors le même monde : collisions, navigation, objets et emplacements dépendent de l'ambiance.
+
+| Ambiance | Décor | Bêtises en plus |
+|---|---|---|
+| ☀️ Été | le quartier habituel | aucune |
+| 🍂 Automne | arbres roux, feuilles au sol, citrouilles au potager, feuilles qui tombent | 4 tas de feuilles (jardin, devant, square). Tofu les éparpille en courant dedans (2,5 points) ; il garde alors des feuilles dans les poils et en sème dans la maison. Ratisser remet le tas en place. |
+| ❄️ Hiver | neige au sol, sur les toits, les murets et les haies ; arbres nus ; flocons | Dehors (sauf dans la rue déneigée), les pattes de Tofu se chargent de neige : traces mouillées dans la maison, qui sèchent seules. 2 bonshommes de neige (jardin et square) : Tofu les pousse (maintenir Action 0,8 s) ou les percute à pleine vitesse (5 points). Les humains les refont. |
+| 🧀 Jour de marché | trois étals rayés sur le square | Fromage, saucisson et poulet rôti sur les étals : Tofu les vole (3 points) et les mange (7 points) ; ils reviennent 45 secondes après. Les humains rendent la marchandise volée au bon étal. Un cageot de pommes se renverse (pommes qui roulent, glissantes). |
 
 ## 9. Capacités
 

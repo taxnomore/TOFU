@@ -1,6 +1,7 @@
 // LAN multiplayer: lobby screen (QR code, players, roles, settings) and the
 // glue between the server connection and network game sessions.
 import qrcode from 'qrcode-generator';
+import { VARIANTS, isVariant } from '../../shared/world/variants';
 import { MAX_SEATS_PER_CLIENT } from '../../shared/net/protocol';
 import type { LobbyPlayer, RolePref, SeatReq } from '../../shared/net/protocol';
 import { sfx } from '../audio/sfx';
@@ -287,7 +288,8 @@ class Lan {
     const set = lob.settings;
     const sh = `<span>Durée</span>${seg('dur', [[240, '4 min'], [360, '6 min'], [480, '8 min']], set.duration)}
       <span>Si personne ne veut être Tofu</span>${seg('fill', [[1, "L'ordinateur joue Tofu"], [0, 'Le premier joueur est Tofu']], set.fillAI ? 1 : 0)}
-      <span>Ordinateur</span>${seg('diff', [[0, 'Facile'], [1, 'Normal'], [2, 'Difficile']], set.difficulty)}`;
+      <span>Ordinateur</span>${seg('diff', [[0, 'Facile'], [1, 'Normal'], [2, 'Difficile']], set.difficulty)}
+      <span>Ambiance</span>${seg('variant', VARIANTS.map((d) => [d.id, `${d.icon} ${d.id === 'marche' ? 'Marché' : d.name}`] as [string, string]), set.variant ?? 'ete')}`;
     const se = q<HTMLElement>('[data-settings]');
     if (se.innerHTML !== sh.replace(/\n\s+/g, '\n')) se.innerHTML = sh.replace(/\n\s+/g, '\n');
 
@@ -411,6 +413,7 @@ class Lan {
     } else if (k === 'dur') net.send({ t: 'settings', settings: { duration: Number(v) } });
     else if (k === 'fill') net.send({ t: 'settings', settings: { fillAI: v === '1' } });
     else if (k === 'diff') net.send({ t: 'settings', settings: { difficulty: Number(v) } });
+    else if (k === 'variant' && isVariant(v)) net.send({ t: 'settings', settings: { variant: v } });
   }
 
   private onChange(e: Event) {

@@ -2,6 +2,7 @@
 import { clamp } from '../math';
 import { BUILDINGS, PROPS, WALLS, WALL_HEIGHT, WORLD_BOUNDS } from './map';
 import { PROP_TYPES, propExtents } from './propTypes';
+import { DEFAULT_VARIANT, Variant, presentIn } from './variants';
 import {
   DoorDef, MASK_ALL, MASK_DOG, MASK_HUMAN, MASK_ITEM, MASK_SOLID, WallDef, WallStyle,
 } from './types';
@@ -103,7 +104,7 @@ export class StaticColliders {
   private boxCells: number[][] = [];
   private circleCells: number[][] = [];
 
-  constructor() {
+  constructor(readonly variant: Variant = DEFAULT_VARIANT) {
     this.gx0 = WORLD_BOUNDS.x0 - 2;
     this.gz0 = WORLD_BOUNDS.z0 - 10;
     this.gw = Math.ceil((WORLD_BOUNDS.x1 + 2 - this.gx0) / this.cell);
@@ -130,7 +131,7 @@ export class StaticColliders {
     }
     for (const p of PROPS) {
       const t = PROP_TYPES[p.type];
-      if (t.col === 'none' || t.mask === 0) continue;
+      if (t.col === 'none' || t.mask === 0 || !presentIn(p.only, this.variant)) continue;
       if (t.col === 'circle') {
         this.circles.push({ x: p.x, z: p.z, r: t.r ?? Math.min(t.w, t.d) / 2, mask: t.mask, h: p.h ?? t.h, tag: 'prop:' + p.type });
       } else {

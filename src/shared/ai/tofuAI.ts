@@ -1,7 +1,7 @@
 // AI for Tofu: picks mischief by utility (secrets, distance, humans nearby),
 // steals and stashes things, knocks objects over, rolls in mud and runs inside,
 // chases the cat, flees from humans, uses zoomies and acts innocent.
-import { BTN_BARK, BTN_INTERACT, BTN_SIT, BTN_SPECIAL, BTN_SPRINT } from '../constants';
+import { BTN_BARK, BTN_INTERACT, BTN_SIT, BTN_SPECIAL, BTN_SPRINT, DOG } from '../constants';
 import { Rng, dist } from '../math';
 import { ITEM_TYPES } from '../world/itemTypes';
 import { CAT_NODES, PUDDLES, STATIONS, STREET_ZONES, inHouse, zoneAt } from '../world/map';
@@ -12,7 +12,7 @@ import { EMPTY_INPUT } from '../sim/types';
 import { Navigator } from './navigator';
 import type { AIController } from './ai';
 
-type Kind = 'act' | 'mud' | 'muddy_run' | 'cat' | 'flee' | 'street' | 'innocent' | 'bark' | 'bump' | 'wander';
+type Kind = 'act' | 'mud' | 'muddy_run' | 'leak' | 'cat' | 'flee' | 'street' | 'innocent' | 'bark' | 'bump' | 'wander';
 
 interface Goal {
   key: string;
@@ -207,7 +207,7 @@ export class TofuAI implements AIController {
           mz = (goal.z - me.z) * 0.6;
         }
         if (goal.kind === 'street' || goal.kind === 'wander' || goal.kind === 'flee') this.goal = null;
-        if (goal.kind === 'muddy_run') this.nextWaypoint();
+        if (goal.kind === 'muddy_run' || goal.kind === 'leak') this.nextWaypoint();
       }
       if (st.failed || (goal.want && this.noAvailT > 1.6)) {
         this.recent.set(goal.key, S.time + 10);
@@ -238,6 +238,8 @@ export class TofuAI implements AIController {
         return me.mud > 0.9;
       case 'muddy_run':
         return me.mud < 0.12;
+      case 'leak':
+        return !me.hold.some((i) => S.items[i].type === 'watering_can' && S.items[i].charge > 0);
       case 'cat':
         return S.cat.y > 0.35 && S.cat.edgeTo < 0 && dist(me.x, me.z, S.cat.x, S.cat.z) > 3;
       case 'flee':
@@ -335,6 +337,11 @@ export class TofuAI implements AIController {
           });
         }
       }
+      // The stolen watering can: run around the house so it leaks everywhere.
+      if (it.type === 'watering_can' && it.charge > 0) {
+        const sp = INDOOR_SPOTS[this.wpIdx % INDOOR_SPOTS.length];
+        add(72 + (this.secret('arrosoir') ? 25 : 0) - this.risk(me.x, me.z) * 0.5, { key: 'leak', kind: 'leak', x: sp[0], z: sp[1], timeout: 25 });
+      }
       if (it.type === 'baguette' && this.secret('baguette')) {
         const si = g.world.stationIndex.get('panier_tofu')!;
         add(95, { key: 'baguette-home', kind: 'act', want: { kind: 'stash', target: si }, x: STATIONS[si].x, z: STATIONS[si].z, timeout: 30 });
@@ -362,6 +369,8 @@ export class TofuAI implements AIController {
         if (t.edible && this.secret('gourmand')) base += 18;
         if (it.type === 'baguette') base += this.secret('baguette') ? 45 : -10;
         if (it.type === 'toilet_roll') base += it.charge > 0 ? (this.secret('papier') ? 40 : 0) : -40;
+        if (it.type === 'watering_can') base += it.charge > 0 ? 6 + (this.secret('arrosoir') ? 30 : 0) : -40;
+        if (t.category === 'market') base += 10 + (this.secret('marche') ? 25 : 0);
         const d = dist(me.x, me.z, it.x, it.z);
         add(base - d * 0.8 - this.risk(it.x, it.z), { key: `item:${it.idx}`, kind: 'act', want: { kind: want, target: it.idx }, x: it.x, z: it.z, timeout: 22 });
       }
@@ -369,12 +378,15 @@ export class TofuAI implements AIController {
       for (const it of S.items) {
         if (it.state !== 'home' || it.knockCd > 0) continue;
         const t = ITEM_TYPES[it.type];
-        if (!t.knock) continue;
+        // Too high for him (the cat's job).
+        if (!t.knock || it.y > DOG.knockReachY) continue;
         const d = dist(me.x, me.z, it.x, it.z);
         const isBin = it.type.includes('bin');
         let base = isBin ? 38 : 36;
         if (this.secret('casse')) base += 18;
         if (isBin && this.secret('poubelles')) base += 22;
+        if (it.type === 'leaf_pile' && this.secret('feuilles')) base += 25;
+        if (it.type === 'snowman') base += this.secret('bonhomme') ? 30 : 4;
         if (inHouse(it.x, it.z)) base += 4;
         const bump = it.y < 0.1 && t.knock.push <= 0 && t.knock.minSpeed < 7;
         const want: IKind = t.knock.push > 0 ? 'push_bin' : 'knock';
@@ -386,7 +398,7 @@ export class TofuAI implements AIController {
       if (S.vacuum.mode === 'dock' && S.vacuum.t <= 0) {
         const v = S.vacuum;
         const dv = dist(me.x, me.z, v.x, v.z);
-        add(34 - dv * 0.8 - this.risk(v.x, v.z), { key: 'vacuum', kind: 'act', want: { kind: 'vacuum', target: 0 }, x: v.x, z: v.z, timeout: 15 });
+        add(34 + (this.secret('chaine') ? 20 : 0) - dv * 0.8 - this.risk(v.x, v.z), { key: 'vacuum', kind: 'act', want: { kind: 'vacuum', target: 0 }, x: v.x, z: v.z, timeout: 15 });
       }
 
       // --- Stations: bed, sofa, flowerbeds, tablecloth, trash bag ---
@@ -425,15 +437,19 @@ export class TofuAI implements AIController {
           add(32 + bonus - mudCells * 3 - d * 0.6, { key: `mud:${p.id}`, kind: 'mud', x: p.x, z: p.z, timeout: 25 });
         }
       } else {
+        // Dirty paws: go and leave prints inside (snowy paws are less of a feat).
         const sp = INDOOR_SPOTS[this.wpIdx % INDOOR_SPOTS.length];
-        add(60 + (this.secret('boue_chambre') ? 20 : 0), { key: 'muddy_run', kind: 'muddy_run', x: sp[0], z: sp[1], timeout: 22, sprint: false });
+        const base = me.pawKind === 'snow' ? 34 : 60;
+        add(base + (me.pawKind === 'mud' && this.secret('boue_chambre') ? 20 : 0), { key: 'muddy_run', kind: 'muddy_run', x: sp[0], z: sp[1], timeout: 22, sprint: false });
       }
     }
     // --- Cat ---
     const cat = S.cat;
     const dc = dist(me.x, me.z, cat.x, cat.z);
     if (cat.y < 0.35 && dc < 22 && !me.hold.length) {
-      add(36 + (this.secret('chat') ? 32 : 0) - dc * 0.9, {
+      // Indoors, a chased cat jumps onto the counter and knocks things over.
+      const chain = inHouse(cat.x, cat.z) ? 10 + (this.secret('chaine') ? 25 : 0) : 0;
+      add(36 + chain + (this.secret('chat') ? 32 : 0) - dc * 0.9, {
         key: 'cat', kind: 'cat', x: cat.x, z: cat.z, sprint: dc < 9, timeout: 10,
         track: () => ({ x: S.cat.x, z: S.cat.z }),
       });

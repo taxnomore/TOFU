@@ -62,6 +62,8 @@ export class DogModel {
   private legs: THREE.Group[] = [];
   private pawMat: THREE.MeshLambertMaterial;
   private mudSpots: THREE.Mesh;
+  /** Leaves stuck in the fur (autumn piles). */
+  private leafBits: THREE.Mesh;
   private halo: THREE.Mesh;
   private stars: THREE.Group;
   readonly mouth: THREE.Group;
@@ -101,6 +103,14 @@ export class DogModel {
     this.mudSpots = mesh(ms);
     this.mudSpots.visible = false;
     this.body.add(this.mudSpots);
+    const lb = new GeoBuilder();
+    const leafCols = [0xd35400, 0xe67e22, 0xeba524, 0xc0392b];
+    [[0.15, 0.08, 0.05], [-0.16, 0.1, -0.1], [0.05, 0.17, -0.22], [-0.06, 0.16, 0.18], [0.17, -0.02, -0.2], [-0.15, -0.04, 0.12]].forEach(([x, y, z], i) => {
+      lb.box(0.09, 0.012, 0.055, { x, y, z, ry: i * 1.3, rz: (i % 3) * 0.4 - 0.4 }, leafCols[i % leafCols.length]);
+    });
+    this.leafBits = mesh(lb);
+    this.leafBits.visible = false;
+    this.body.add(this.leafBits);
 
     // Head.
     this.head = joint(this.body, 0, 0.19, 0.4);
@@ -381,9 +391,14 @@ export class DogModel {
       b.position.y = 0.14 + browTilt * 0.03;
     });
     // Mud.
+    // Dirty paws: brown mud, white snow, or leaves in the fur.
     const mud = clamp(c.mud, 0, 1);
-    this.pawMat.color.setRGB(1 - mud * 0.62, 1 - mud * 0.7, 1 - mud * 0.78);
-    this.mudSpots.visible = mud > 0.45;
+    const kind = c.pawKind ?? 'mud';
+    if (kind === 'snow') this.pawMat.color.setRGB(1 + mud * 0.4, 1 + mud * 0.45, 1 + mud * 0.55);
+    else if (kind === 'leaves') this.pawMat.color.setRGB(1, 1 - mud * 0.25, 1 - mud * 0.55);
+    else this.pawMat.color.setRGB(1 - mud * 0.62, 1 - mud * 0.7, 1 - mud * 0.78);
+    this.mudSpots.visible = kind === 'mud' && mud > 0.45;
+    this.leafBits.visible = kind === 'leaves' && mud > 0.15;
     void mudSurface;
     // Halo + stars (halo when sitting still long enough: "who, me?").
     if (anim === Anim.Sit && c.sitT > 3.5) this.haloT = Math.min(1, this.haloT + dt * 2);

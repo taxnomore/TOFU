@@ -7,6 +7,7 @@ import {
 import { MASK_DOG, MASK_HUMAN } from '../src/shared/world/types';
 import { ITEM_TYPES } from '../src/shared/world/itemTypes';
 import { distToSegment } from '../src/shared/math';
+import { VARIANTS, presentIn } from '../src/shared/world/variants';
 
 const cols = new StaticColliders();
 const humanNav = new NavGrid(cols, MASK_HUMAN, 0.34);
@@ -167,5 +168,56 @@ describe('world map', () => {
 
   it('distToSegment helper sanity', () => {
     expect(distToSegment(0, 0, 10, 0, 5, 3)).toBeCloseTo(3);
+  });
+});
+
+describe.each(VARIANTS.map((v) => v.id))('ambiance %s', (variant) => {
+  const vcols = new StaticColliders(variant);
+  const vHuman = new NavGrid(vcols, MASK_HUMAN, 0.34);
+  const vDog = new NavGrid(vcols, MASK_DOG, 0.3);
+
+  it('spawns are free and the square is still reachable', () => {
+    for (const s of SPAWNS.humans) expect(vHuman.isFree(s.x, s.z)).toBe(true);
+    expect(vDog.isFree(SPAWNS.tofu.x, SPAWNS.tofu.z)).toBe(true);
+    expect(vHuman.findPath(-11, -4.5, -20, 0, allOpen)).not.toBeNull();
+    expect(vDog.findPath(-10, 15, -18, 15, allOpen)).not.toBeNull();
+  });
+
+  it('its stations and objects are reachable by humans', () => {
+    for (const s of STATIONS) {
+      if (!presentIn(s.only, variant)) continue;
+      const a = stationAnchor(s);
+      expect(reachableWithin(vHuman, a.x, a.z, s.r, a.hw, a.hd), `station ${s.id}`).toBe(true);
+    }
+    for (const it of ITEMS) {
+      if (it.station || !presentIn(it.only, variant)) continue;
+      expect(reachableWithin(vHuman, it.x!, it.z!, 1.0 + ITEM_TYPES[it.type].size), `item ${it.id}`).toBe(true);
+    }
+  });
+
+  it('floor objects do not stand inside furniture or walls', () => {
+    for (const it of ITEMS) {
+      if (it.station || (it.y ?? 0) > 0.1 || !presentIn(it.only, variant)) continue;
+      expect(vcols.overlaps(it.x!, it.z!, 0.05, MASK_DOG), `item ${it.id}`).toBe(false);
+    }
+  });
+
+  it('cat walk edges avoid its props', () => {
+    const byId = new Map(CAT_NODES.map((n) => [n.id, n]));
+    for (const e of CAT_EDGES) {
+      const a = byId.get(e.a)!;
+      const b = byId.get(e.b)!;
+      if (e.jump || a.y > 0.1 || b.y > 0.1) continue;
+      const n = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 0.2);
+      for (let k = 1; k < n; k++) {
+        const x = a.x + ((b.x - a.x) * k) / n;
+        const z = a.z + ((b.z - a.z) * k) / n;
+        const nearDoor = DOORS.some((d) => {
+          const bx = doorBox(d);
+          return x > bx.x0 - 0.4 && x < bx.x1 + 0.4 && z > bx.z0 - 0.4 && z < bx.z1 + 0.4;
+        });
+        if (!nearDoor) expect(vcols.overlaps(x, z, 0.12, MASK_DOG), `cat edge ${e.a}-${e.b}`).toBe(false);
+      }
+    }
   });
 });

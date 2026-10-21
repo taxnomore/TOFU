@@ -317,6 +317,10 @@ export const PROPS: PropDef[] = [
   { type: 'bush', x: 30.8, z: -6.6, v: 1 },
   { type: 'bush', x: 11.4, z: -6.0, v: 1 },
   { type: 'mailbox_post', x: 12.0, z: -12.4 },
+  // --- Jour de marché (square) ---
+  { type: 'market_stall', x: -24.0, z: 8.6, rot: 0, color: 0xf6c453, only: ['marche'] },
+  { type: 'market_stall', x: -16.6, z: 8.8, rot: 0, color: 0xe74c3c, only: ['marche'] },
+  { type: 'market_stall', x: -24.2, z: -0.6, rot: 0, color: 0x27ae60, only: ['marche'] },
 ];
 
 /** Interaction stations. */
@@ -349,6 +353,13 @@ export const STATIONS: StationDef[] = [
   { id: 'meuble_chaussures', kind: 'shoe_rack', name: 'le meuble à chaussures', x: -7.75, z: -4.6, y: 0.5, r: 0.85, hw: 0.17, hd: 0.4, dogReach: true, capacity: 4 },
   { id: 'pied_lit', kind: 'bedside', name: 'le pied du lit', x: -11.3, z: -3.0, y: 0.0, r: 0.9, dogReach: true, capacity: 4,
     slots: [[0.1, 0.0, -0.25], [0.1, 0.0, 0.25], [0.35, 0, 0], [-0.1, 0, 0.5]] },
+  // Market day: Tofu can grab the goods from the stall tables.
+  { id: 'etal_fromage', kind: 'market', name: "l'étal du fromager", x: -24.0, z: 8.6, y: 0.92, r: 0.95, hw: 1.0, hd: 0.35, dogReach: true, capacity: 2,
+    slots: [[-0.45, 0.92, 0.05], [0.45, 0.92, 0.05]], only: ['marche'] },
+  { id: 'etal_charcuterie', kind: 'market', name: "l'étal du charcutier", x: -16.6, z: 8.8, y: 0.92, r: 0.95, hw: 1.0, hd: 0.35, dogReach: true, capacity: 2,
+    slots: [[-0.45, 0.92, 0.05], [0.45, 0.92, 0.05]], only: ['marche'] },
+  { id: 'etal_volaille', kind: 'market', name: "l'étal du rôtisseur", x: -24.2, z: -0.6, y: 0.92, r: 0.95, hw: 1.0, hd: 0.35, dogReach: true, capacity: 2,
+    slots: [[-0.45, 0.92, 0.05], [0.45, 0.92, 0.05]], only: ['marche'] },
 ];
 
 export const ITEMS: ItemPlacement[] = [
@@ -400,6 +411,22 @@ export const ITEMS: ItemPlacement[] = [
   { id: 'pot_voisin_2', type: 'flowerpot', x: 21.0, z: -5.7 },
   { id: 'bin_square', type: 'public_bin', x: -16.0, z: 4.2 },
   { id: 'seau', type: 'watering_pot', x: -9.7, z: 18.4 },
+  // Up high in the kitchen, where the cat runs when Tofu chases it inside.
+  { id: 'tasse', type: 'mug', x: -2.35, z: -5.45, y: 0.92, rot: 0.4 },
+  { id: 'basilic', type: 'herb_pot', x: -1.6, z: -5.95, y: 1.05 },
+  // Autumn.
+  { id: 'feuilles_jardin_o', type: 'leaf_pile', x: -9.0, z: 10.0, only: ['automne'] },
+  { id: 'feuilles_jardin_e', type: 'leaf_pile', x: 4.5, z: 12.0, only: ['automne'] },
+  { id: 'feuilles_devant', type: 'leaf_pile', x: -1.5, z: -10.6, only: ['automne'] },
+  { id: 'feuilles_square', type: 'leaf_pile', x: -18.5, z: 6.5, only: ['automne'] },
+  // Winter.
+  { id: 'bonhomme_jardin', type: 'snowman', x: -5.0, z: 10.6, rot: 0.3, only: ['hiver'] },
+  { id: 'bonhomme_square', type: 'snowman', x: -20.0, z: -2.5, rot: -0.4, only: ['hiver'] },
+  // Market day.
+  { id: 'marche_fromage', type: 'fromage', station: 'etal_fromage', only: ['marche'] },
+  { id: 'marche_saucisson', type: 'saucisson', station: 'etal_charcuterie', only: ['marche'] },
+  { id: 'marche_poulet', type: 'poulet', station: 'etal_volaille', only: ['marche'] },
+  { id: 'cageot', type: 'apple_crate', x: -16.6, z: 9.9, rot: 0.2, only: ['marche'] },
 ];
 
 export const PUDDLES: Puddle[] = [

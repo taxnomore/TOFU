@@ -119,6 +119,7 @@ export function listInteractions(g: Game, c: Character): Interaction[] {
           case 'street_bin': label = 'Jeter le sac poubelle'; hold = 0.5; break;
           case 'counter': label = `Poser ${t.name}`; break;
           case 'bakery': label = 'Rendre la baguette'; break;
+          case 'market': label = `Rendre ${t.name} au marchand`; break;
           case 'hamper': case 'dresser': case 'toybox':
             label = storable.length > 1 ? `Ranger ${storable.length} objets` : `Ranger ${t.name}`;
             break;
@@ -194,7 +195,7 @@ export function listInteractions(g: Game, c: Character): Interaction[] {
     for (const it of S.items) {
       if (it.state !== 'home' || it.knockCd > 0) continue;
       const t = ITEM_TYPES[it.type];
-      if (!t.knock) continue;
+      if (!t.knock || it.y > DOG.knockReachY) continue;
       const d = Math.hypot(it.x - c.x, it.z - c.z) - t.size;
       if (d > reach) continue;
       if (t.knock.push > 0) add('push_bin', it.idx, `Renverser ${t.name}`, t.knock.push, it.x, it.y, it.z, d, 55);

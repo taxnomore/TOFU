@@ -1,6 +1,7 @@
 // Autonomous neighborhood cat. Moves on a hand-authored graph (ground paths,
 // wall tops, car roofs, the dog flap, the kitchen window...). Flees from Tofu
-// to safe perches, may knock things over while fleeing, hisses at barks.
+// to safe perches, knocks things over while fleeing (even up on the kitchen
+// counter: a chain reaction when Tofu is the cause), hisses at barks.
 import { CAT, CHAOS, DOG } from '../constants';
 import { angleDiff, dist } from '../math';
 import { ITEM_TYPES } from '../world/itemTypes';
@@ -212,7 +213,9 @@ export function updateCat(g: Game, dt: number): void {
     cat.x = a.x + (b.x - a.x) * t;
     cat.z = a.z + (b.z - a.z) * t;
     cat.y = a.y + (b.y - a.y) * t + (cat.jump ? 4 * 0.7 * t * (1 - t) : 0);
-    if (cat.mode === 'flee' && !cat.jump && cat.y < 0.3) bumpKnockables(g, cat);
+    // Running away, it knocks over what stands in its way, on the floor or up
+    // on the kitchen counter (landing from a jump too).
+    if (cat.mode === 'flee' && (!cat.jump || cat.edgeT > 0.6)) bumpKnockables(g, cat);
     if (cat.edgeT >= 1) {
       cat.node = cat.edgeTo;
       cat.edgeTo = -1;

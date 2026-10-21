@@ -1,10 +1,17 @@
 import { StationKind } from './types';
 
-export type ItemCategory = 'laundry' | 'toy' | 'food' | 'paper' | 'trash' | 'dishes' | 'ball' | 'tool' | 'knockable' | 'roll';
+export type ItemCategory = 'laundry' | 'toy' | 'food' | 'paper' | 'trash' | 'dishes' | 'ball' | 'tool' | 'knockable' | 'roll' | 'market';
 
 export type MessKind =
   | 'water' | 'soil' | 'blocks' | 'cushion' | 'trash' | 'gnome' | 'mud' | 'crumbs' | 'shards' | 'dig'
-  | 'muddy_bed' | 'muddy_sofa' | 'paper';
+  | 'muddy_bed' | 'muddy_sofa' | 'paper' | 'wet' | 'leaves' | 'leaf_trail' | 'snow' | 'apples' | 'coffee';
+
+/** Messes made of many small marks along a path (paw prints, paper strips, drops). */
+export const TRAIL_KINDS: readonly MessKind[] = ['mud', 'paper', 'wet', 'leaf_trail'];
+
+export function isTrail(kind: MessKind): boolean {
+  return TRAIL_KINDS.includes(kind);
+}
 
 export interface KnockDef {
   mess: MessKind;
@@ -17,6 +24,8 @@ export interface KnockDef {
   lie: 'side' | 'flat' | 'scatter';
   /** Height of the object (for tumble visuals). */
   height: number;
+  /** Chaos message (default: "<Objet> renversé !"). */
+  text?: string;
 }
 
 export interface ItemTypeDef {
@@ -76,8 +85,16 @@ export const ITEM_TYPES: Record<string, ItemTypeDef> = {
     carry: { dog: false, human: true, stack: 1, slow: 0.08 }, homes: ['cupboard', 'dining_table'] },
   ball: { name: 'la balle', short: 'balle', category: 'ball', icon: '🎾', size: 0.1,
     carry: { dog: true, human: true, stack: 1, slow: 0 }, neverMess: true },
+  // Tofu can steal it too: carried by him, it leaks all over the floor.
   watering_can: { name: "l'arrosoir", short: 'arrosoir', category: 'tool', icon: '🚿', size: 0.25,
-    carry: { dog: false, human: true, stack: 1, slow: 0.06 }, neverMess: true },
+    carry: { dog: true, human: true, stack: 1, slow: 0.1 }, neverMess: true },
+  // Market day (on the stalls of the square).
+  saucisson: { name: 'le saucisson', short: 'saucisson', category: 'market', icon: '🌭', size: 0.18,
+    carry: { dog: true, human: true, stack: 1, slow: 0.02 }, edible: true, homes: ['market'], respawnAt: 'etal_charcuterie' },
+  fromage: { name: 'le fromage', short: 'fromage', category: 'market', icon: '🧀', size: 0.18,
+    carry: { dog: true, human: true, stack: 1, slow: 0.02 }, edible: true, homes: ['market'], respawnAt: 'etal_fromage' },
+  poulet: { name: 'le poulet rôti', short: 'poulet rôti', category: 'market', icon: '🍗', size: 0.2,
+    carry: { dog: true, human: true, stack: 1, slow: 0.03 }, edible: true, homes: ['market'], respawnAt: 'etal_volaille' },
 
   vase: { name: 'le vase de fleurs', short: 'vase', category: 'knockable', icon: '🏺', size: 0.18,
     knock: { mess: 'water', chaos: 4, minSpeed: 0.8, push: 0, lie: 'side', height: 0.4 } },
@@ -99,6 +116,20 @@ export const ITEM_TYPES: Record<string, ItemTypeDef> = {
     knock: { mess: 'gnome', chaos: 3, minSpeed: 0.8, push: 0, lie: 'side', height: 0.55 } },
   watering_pot: { name: "le seau d'eau", short: 'seau', category: 'knockable', icon: '🪣', size: 0.2,
     knock: { mess: 'water', chaos: 2.5, minSpeed: 0.8, push: 0, lie: 'side', height: 0.35 } },
+  // Up high, out of Tofu's reach: the cat (or a ball) knocks them down.
+  mug: { name: 'la tasse de café', short: 'tasse', category: 'knockable', icon: '☕', size: 0.08,
+    knock: { mess: 'coffee', chaos: 3, minSpeed: 0.5, push: 0, lie: 'scatter', height: 0.12, text: 'La tasse de café ! Patatras !' } },
+  herb_pot: { name: 'le pot de basilic', short: 'pot de basilic', category: 'knockable', icon: '🌿', size: 0.12,
+    knock: { mess: 'soil', chaos: 3, minSpeed: 0.8, push: 0, lie: 'side', height: 0.25 } },
+  // Autumn: running through a pile scatters it.
+  leaf_pile: { name: 'le tas de feuilles', short: 'tas de feuilles', category: 'knockable', icon: '🍂', size: 0.45,
+    knock: { mess: 'leaves', chaos: 2.5, minSpeed: 0.3, push: 0, lie: 'scatter', height: 0.35, text: 'Tas de feuilles éparpillé !' } },
+  // Winter: heavy, Tofu pushes it over (or runs into it at full speed).
+  snowman: { name: 'le bonhomme de neige', short: 'bonhomme de neige', category: 'knockable', icon: '⛄', size: 0.42,
+    knock: { mess: 'snow', chaos: 5, minSpeed: 6.5, push: 0.8, lie: 'scatter', height: 1.25, text: 'Bonhomme de neige démoli !' } },
+  // Market day.
+  apple_crate: { name: 'le cageot de pommes', short: 'cageot de pommes', category: 'knockable', icon: '🍎', size: 0.3,
+    knock: { mess: 'apples', chaos: 4, minSpeed: 1.2, push: 0, lie: 'side', height: 0.3, text: 'Les pommes roulent partout !' } },
 };
 
 export interface MessTypeDef {
@@ -127,4 +158,10 @@ export const MESS_TYPES: Record<MessKind, MessTypeDef> = {
   muddy_bed: { name: 'des draps boueux', dirt: 7, clean: 2.2, icon: '🛏️', verb: 'Changer les draps' },
   muddy_sofa: { name: 'un canapé boueux', dirt: 7, clean: 2.2, icon: '🛋️', verb: 'Brosser le canapé' },
   paper: { name: 'du papier toilette déroulé', dirt: 4, clean: 1.2, icon: '🧻', verb: 'Ramasser le papier' },
+  wet: { name: "des traces d'eau", dirt: 3, clean: 1.0, icon: '💧', verb: 'Éponger les traces', slippery: true },
+  leaves: { name: 'des feuilles éparpillées', dirt: 4, clean: 2.0, icon: '🍂', verb: 'Ratisser les feuilles' },
+  leaf_trail: { name: 'des feuilles dans la maison', dirt: 3, clean: 1.0, icon: '🍂', verb: 'Ramasser les feuilles' },
+  snow: { name: 'un bonhomme de neige démoli', dirt: 4, clean: 2.5, icon: '⛄', verb: 'Refaire le bonhomme' },
+  apples: { name: 'des pommes par terre', dirt: 5, clean: 1.8, icon: '🍎', verb: 'Ramasser les pommes', slippery: true },
+  coffee: { name: 'du café renversé', dirt: 5, clean: 1.6, icon: '☕', verb: 'Éponger le café', slippery: true },
 };

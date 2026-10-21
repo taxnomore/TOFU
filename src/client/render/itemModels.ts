@@ -185,6 +185,79 @@ const ITEMS: Record<string, ItemBuilder> = {
     b.torus(0.12, 0.01, { y: 0.25, rx: Math.PI / 2 }, 0x2980b9);
     b.cylU(0.12, 0.02, { y: 0.22 }, 0x74b9ff, 12);
   },
+  mug(b) {
+    b.cyl(0.045, 0.04, 0.1, { y: 0.05 }, 0xfdfdfd, 12);
+    b.cylU(0.038, 0.01, { y: 0.095 }, 0x5d4037, 12);
+    b.torus(0.028, 0.008, { x: 0.05, y: 0.05 }, 0xfdfdfd);
+    b.box(0.05, 0.03, 0.002, { y: 0.05, z: 0.046 }, 0xe74c3c);
+  },
+  herb_pot(b) {
+    b.cyl(0.09, 0.07, 0.13, { y: 0.065 }, 0xc0703f, 12);
+    b.cylU(0.095, 0.02, { y: 0.13 }, 0xa85f33, 12);
+    for (let i = 0; i < 7; i++) {
+      const a = (i / 7) * Math.PI * 2;
+      b.ico(0.045, { x: Math.cos(a) * 0.05, y: 0.19 + (i % 2) * 0.04, z: Math.sin(a) * 0.05, sy: 0.7 }, i % 2 ? 0x4caf50 : 0x66bb6a);
+    }
+    b.ico(0.05, { y: 0.25 }, 0x5aa547);
+  },
+  leaf_pile(b, seed) {
+    const cols = [0xd35400, 0xe67e22, 0xeba524, 0xc0392b, 0xd4a017, 0xb5651d];
+    b.ico(0.42, { y: 0.1, sy: 0.45 }, 0xc0703a, 0.12);
+    for (let i = 0; i < 26; i++) {
+      const a = hash(i, seed) * Math.PI * 2;
+      const d = hash(i + 30, seed) * 0.38;
+      const y = 0.06 + (0.38 - d) * 0.5 + hash(i + 60, seed) * 0.05;
+      b.box(0.1, 0.012, 0.06, { x: Math.cos(a) * d, y, z: Math.sin(a) * d, ry: hash(i + 90, seed) * 3, rx: (hash(i + 7, seed) - 0.5) * 0.8 }, cols[i % cols.length]);
+    }
+    // A rake left there.
+    b.cylU(0.012, 1.3, { x: 0.45, y: 0.05, z: 0.1, rz: Math.PI / 2, ry: 0.4 }, 0x9a7650, 6);
+    b.box(0.04, 0.03, 0.3, { x: 1.03, y: 0.04, z: -0.15, ry: 0.4 }, 0x7f8c8d);
+  },
+  snowman(b, seed) {
+    const snow = 0xf6f9fc;
+    b.sphere(0.4, { y: 0.34 }, snow, 'hi');
+    b.sphere(0.29, { y: 0.88 }, snow, 'hi');
+    b.sphere(0.2, { y: 1.27 }, snow, 'hi');
+    // Carrot nose, coal eyes and buttons.
+    b.cone(0.035, 0.18, { y: 1.27, z: 0.27, rx: Math.PI / 2 }, 0xe67e22);
+    for (const sx of [-1, 1]) b.sphere(0.025, { x: sx * 0.07, y: 1.34, z: 0.17 }, 0x2d3436, 'lo');
+    for (let i = 0; i < 3; i++) b.sphere(0.03, { y: 0.78 + i * 0.11, z: 0.28 - Math.abs(i - 1) * 0.02 }, 0x2d3436, 'lo');
+    // Scarf and hat.
+    const scarf = seed % 2 ? 0xe74c3c : 0x2e86de;
+    b.torus(0.19, 0.045, { y: 1.1, rx: Math.PI / 2 }, scarf);
+    b.box(0.08, 0.25, 0.03, { x: 0.12, y: 0.98, z: 0.2, rz: 0.2 }, scarf);
+    b.cylU(0.18, 0.03, { y: 1.44 }, 0x2d3436, 14);
+    b.cylU(0.12, 0.2, { y: 1.55 }, 0x2d3436, 14);
+    // Twig arms.
+    for (const sx of [-1, 1]) b.cylU(0.015, 0.5, { x: sx * 0.42, y: 1.0, rz: sx * 1.1 }, 0x6d4c33, 6);
+  },
+  saucisson(b) {
+    b.cylU(0.05, 0.3, { y: 0.05, rz: Math.PI / 2 }, 0x8e3b2f, 12);
+    for (const sx of [-1, 1]) b.sphere(0.05, { x: sx * 0.15, y: 0.05 }, 0x7a3227, 'lo');
+    for (let i = 0; i < 4; i++) b.torus(0.051, 0.004, { x: -0.1 + i * 0.065, y: 0.05, ry: Math.PI / 2 }, 0xf5f6fa);
+    b.cylU(0.004, 0.08, { x: 0.19, y: 0.05, rz: Math.PI / 2 }, 0xf5f6fa, 6);
+  },
+  fromage(b) {
+    b.cylU(0.16, 0.09, { y: 0.045 }, 0xf6d365, 18);
+    b.cylU(0.162, 0.012, { y: 0.088 }, 0xe8c25a, 18);
+    // A wedge missing, holes.
+    b.box(0.13, 0.092, 0.012, { x: 0.07, y: 0.046, z: 0.0 }, 0xffe9a0);
+    for (let i = 0; i < 4; i++) b.sphere(0.012, { x: -0.06 + i * 0.03, y: 0.092, z: -0.05 + (i % 2) * 0.05, sy: 0.4 }, 0xe0b84a, 'lo');
+  },
+  poulet(b) {
+    b.sphere(0.12, { y: 0.1, sx: 1.25, sz: 0.95 }, 0xc8792e);
+    for (const sx of [-1, 1]) {
+      b.sphere(0.055, { x: 0.1, y: 0.07, z: sx * 0.09, sx: 1.4 }, 0xb5651d);
+      b.cylU(0.012, 0.06, { x: 0.19, y: 0.07, z: sx * 0.09, rz: Math.PI / 2 }, 0xf5f6fa, 6);
+    }
+    b.box(0.32, 0.015, 0.24, { y: 0.008 }, 0xfdfdfd);
+  },
+  apple_crate(b) {
+    b.box(0.5, 0.04, 0.36, { y: 0.02 }, 0xb08850);
+    for (const sz of [-1, 1]) b.box(0.5, 0.2, 0.025, { y: 0.12, z: sz * 0.17 }, 0xc49a6c);
+    for (const sx of [-1, 1]) b.box(0.025, 0.2, 0.36, { x: sx * 0.24, y: 0.12 }, 0xc49a6c);
+    for (let i = 0; i < 12; i++) b.sphere(0.055, { x: -0.18 + (i % 4) * 0.12, y: 0.21 + (i % 3 === 0 ? 0.03 : 0), z: -0.1 + Math.floor(i / 4) * 0.1 }, i % 3 ? 0xd63031 : 0x7cb342, 'lo');
+  },
 };
 
 export function buildItemGeometry(type: string, seed = 0): THREE.BufferGeometry {
@@ -290,6 +363,51 @@ export function buildMessGeometry(kind: MessKind, seed: number, r: number): THRE
       }
       b.cylU(0.01, 0.2, { x: 0.45, y: 0.04, z: 0.1, rz: Math.PI / 2 }, 0x4f8f3a, 6);
       b.ico(0.05, { x: 0.55, y: 0.05, z: 0.1 }, 0xe74c3c);
+      break;
+    }
+    case 'leaves': {
+      const cols = [0xd35400, 0xe67e22, 0xeba524, 0xc0392b, 0xd4a017, 0xb5651d];
+      for (let i = 0; i < 70; i++) {
+        const a = rnd(i) * Math.PI * 2;
+        const d = Math.sqrt(rnd(i + 200)) * r;
+        b.box(0.11, 0.008, 0.065, { x: Math.cos(a) * d, y: 0.012 + (i % 5) * 0.003, z: Math.sin(a) * d, ry: rnd(i + 400) * 3 }, cols[i % cols.length]);
+      }
+      // What is left of the pile, and the rake.
+      b.ico(0.22, { y: 0.03, sy: 0.3 }, 0xc0703a, 0.15);
+      b.cylU(0.012, 1.3, { x: 0.5, y: 0.03, z: 0.25, rz: Math.PI / 2, ry: 0.4 }, 0x9a7650, 6);
+      break;
+    }
+    case 'snow': {
+      const snow = 0xf6f9fc;
+      for (let i = 0; i < 9; i++) {
+        const a = rnd(i) * Math.PI * 2;
+        const d = 0.15 + rnd(i + 20) * r * 0.75;
+        b.sphere(0.12 + rnd(i + 40) * 0.16, { x: Math.cos(a) * d, y: 0.06, z: Math.sin(a) * d, sy: 0.55 }, snow, 'mid');
+      }
+      b.cone(0.035, 0.18, { x: 0.3, y: 0.04, z: -0.2, rz: Math.PI / 2, ry: 0.6 }, 0xe67e22);
+      b.cylU(0.12, 0.2, { x: -0.35, y: 0.08, z: 0.25, rz: Math.PI / 2 - 0.3 }, 0x2d3436, 14);
+      b.torus(0.15, 0.04, { x: 0.05, y: 0.04, z: 0.45, rx: Math.PI / 2 }, rnd(7) > 0.5 ? 0xe74c3c : 0x2e86de);
+      for (const sx of [-1, 1]) b.cylU(0.015, 0.5, { x: sx * 0.6, y: 0.02, z: sx * 0.1, rz: Math.PI / 2, ry: sx }, 0x6d4c33, 6);
+      break;
+    }
+    case 'apples': {
+      for (let i = 0; i < 16; i++) {
+        const a = rnd(i) * Math.PI * 2;
+        const d = 0.2 + rnd(i + 20) * r;
+        b.sphere(0.055, { x: Math.cos(a) * d, y: 0.05, z: Math.sin(a) * d }, i % 3 ? 0xd63031 : 0x7cb342, 'lo');
+      }
+      break;
+    }
+    case 'coffee': {
+      blob(b, r * 0.45, 0x5d3a1f, seed, 0.012);
+      for (let i = 0; i < 7; i++) {
+        const a = rnd(i) * Math.PI * 2;
+        const d = 0.1 + rnd(i + 20) * r * 0.6;
+        const x = Math.cos(a) * d;
+        const z = Math.sin(a) * d;
+        b.tris([x, 0.02, z, x + 0.06, 0.02, z + 0.02, x + 0.02, 0.02, z + 0.07], i === 2 ? 0xe74c3c : 0xfdfdfd);
+      }
+      b.torus(0.028, 0.008, { x: 0.2, y: 0.01, z: 0.1, rx: Math.PI / 2 }, 0xfdfdfd);
       break;
     }
     case 'muddy_bed':

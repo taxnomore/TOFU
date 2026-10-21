@@ -147,6 +147,7 @@ button small { display: block; font-weight: 500; font-size: 0.85rem; opacity: 0.
 .choice.sel { background: var(--sun); transform: translateY(-3px); }
 .choice:focus-visible { outline: 4px solid #2e86de; }
 .opts { display: grid; grid-template-columns: auto 1fr; gap: 0.5rem 1rem; align-items: center; margin: 0.8rem 0; }
+.opts .vdesc { grid-column: 2; margin-top: -0.25rem; opacity: 0.8; font-size: 0.85em; }
 .seg { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .seg button {
   font: 600 1rem var(--font);
@@ -245,6 +246,7 @@ body.lan-host .guest-only { display: none !important; }
   .panel { padding: 0.9rem 1rem; }
   .panel h2 { font-size: 1.35rem; }
   .opts { grid-template-columns: 1fr; gap: 0.3rem; }
+  .opts .vdesc { grid-column: auto; margin-top: 0; }
   .stats { grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 0.25rem 0.6rem; font-size: 0.82rem; }
   .stats div { padding: 0.15rem 0.45rem; }
   .stats { max-height: 34vh; overflow-y: auto; }

@@ -3,6 +3,7 @@
 // the action (works per viewport in split screen).
 import * as THREE from 'three';
 import type { FloorKind } from '../../shared/world/types';
+import type { Variant } from '../../shared/world/variants';
 import { floorTexture } from './textures';
 
 export const cutUniforms = {
@@ -116,8 +117,8 @@ export interface Materials {
   glassCut: THREE.MeshLambertMaterial;
   mud: THREE.MeshPhongMaterial;
   water: THREE.MeshPhongMaterial;
-  floors: Map<FloorKind, THREE.MeshLambertMaterial>;
-  floor(kind: FloorKind): THREE.MeshLambertMaterial;
+  floors: Map<string, THREE.MeshLambertMaterial>;
+  floor(kind: FloorKind, season?: Variant): THREE.MeshLambertMaterial;
   basic(color: number): THREE.MeshBasicMaterial;
   sign(tex: THREE.Texture): THREE.MeshLambertMaterial;
 }
@@ -136,17 +137,18 @@ export function materials(maxAniso = 4): Materials {
   applyCutout(glassCut);
   const mud = new THREE.MeshPhongMaterial({ color: 0x5a3f2a, shininess: 70, specular: 0x4a4a4a });
   const water = new THREE.MeshPhongMaterial({ color: 0x8cc8ea, transparent: true, opacity: 0.62, shininess: 110, specular: 0xffffff, depthWrite: false });
-  const floors = new Map<FloorKind, THREE.MeshLambertMaterial>();
+  const floors = new Map<string, THREE.MeshLambertMaterial>();
   const basicCache = new Map<number, THREE.MeshBasicMaterial>();
   shared = {
     vc, vcCut, cap, glass, glassCut, mud, water, floors,
-    floor(kind) {
-      let m = floors.get(kind);
+    floor(kind, season = 'ete') {
+      const key = `${kind}|${season}`;
+      let m = floors.get(key);
       if (!m) {
-        const { tex } = floorTexture(kind, maxAniso);
+        const { tex } = floorTexture(kind, maxAniso, season);
         m = new THREE.MeshLambertMaterial({ map: tex, transparent: kind === 'crosswalk' });
         if (kind === 'crosswalk') m.depthWrite = false;
-        floors.set(kind, m);
+        floors.set(key, m);
       }
       return m;
     },
