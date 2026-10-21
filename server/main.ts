@@ -36,7 +36,8 @@ function serveStatic(req: http.IncomingMessage, res: http.ServerResponse): void 
   let p = decodeURIComponent(url.pathname);
   if (p.endsWith('/')) p += 'index.html';
   const file = path.normalize(path.join(DIST, p));
-  if (!file.startsWith(DIST)) {
+  // Only files inside dist/ (not a sibling such as dist-server/).
+  if (file !== DIST && !file.startsWith(DIST + path.sep)) {
     res.writeHead(403).end();
     return;
   }

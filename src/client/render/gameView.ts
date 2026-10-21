@@ -4,12 +4,12 @@ import * as THREE from 'three';
 import type { GameState, Item } from '../../shared/sim/types';
 import { Anim } from '../../shared/sim/types';
 import { ITEM_TYPES } from '../../shared/world/itemTypes';
-import { DOORS, STATIONS } from '../../shared/world/map';
+import { DOORS, STATIONS, PROPS } from '../../shared/world/map';
 import { CatModel, DogModel, HumanModel } from './characters';
 import { GeoBuilder } from './geo';
 import { buildItemGeometry, buildMessGeometry, buildSetTableGeometry, treatGeometry, waterGeometry } from './itemModels';
 import { materials } from './materials';
-import { pawTexture } from './textures';
+import { pawTexture, paperTexture } from './textures';
 
 /** Positions captured before the latest simulation step (for render interpolation). */
 export interface PrevSnapshot {
@@ -30,6 +30,7 @@ export function captureSnapshot(S: GameState, out?: PrevSnapshot): PrevSnapshot 
 
 const HIDDEN_KINDS = new Set(['hamper', 'dresser', 'toybox', 'mailbox', 'cupboard', 'street_bin']);
 const MAX_PRINTS = 900;
+const MAX_PAPER = 400;
 
 interface DoorVis {
   pivots: THREE.Group[];
@@ -45,12 +46,16 @@ export class GameView {
   humans = new Map<number, HumanModel>();
   cat = new CatModel();
   carrier = new HumanModel(4);
+  private vacuum = new THREE.Group();
+  private vacuumLed!: THREE.Mesh;
   private items: THREE.Mesh[] = [];
   private setTable: THREE.Mesh;
   private doors: DoorVis[] = [];
   private messes = new Map<number, { obj: THREE.Object3D; rev: number }>();
   private prints: THREE.InstancedMesh;
   private printsKey = '';
+  private paper: THREE.InstancedMesh;
+  private paperKey = '';
   private treats: THREE.Mesh[] = [];
   private duvet: THREE.Mesh;
   private duvetT = 0;
@@ -77,6 +82,18 @@ export class GameView {
     this.root.add(this.carrier.root);
     this.carrier.root.visible = false;
 
+    // Robot vacuum.
+    const vb = new GeoBuilder();
+    vb.cylU(0.2, 0.07, { y: 0.045 }, 0x3d4852, 20);
+    vb.cylU(0.175, 0.014, { y: 0.086 }, 0x5d6d7e, 20);
+    vb.cylU(0.05, 0.012, { y: 0.096, z: -0.05 }, 0x2c3e50, 12);
+    vb.box(0.26, 0.04, 0.05, { y: 0.035, z: 0.175 }, 0x17202a);
+    this.vacuum.add(vb.mesh(materials().vc));
+    this.vacuumLed = new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 6), new THREE.MeshBasicMaterial({ color: 0xf39c12 }));
+    this.vacuumLed.position.set(0, 0.1, 0.1);
+    this.vacuum.add(this.vacuumLed);
+    this.root.add(this.vacuum);
+
     // Items.
     for (const it of S.items) {
       const m = new THREE.Mesh(buildItemGeometry(it.type, it.idx), mats.vc);
@@ -100,6 +117,16 @@ export class GameView {
     this.prints.frustumCulled = false;
     this.prints.renderOrder = 1;
     this.root.add(this.prints);
+
+    // Toilet paper strips.
+    const sg = new THREE.PlaneGeometry(0.15, 0.38);
+    sg.rotateX(-Math.PI / 2);
+    const sm = new THREE.MeshLambertMaterial({ color: 0xffffff, map: paperTexture(), side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2 });
+    this.paper = new THREE.InstancedMesh(sg, sm, MAX_PAPER);
+    this.paper.count = 0;
+    this.paper.frustumCulled = false;
+    this.paper.renderOrder = 1;
+    this.root.add(this.paper);
 
     // Treats pool.
     const tg = treatGeometry();
@@ -267,6 +294,15 @@ export class GameView {
       this.carrier.update({ x: car.x, z: car.z, facing: car.facing, speed: car.wait > 0 ? 0 : 1.3, anim: car.wait > 0 ? Anim.Idle : car.scared > 0 ? Anim.Run : Anim.Walk, animT: car.t, hold: [], stun: 0 }, dt);
     }
 
+    // Robot vacuum: a little wobble when running, blinking green light, orange on its dock.
+    const vac = S.vacuum;
+    if (vac) {
+      const on = vac.mode !== 'dock';
+      this.vacuum.position.set(vac.x, on ? Math.abs(Math.sin(this.time * 23)) * 0.006 : 0, vac.z);
+      this.vacuum.rotation.y = vac.facing;
+      (this.vacuumLed.material as THREE.MeshBasicMaterial).color.setHex(on ? (Math.sin(this.time * 9) > 0 ? 0x2ecc71 : 0x145a32) : 0xf39c12);
+    }
+
     // Items.
     const tofu = S.chars.find((c) => c.role === 'tofu')!;
     for (const it of S.items) this.syncItem(S, it, tofu.id, alpha, prev);
@@ -377,6 +413,9 @@ export class GameView {
           m.rotation.z = Math.sin(this.time * 1.7 + it.idx) * 0.08;
         } else if (st.kind === 'dog_basket' || st.kind === 'bedside') {
           this.lieFlat(m, it, t.category);
+        } else if (st.kind === 'roll_holder') {
+          // The roll hangs on its bar along the wall.
+          m.rotation.y = ((PROPS.find((p) => p.type === 'roll_holder')?.rot ?? 0) * Math.PI) / 2;
         }
         return;
       }
@@ -428,11 +467,16 @@ export class GameView {
     const alive = new Set<number>();
     let printCount = 0;
     let key = '';
+    let paperKey = '';
     for (const m of S.messes) {
       alive.add(m.id);
       if (m.kind === 'mud') {
         printCount += m.prints.length / 3;
         key += m.id + ':' + m.prints.length + ',';
+        continue;
+      }
+      if (m.kind === 'paper') {
+        paperKey += m.id + ':' + m.prints.length + ',';
         continue;
       }
       if (this.messes.has(m.id)) continue;
@@ -481,6 +525,25 @@ export class GameView {
       this.prints.count = n;
       this.prints.instanceMatrix.needsUpdate = true;
       void printCount;
+    }
+    if (paperKey !== this.paperKey) {
+      this.paperKey = paperKey;
+      let n = 0;
+      const up = new THREE.Vector3(0, 1, 0);
+      const scale = new THREE.Vector3();
+      for (const m of S.messes) {
+        if (m.kind !== 'paper') continue;
+        for (let i = 0; i < m.prints.length && n < MAX_PAPER; i += 3) {
+          this.tmpQ.setFromAxisAngle(up, m.prints[i + 2]);
+          // Slight size variety so the trail looks crumpled.
+          const k = 0.85 + ((n * 37) % 11) / 30;
+          scale.set(k, 1, 0.8 + ((n * 53) % 7) / 15);
+          this.tmpM.compose(this.tmpV.set(m.prints[i], 0.025 + (n % 5) * 0.0005, m.prints[i + 1]), this.tmpQ, scale);
+          this.paper.setMatrixAt(n++, this.tmpM);
+        }
+      }
+      this.paper.count = n;
+      this.paper.instanceMatrix.needsUpdate = true;
     }
   }
 

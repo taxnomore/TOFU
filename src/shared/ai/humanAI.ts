@@ -368,6 +368,9 @@ export class HumanAI implements AIController {
       case 'toy':
         ids = ['coffre_jouets'];
         break;
+      case 'roll':
+        ids = ['derouleur'];
+        break;
       case 'dishes':
         ids = taskOpen('table') || S.tasks.every((x) => x.kind !== 'table') ? ['table_salon'] : ['placard'];
         break;

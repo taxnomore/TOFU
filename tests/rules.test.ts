@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { faceTo, hold, makeGame, place, press, steps, walk } from './helpers';
 import { BTN_BARK, BTN_SPECIAL, BTN_SPRINT } from '../src/shared/constants';
 import { ITEM_TYPES } from '../src/shared/world/itemTypes';
-import { CAT_NODES, PUDDLES } from '../src/shared/world/map';
+import { CAT_NODES, PUDDLES, STATIONS } from '../src/shared/world/map';
+import { BTN_INTERACT, PAPER, VACUUM } from '../src/shared/constants';
+import type { InputFrame } from '../src/shared/sim/types';
 import { listInteractions } from '../src/shared/sim/interactions';
 import { Game } from '../src/shared/sim/game';
 
@@ -237,6 +239,138 @@ describe('abilities', () => {
     place(human, -20, 0, 0);
     walk(g, human.id, 0, 1, 1.0, BTN_SPRINT);
     expect(human.stamina).toBeLessThan(0.9);
+  });
+});
+
+describe('toilet paper', () => {
+  it('a carried roll unrolls into a cleanable trail, then comes back on its holder', () => {
+    const g = makeGame();
+    const S = g.state;
+    const tofu = g.tofu;
+    const human = g.state.chars[1];
+    const roll = g.itemById('papier_toilette')!;
+    expect(roll.state).toBe('stored');
+    // Tofu takes the roll from its holder.
+    const holder = STATIONS[roll.station];
+    place(tofu, holder.x, holder.z - 0.55, Math.PI);
+    const take = listInteractions(g, tofu).find((i) => i.kind === 'take' && i.target === roll.idx);
+    expect(take, 'Tofu can take the roll').toBeTruthy();
+    press(g, tofu.id);
+    expect(tofu.hold).toContain(roll.idx);
+    const chaos0 = S.chaos;
+    // Running through the living room unrolls it.
+    place(tofu, -3.5, 1.2, Math.PI / 2);
+    walk(g, tofu.id, 1, 0, 1.5);
+    const paper = S.messes.filter((m) => m.kind === 'paper');
+    expect(paper.length).toBeGreaterThan(0);
+    expect(S.stats.paperUnrolled).toBeGreaterThan(8);
+    expect(roll.charge).toBeLessThan(PAPER.length);
+    expect(S.chaos).toBeGreaterThan(chaos0);
+    steps(g, 3);
+    expect(S.cleanliness).toBeLessThan(100);
+    // A human cleans every paper cell (Tofu waits in the garden with the roll).
+    place(tofu, -10, 15, 0);
+    for (const m of paper) {
+      place(human, m.x, m.z, 0);
+      hold(g, human.id, 1.6);
+    }
+    expect(S.messes.filter((m) => m.kind === 'paper').length).toBe(0);
+    // Unrolling to the end: the empty roll disappears, then comes back on its holder.
+    for (let i = 0; i < 6 && roll.state === 'held'; i++) {
+      place(tofu, -3.5, 1.2 + (i % 2) * 2.5, Math.PI / 2);
+      walk(g, tofu.id, 1, 0, 2);
+    }
+    expect(roll.state).toBe('gone');
+    expect(tofu.hold).not.toContain(roll.idx);
+    steps(g, 60 * (PAPER.respawn + 1));
+    expect(roll.state).toBe('stored');
+    expect(STATIONS[roll.station].kind).toBe('roll_holder');
+    expect(roll.charge).toBe(PAPER.length);
+  });
+});
+
+describe('robot vacuum', () => {
+  it('Tofu switches it on; it wanders, knocks things over, sucks up mud and goes home', () => {
+    const g = makeGame();
+    const S = g.state;
+    const tofu = g.tofu;
+    const human = S.chars[1];
+    const v = S.vacuum;
+    expect(v.mode).toBe('dock');
+    place(tofu, v.x, v.z + 0.7, Math.PI);
+    const it = listInteractions(g, tofu).find((i) => i.kind === 'vacuum');
+    expect(it?.label).toBe("Allumer l'aspirateur robot");
+    const chaos0 = S.chaos;
+    press(g, tofu.id);
+    expect(v.mode).toBe('run');
+    expect(S.chaos).toBeGreaterThan(chaos0);
+    place(tofu, -10, 15, 0);
+    const x0 = v.x;
+    const z0 = v.z;
+    steps(g, 120);
+    expect(Math.hypot(v.x - x0, v.z - z0)).toBeGreaterThan(0.5);
+    // It knocks over a plant standing in its way.
+    const plant = g.itemById('plante_salon')!;
+    v.x = plant.x - 0.9;
+    v.z = plant.z;
+    v.facing = Math.PI / 2;
+    v.turnT = 5;
+    steps(g, 60);
+    expect(plant.state === 'air' || plant.state === 'knocked').toBe(true);
+    // It sucks up mud prints on its way.
+    tofu.mud = 1;
+    place(tofu, -3.5, 1.5, Math.PI / 2);
+    walk(g, tofu.id, 1, 0, 1.2);
+    place(tofu, -10, 15, 0);
+    tofu.mud = 0;
+    const prints = () => S.messes.filter((m) => m.kind === 'mud').reduce((n, m) => n + m.prints.length / 3, 0);
+    const before = prints();
+    expect(before).toBeGreaterThan(3);
+    v.x = -3.6;
+    v.z = 1.5;
+    v.facing = Math.PI / 2;
+    v.turnT = 5;
+    v.t = 20;
+    steps(g, 150);
+    expect(prints()).toBeLessThan(before);
+    // A human switches it off: it drives back to its dock (or is put back after a while).
+    place(human, v.x + 0.6, v.z, -Math.PI / 2);
+    const off = listInteractions(g, human).find((i) => i.kind === 'vacuum');
+    expect(off?.label).toBe("Éteindre l'aspirateur robot");
+    g.state.chars[1].facing = Math.atan2(v.x - human.x, v.z - human.z);
+    const inp: (InputFrame | undefined)[] = [];
+    inp[human.id] = { mx: 0, mz: 0, buttons: BTN_INTERACT, pick: { kind: 'vacuum', target: 0 } };
+    g.step(inp);
+    inp[human.id] = { mx: 0, mz: 0, buttons: 0 };
+    g.step(inp);
+    expect(v.mode).toBe('home');
+    steps(g, 60 * (VACUUM.homeTime + 1));
+    expect(v.mode).toBe('dock');
+    expect(v.x).toBeCloseTo(VACUUM.dock.x, 5);
+    // Charging: it cannot be restarted at once.
+    place(tofu, v.x, v.z + 0.7, Math.PI);
+    expect(listInteractions(g, tofu).some((i) => i.kind === 'vacuum')).toBe(false);
+    steps(g, 60 * (VACUUM.rest + 1));
+    expect(listInteractions(g, tofu).some((i) => i.kind === 'vacuum')).toBe(true);
+  });
+});
+
+describe('interaction priority', () => {
+  it('a closed door the human walks into beats a mess within reach', () => {
+    const g = makeGame();
+    const human = g.state.chars[1];
+    const plant = g.itemById('plante_salon')!;
+    // A soil mess right next to the closed garden door.
+    g.state.messes.push({
+      id: 999, kind: 'soil', x: -6.0, z: 5.2, r: 0.5, zone: 'entree', progress: 0, item: plant.idx, station: -1,
+      prints: [], seed: 1, byTofu: true, age: 0, rev: 0,
+    });
+    place(human, -6.5, 5.58, 0);
+    expect(g.state.doors[g.world.doorIndex.get('porte_arriere')!].open).toBe(false);
+    expect(listInteractions(g, human)[0].kind).toBe('door');
+    // Looking away from the door, the mess comes first again.
+    place(human, -6.5, 5.58, Math.PI);
+    expect(listInteractions(g, human)[0].kind).toBe('clean');
   });
 });
 

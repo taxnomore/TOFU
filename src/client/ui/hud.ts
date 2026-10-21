@@ -62,10 +62,17 @@ export function eventToast(e: GameEvent, viewer: Character, S: GameState): Toast
   switch (e.t) {
     case 'steal':
       return dog ? null : { text: `🐶 Tofu a pris ${itemName(e.item)} !`, kind: 'bad' };
+    case 'vacuum':
+      if (!e.on) return e.by === viewer.id ? { text: "🤖 Aspirateur éteint : il rentre à sa base.", kind: 'info' } : null;
+      if (S.chars[e.by]?.role === 'tofu') return dog ? { text: '🤖 Vrrrr ! L\'aspirateur part en balade !', kind: 'good' } : { text: "🤖 Tofu a allumé l'aspirateur robot !", kind: 'bad' };
+      return { text: "🤖 L'aspirateur nettoie… et bouscule tout !", kind: 'info' };
+    case 'paper':
+      return dog ? { text: '🧻 Ça se déroule tout seul !', kind: 'good' } : { text: '🧻 Tofu déroule le papier toilette !', kind: 'bad' };
     case 'recover':
       return e.id === viewer.id ? { text: `👍 Tu as repris ${itemName(e.item)} !`, kind: 'good' } : dog ? { text: `😤 On t'a repris ${itemName(e.item)} !`, kind: 'bad' } : null;
     case 'knock':
       if (e.by === -2) return { text: '🐈 Le chat a tout renversé !', kind: dog ? 'good' : 'bad' };
+      if (e.by === -4) return { text: "🤖 L'aspirateur a tout renversé !", kind: dog ? 'good' : 'bad' };
       if (S.chars[e.by]?.role === 'human') return { text: `😅 ${S.chars[e.by].name} a fait tomber quelque chose !`, kind: dog ? 'good' : 'bad' };
       return dog ? null : { text: `💥 Tofu a renversé ${itemName(e.item)} !`, kind: 'bad' };
     case 'task': {

@@ -48,6 +48,7 @@ describe('delta snapshots', () => {
       expect(client.tasks).toEqual(S.tasks);
       expect(client.secrets).toEqual(S.secrets);
       expect(client.treats).toEqual(S.treats);
+      expect(client.vacuum).toEqual(S.vacuum);
       checks++;
     };
     const ended = (): boolean => g.state.phase === 'end';

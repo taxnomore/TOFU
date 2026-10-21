@@ -107,7 +107,7 @@ export type PropType =
   | 'fruit_tree' | 'bush' | 'car' | 'streetlamp' | 'plane_tree' | 'bench' | 'bollard' | 'barrier' | 'spring_rider'
   | 'planter' | 'veg_patch' | 'flowerbed' | 'bike' | 'roadsign' | 'cafe_table' | 'awning' | 'mailbox_post'
   | 'dog_bowl' | 'pot_decor' | 'swing_set' | 'hydrant' | 'bus_shelter' | 'kennel'
-  | 'toybox' | 'hamper' | 'dog_basket' | 'bakery_stand' | 'clothesline_basket';
+  | 'toybox' | 'hamper' | 'dog_basket' | 'bakery_stand' | 'clothesline_basket' | 'roll_holder' | 'vacuum_dock';
 
 export interface PropDef {
   type: PropType;
@@ -128,7 +128,7 @@ export interface PropDef {
 export type StationKind =
   | 'hamper' | 'dresser' | 'clothesline' | 'toybox' | 'dining_table' | 'garden_table' | 'console'
   | 'street_bin' | 'mailbox' | 'cupboard' | 'counter' | 'treat_jar' | 'bakery' | 'bed' | 'sofa'
-  | 'flowerbed' | 'dog_basket' | 'tap' | 'shoe_rack' | 'bedside';
+  | 'flowerbed' | 'dog_basket' | 'tap' | 'shoe_rack' | 'bedside' | 'roll_holder';
 
 export interface StationDef {
   id: string;

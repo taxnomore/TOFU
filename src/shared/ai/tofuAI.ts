@@ -361,6 +361,7 @@ export class TofuAI implements AIController {
         if (t.category === 'laundry' && this.secret('voleur')) base += 22;
         if (t.edible && this.secret('gourmand')) base += 18;
         if (it.type === 'baguette') base += this.secret('baguette') ? 45 : -10;
+        if (it.type === 'toilet_roll') base += it.charge > 0 ? (this.secret('papier') ? 40 : 0) : -40;
         const d = dist(me.x, me.z, it.x, it.z);
         add(base - d * 0.8 - this.risk(it.x, it.z), { key: `item:${it.idx}`, kind: 'act', want: { kind: want, target: it.idx }, x: it.x, z: it.z, timeout: 22 });
       }
@@ -381,6 +382,13 @@ export class TofuAI implements AIController {
           key: `knock:${it.idx}`, kind: bump ? 'bump' : 'act', item: it.idx, want: { kind: want, target: it.idx }, x: it.x, z: it.z, timeout: 18,
         });
       }
+      // --- Robot vacuum: switch it on and let it wreak havoc ---
+      if (S.vacuum.mode === 'dock' && S.vacuum.t <= 0) {
+        const v = S.vacuum;
+        const dv = dist(me.x, me.z, v.x, v.z);
+        add(20 - dv * 0.8 - this.risk(v.x, v.z), { key: 'vacuum', kind: 'act', want: { kind: 'vacuum', target: 0 }, x: v.x, z: v.z, timeout: 15 });
+      }
+
       // --- Stations: bed, sofa, flowerbeds, tablecloth, trash bag ---
       STATIONS.forEach((s, si) => {
         const st = S.stations[si];

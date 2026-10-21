@@ -1,10 +1,10 @@
 import { StationKind } from './types';
 
-export type ItemCategory = 'laundry' | 'toy' | 'food' | 'paper' | 'trash' | 'dishes' | 'ball' | 'tool' | 'knockable';
+export type ItemCategory = 'laundry' | 'toy' | 'food' | 'paper' | 'trash' | 'dishes' | 'ball' | 'tool' | 'knockable' | 'roll';
 
 export type MessKind =
   | 'water' | 'soil' | 'blocks' | 'cushion' | 'trash' | 'gnome' | 'mud' | 'crumbs' | 'shards' | 'dig'
-  | 'muddy_bed' | 'muddy_sofa';
+  | 'muddy_bed' | 'muddy_sofa' | 'paper';
 
 export interface KnockDef {
   mess: MessKind;
@@ -35,6 +35,8 @@ export interface ItemTypeDef {
   neverMess?: boolean;
   /** Approximate radius (pickup reach + visuals). */
   size: number;
+  /** Station id where the item comes back after being eaten or used up. */
+  respawnAt?: string;
 }
 
 const LAUNDRY_HOMES: StationKind[] = ['hamper', 'dresser', 'clothesline'];
@@ -63,7 +65,9 @@ export const ITEM_TYPES: Record<string, ItemTypeDef> = {
   croissants: { name: 'le sachet de croissants', short: 'croissants', category: 'food', icon: '🥐', size: 0.2,
     carry: { dog: true, human: true, stack: 1, slow: 0.02 }, edible: true, homes: ['counter', 'garden_table', 'bakery'] },
   baguette: { name: 'la baguette', short: 'baguette', category: 'food', icon: '🥖', size: 0.35,
-    carry: { dog: true, human: true, stack: 1, slow: 0.03 }, edible: true, homes: ['bakery', 'counter', 'garden_table'] },
+    carry: { dog: true, human: true, stack: 1, slow: 0.03 }, edible: true, homes: ['bakery', 'counter', 'garden_table'], respawnAt: 'boulangerie' },
+  toilet_roll: { name: 'le rouleau de papier toilette', short: 'papier toilette', category: 'roll', icon: '🧻', size: 0.12,
+    carry: { dog: true, human: true, stack: 2, slow: 0.01 }, homes: ['roll_holder'], respawnAt: 'derouleur' },
   letter: { name: 'le courrier', short: 'courrier', category: 'paper', icon: '✉️', size: 0.15,
     carry: { dog: true, human: true, stack: 3, slow: 0 }, homes: ['mailbox', 'console'] },
   trash_bag: { name: 'le sac poubelle', short: 'sac poubelle', category: 'trash', icon: '🗑️', size: 0.3,
@@ -122,4 +126,5 @@ export const MESS_TYPES: Record<MessKind, MessTypeDef> = {
   dig: { name: 'un trou dans le massif', dirt: 6, clean: 2.0, icon: '🕳️', verb: 'Reboucher le trou' },
   muddy_bed: { name: 'des draps boueux', dirt: 7, clean: 2.2, icon: '🛏️', verb: 'Changer les draps' },
   muddy_sofa: { name: 'un canapé boueux', dirt: 7, clean: 2.2, icon: '🛋️', verb: 'Brosser le canapé' },
+  paper: { name: 'du papier toilette déroulé', dirt: 4, clean: 1.2, icon: '🧻', verb: 'Ramasser le papier' },
 };

@@ -393,6 +393,20 @@ export function pawTexture(): THREE.Texture {
   return new THREE.CanvasTexture(c);
 }
 
+/** A sheet of toilet paper: soft grey edge and dotted tear lines. */
+export function paperTexture(): THREE.Texture {
+  const [c, ctx] = canvas(32, 96);
+  ctx.fillStyle = '#b9b9b0';
+  ctx.fillRect(0, 0, 32, 96);
+  ctx.fillStyle = '#fdfdf9';
+  ctx.fillRect(3, 0, 26, 96);
+  ctx.fillStyle = '#c4c4bb';
+  for (const y of [31, 63]) for (let x = 4; x < 28; x += 4) ctx.fillRect(x, y, 2, 2);
+  ctx.fillStyle = 'rgba(0,0,0,0.05)';
+  for (let x = 6; x < 28; x += 5) ctx.fillRect(x, 0, 1, 96);
+  return new THREE.CanvasTexture(c);
+}
+
 /** Simple circular gradient sprite used for particles. */
 export function dotTexture(): THREE.Texture {
   const [c, ctx] = canvas(32, 32);

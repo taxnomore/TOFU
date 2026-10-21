@@ -73,6 +73,7 @@ export interface Snap {
   chars: GameState['chars'];
   cat: GameState['cat'];
   carrier: GameState['carrier'];
+  vacuum: GameState['vacuum'];
   treats: GameState['treats'];
   tasks: GameState['tasks'];
   secrets: GameState['secrets'];

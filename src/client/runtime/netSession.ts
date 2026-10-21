@@ -38,6 +38,7 @@ interface Frame {
   chars: number[];
   cat: number[];
   carrier: number[];
+  vacuum: number[];
   air: Map<number, number[]>;
   treats: Map<number, number[]>;
 }
@@ -115,6 +116,7 @@ export class NetSession implements Session {
     const S = this.auth;
     const f: Frame = {
       t, chars: [], cat: [S.cat.x, S.cat.y, S.cat.z, S.cat.facing], carrier: [S.carrier.x, S.carrier.z, S.carrier.facing],
+      vacuum: [S.vacuum.x, S.vacuum.z, S.vacuum.facing],
       air: new Map(), treats: new Map(),
     };
     for (const c of S.chars) f.chars.push(c.x, c.z, c.facing);
@@ -265,6 +267,9 @@ export class NetSession implements Session {
       ...S.cat, x: lerp(a.cat[0], b.cat[0], t), y: lerp(a.cat[1], b.cat[1], t), z: lerp(a.cat[2], b.cat[2], t),
       facing: lerpAngle(a.cat[3], b.cat[3], t),
     };
+    if (S.vacuum.mode !== 'dock') {
+      view.vacuum = { ...S.vacuum, x: lerp(a.vacuum[0], b.vacuum[0], t), z: lerp(a.vacuum[1], b.vacuum[1], t), facing: lerpAngle(a.vacuum[2], b.vacuum[2], t) };
+    }
     if (S.carrier.active) {
       view.carrier = { ...S.carrier, x: lerp(a.carrier[0], b.carrier[0], t), z: lerp(a.carrier[1], b.carrier[1], t), facing: lerpAngle(a.carrier[2], b.carrier[2], t) };
     }

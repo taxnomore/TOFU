@@ -9,7 +9,7 @@ export const GUESTS_COUNTDOWN = 15;
 
 export const CHAOS_GOAL = 200;
 /** Chaos goal by number of humans (2 humans clean up faster). */
-export const CHAOS_GOAL_BY_HUMANS = [200, 200, 170];
+export const CHAOS_GOAL_BY_HUMANS = [220, 220, 170];
 export const CLEAN_GOAL = 70;
 
 export const BTN_INTERACT = 1;
@@ -117,6 +117,37 @@ export const CHAOS = {
   messDripCap: 0.12,
   secret: 20,
   innocent: 2,
+  /** Each strip of toilet paper unrolled by Tofu. */
+  paper: 0.15,
+  /** Tofu switches the robot vacuum on. */
+  vacuum: 1.5,
+};
+
+/** Robot vacuum of the living room. */
+export const VACUUM = {
+  radius: 0.2,
+  speed: 1.1,
+  /** Seconds of wandering once switched on. */
+  runTime: 25,
+  /** Seconds to drive back home before it teleports onto its dock. */
+  homeTime: 12,
+  /** Charging time on the dock before it can run again. */
+  rest: 20,
+  dock: { x: 1.35, z: 0.38, facing: 0 },
+  /** Cat runs away when the vacuum gets this close. */
+  catFear: 2.2,
+};
+
+/** Toilet paper: a carried roll unrolls behind Tofu. */
+export const PAPER = {
+  /** Strips in a full roll. */
+  length: 30,
+  /** Distance between two strips (m). */
+  spacing: 0.34,
+  /** A used-up roll comes back on its holder after this delay (s). */
+  respawn: 40,
+  /** Strips for a fully dirty paper cell. */
+  fullStrips: 6,
 };
 
 /** Zoomies meter gain per mischief type (diminishing for repeats). */
@@ -134,6 +165,8 @@ export const ZOOM_GAIN: Record<string, number> = {
   tablecloth: 0.16,
   treat: 0.08,
   street: 0.1,
+  paper: 0.1,
+  vacuum: 0.12,
 };
 
 export const CLEANLINESS = {
@@ -144,7 +177,7 @@ export const CLEANLINESS = {
 };
 
 /** Number of household jobs per round according to the human count. */
-export const TASKS_PER_HUMANS = [0, 4, 6];
+export const TASKS_PER_HUMANS = [0, 3, 6];
 
 export const KNOCK_RESTORE_CD = 14;
 /** Protection after a human recovers an object or puts it back in place. */

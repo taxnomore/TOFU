@@ -1,7 +1,7 @@
 // Household jobs (humans), secret mischief challenges (Tofu) and cleanliness.
 // Jobs are predicates over the world state, so the checklist always reflects
 // what is really in the house (a job can be undone by Tofu and redone).
-import { CLEANLINESS, TASKS_PER_HUMANS } from '../constants';
+import { CLEANLINESS, TASKS_PER_HUMANS, PAPER } from '../constants';
 import { Rng } from '../math';
 import { ITEM_TYPES, MESS_TYPES } from '../world/itemTypes';
 import { OUTSIDE_PROPERTY_ZONES, STATIONS, zoneById } from '../world/map';
@@ -135,6 +135,7 @@ export const SECRET_DEFS: SecretDef[] = [
   { id: 'creuse', text: 'Creuse un trou dans un massif de fleurs', goal: 1, icon: '🕳️' },
   { id: 'aboie', text: 'Fais sursauter les humains 3 fois en aboyant', goal: 3, icon: '📢' },
   { id: 'facteur', text: 'Aboie sur la factrice quand elle passe', goal: 1, icon: '📮', needs: 'carrier' },
+  { id: 'papier', text: 'Déroule 25 feuilles de papier toilette', goal: 25, icon: '🧻' },
 ];
 
 export function secretDef(id: string): SecretDef {
@@ -155,6 +156,7 @@ export function computeCleanliness(g: Game): number {
     const def = MESS_TYPES[m.kind];
     let d = def.dirt;
     if (m.kind === 'mud') d *= Math.min(1, m.prints.length / 3 / CLEANLINESS.mudFullPrints);
+    if (m.kind === 'paper') d *= Math.min(1, m.prints.length / 3 / PAPER.fullStrips);
     dirt += d * zoneFactor(m.zone);
   }
   for (const it of S.items) {

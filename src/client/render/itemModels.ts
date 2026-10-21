@@ -10,6 +10,12 @@ function stripes(b: GeoBuilder, w: number, h: number, d: number, y: number, n: n
 }
 
 const ITEMS: Record<string, ItemBuilder> = {
+  toilet_roll(b) {
+    b.cylU(0.06, 0.11, { y: 0.06, rz: Math.PI / 2 }, 0xfafafa, 14);
+    b.cylU(0.022, 0.112, { y: 0.06, rz: Math.PI / 2 }, 0xc8a46e, 10);
+    // A loose sheet.
+    b.box(0.1, 0.004, 0.14, { y: 0.004, z: 0.08 }, 0xffffff);
+  },
   sock(b) {
     b.rbox(0.09, 0.2, 0.05, 0.03, { y: 0.1 }, 0xe74c3c);
     b.rbox(0.09, 0.07, 0.15, 0.03, { y: 0.035, z: 0.05 }, 0xe74c3c);

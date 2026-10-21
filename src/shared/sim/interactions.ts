@@ -1,17 +1,18 @@
 // Context-sensitive interactions. One "action" button does the most relevant
 // thing nearby. The same code produces the on-screen prompt (client) and
 // validates/executes the action (simulation), so prompts never lie.
-import { BAKERY_BUY_TIME, DOG, HUMAN } from '../constants';
+import { BAKERY_BUY_TIME, DOG, HUMAN, VACUUM } from '../constants';
 import { ITEM_TYPES, MESS_TYPES } from '../world/itemTypes';
 import { DOORS, STATIONS } from '../world/map';
 import type { StationDef } from '../world/types';
 import type { Game } from './game';
+import { switchVacuum } from './vacuum';
 import type { Character } from './types';
 
 export type IKind =
   | 'pickup' | 'take' | 'store' | 'drop' | 'clean' | 'door' | 'take_dog' | 'paws' | 'pet' | 'bed' | 'water' | 'fill'
   | 'treats' | 'buy' | 'knock' | 'push_bin' | 'push_door' | 'bed_jump' | 'sofa_jump' | 'dig' | 'rip' | 'eat'
-  | 'stash' | 'tablecloth';
+  | 'stash' | 'tablecloth' | 'vacuum';
 
 export interface Interaction {
   kind: IKind;
@@ -219,12 +220,27 @@ export function listInteractions(g: Game, c: Character): Interaction[] {
     const ez = Math.max(b.z0 - c.z, 0, c.z - b.z1);
     const d = Math.hypot(ex, ez);
     if (d > (isDog ? 0.75 : 1.1)) return;
+    // Standing against a closed door and facing it: opening it comes first,
+    // even with a mess or an item within reach.
+    const dl = Math.hypot(dd.x - c.x, dd.z - c.z);
+    const facing = dl > 0.05 ? ((dd.x - c.x) * fx + (dd.z - c.z) * fz) / dl : 1;
+    const prio = !ds.open && d < 0.45 && facing > 0.5 ? 75 : 35;
     if (isDog) {
-      if (!ds.open && dd.dogCanPush) add('push_door', di, `Pousser ${dd.name}`, DOG.pushDoorTime, dd.x, 1, dd.z, d, 35);
+      if (!ds.open && dd.dogCanPush) add('push_door', di, `Pousser ${dd.name}`, DOG.pushDoorTime, dd.x, 1, dd.z, d, prio);
     } else {
-      add('door', di, `${ds.open ? 'Fermer' : 'Ouvrir'} ${dd.name}`, 0, dd.x, 1, dd.z, d, 35);
+      add('door', di, `${ds.open ? 'Fermer' : 'Ouvrir'} ${dd.name}`, 0, dd.x, 1, dd.z, d, prio);
     }
   });
+
+  // --- Robot vacuum ---
+  {
+    const v = S.vacuum;
+    const dv = Math.hypot(v.x - c.x, v.z - c.z) - VACUUM.radius;
+    if (dv < reach) {
+      if (v.mode === 'dock' && v.t <= 0) add('vacuum', 0, "Allumer l'aspirateur robot", 0, v.x, 0.1, v.z, dv, isDog ? 50 : 22);
+      else if (v.mode === 'run' && !isDog) add('vacuum', 0, "Éteindre l'aspirateur robot", 0, v.x, 0.1, v.z, dv, 70);
+    }
+  }
 
   // --- Characters ---
   if (!isDog) {
@@ -282,6 +298,7 @@ export function executeInteraction(g: Game, c: Character, it: Interaction): void
     case 'push_bin': g.knock(it.target, Math.sin(c.facing), Math.cos(c.facing), 3.5, c.id); break;
     case 'bed_jump': g.bedJump(c, it.target); break;
     case 'sofa_jump': g.sofaJump(c, it.target); break;
+    case 'vacuum': switchVacuum(g, c); break;
     case 'dig': g.dig(c, it.target); break;
     case 'rip': g.ripBag(c, it.target); break;
     case 'eat': g.eatHeld(c); break;

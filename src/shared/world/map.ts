@@ -212,6 +212,8 @@ export const PROPS: PropDef[] = [
   { type: 'bathtub', x: 5.45, z: -4.95, rot: 0 },
   { type: 'vanity', x: 1.85, z: -2.4, rot: 1 },
   { type: 'toilet', x: 5.5, z: -1.0, rot: 3 },
+  { type: 'roll_holder', x: 4.95, z: -0.06, rot: 2 },
+  { type: 'vacuum_dock', x: 1.35, z: 0.13, rot: 0 },
   { type: 'rug', x: 4.0, z: -3.2, w: 1.0, d: 0.7, color: 0x7fb7c9 },
   // --- Salon ---
   { type: 'dining_table', x: -2.6, z: 2.9, rot: 0 },
@@ -319,6 +321,7 @@ export const PROPS: PropDef[] = [
 
 /** Interaction stations. */
 export const STATIONS: StationDef[] = [
+  { id: 'derouleur', kind: 'roll_holder', name: 'le dérouleur de papier', x: 4.95, z: -0.14, y: 0.56, r: 0.8, dogReach: true, capacity: 1 },
   { id: 'panier_linge', kind: 'hamper', name: 'le panier à linge', x: 2.95, z: -5.45, y: 0.62, r: 1.0, dogReach: false, capacity: 12 },
   { id: 'commode', kind: 'dresser', name: 'la commode', x: -10.6, z: -0.4, y: 0.9, r: 0.9, hw: 0.6, hd: 0.25, dogReach: true, capacity: 12 },
   { id: 'fil_linge', kind: 'clothesline', name: 'le fil à linge', x: -9.0, z: 13.5, y: 1.45, r: 1.0, hw: 3.0, hd: 0.1, dogReach: true, capacity: 4,
@@ -350,6 +353,7 @@ export const STATIONS: StationDef[] = [
 
 export const ITEMS: ItemPlacement[] = [
   // Laundry
+  { id: 'papier_toilette', type: 'toilet_roll', station: 'derouleur' },
   { id: 'chaussette_1', type: 'sock', station: 'panier_linge' },
   { id: 'chaussette_2', type: 'sock2', station: 'panier_linge' },
   { id: 'chaussette_3', type: 'sock', station: 'commode' },

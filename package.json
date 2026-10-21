@@ -19,7 +19,7 @@
     "ws": "8.22.0"
   },
   "devDependencies": {
-    "@fontsource/fredoka": "^5.2.8",
+    "@fontsource/fredoka": "5.2.8",
     "@types/node": "22.18.12",
     "@types/three": "0.180.0",
     "@types/ws": "8.18.1",
@@ -29,6 +29,6 @@
     "tsx": "4.23.15",
     "typescript": "5.9.3",
     "vite": "7.3.7",
-    "vitest": "3.2.7"
+    "vitest": "5.0.5"
   }
 }

@@ -164,6 +164,37 @@ class Sfx {
       case 'clean':
         [1047, 1319, 1568, 2093].forEach((f, i) => this.tone(f, 0.18, 'sine', 0.12 * vol, i * 0.06));
         break;
+      case 'vacuumOn':
+        this.tone(880, 0.07, 'square', 0.06 * vol);
+        this.tone(1320, 0.09, 'square', 0.06 * vol, 0.09);
+        this.noise(0.9, 0.06 * vol, 'lowpass', 300, 0.15, 0.7, 1800);
+        break;
+      case 'vacuumOff':
+        this.tone(1320, 0.07, 'square', 0.05 * vol);
+        this.tone(880, 0.1, 'square', 0.05 * vol, 0.09);
+        break;
+      case 'unroll':
+        if (!this.throttle('unroll', 400)) return;
+        this.noise(0.35, 0.12 * vol, 'bandpass', 3200, 0, 1.5, 1400);
+        this.noise(0.25, 0.08 * vol, 'bandpass', 2400, 0.18, 1.5, 1200);
+        break;
+      // Footsteps: soft thuds for humans, light clicks for Tofu's paws.
+      case 'step':
+        this.noise(0.06, 0.07 * vol, 'bandpass', 1100 + Math.random() * 300, 0, 1.4);
+        this.tone(105 + Math.random() * 20, 0.06, 'sine', 0.05 * vol, 0, 70);
+        break;
+      case 'stepGrass':
+        this.noise(0.09, 0.06 * vol, 'lowpass', 700 + Math.random() * 200, 0, 0.8);
+        break;
+      case 'paw':
+        this.noise(0.03, 0.05 * vol, 'bandpass', 2600 + Math.random() * 600, 0, 2.5);
+        break;
+      case 'pawGrass':
+        this.noise(0.05, 0.04 * vol, 'lowpass', 1300 + Math.random() * 300, 0, 0.8);
+        break;
+      case 'pawMud':
+        this.noise(0.07, 0.07 * vol, 'bandpass', 600, 0, 3, 350);
+        break;
       case 'scrub':
         if (!this.throttle('scrub', 180)) return;
         this.noise(0.14, 0.08 * vol, 'bandpass', 2500, 0, 3);

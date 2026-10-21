@@ -16,7 +16,7 @@ export class SnapshotEncoder {
     const snap: Snap = {
       tick: S.tick, time: S.time, phase: S.phase, countdown: S.countdown, chaos: S.chaos, cleanliness: S.cleanliness,
       guestsT: S.guestsT, winner: S.winner, endReason: S.endReason,
-      chars: S.chars, cat: S.cat, carrier: S.carrier, treats: S.treats, tasks: S.tasks, secrets: S.secrets,
+      chars: S.chars, cat: S.cat, carrier: S.carrier, vacuum: S.vacuum, treats: S.treats, tasks: S.tasks, secrets: S.secrets,
       messIds: S.messes.map((m) => m.id), ev: events,
     };
     const items = S.items.filter((it) => this.itemRev[it.idx] !== it.rev);
@@ -69,6 +69,7 @@ export function applySnap(S: GameState, d: Snap): void {
   S.chars = d.chars;
   S.cat = d.cat;
   S.carrier = d.carrier;
+  S.vacuum = d.vacuum;
   S.treats = d.treats;
   S.tasks = d.tasks;
   S.secrets = d.secrets;

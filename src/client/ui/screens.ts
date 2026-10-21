@@ -1,7 +1,7 @@
 // Menus and game flow screens (French UI).
 import type { App } from '../app';
 import { sfx } from '../audio/sfx';
-import { COUNTDOWN_TIME, DEFAULT_DURATION } from '../../shared/constants';
+import { CHAOS_GOAL_BY_HUMANS, COUNTDOWN_TIME, DEFAULT_DURATION } from '../../shared/constants';
 import type { GameConfig, GameState, PlayerSlot } from '../../shared/sim/types';
 import { SECRET_DEFS, TASK_DEFS } from '../../shared/sim/rules';
 import { CameraRig } from '../render/camera';
@@ -673,8 +673,9 @@ export class Screens {
     if (st.laundryStolen >= 3) awards.push('🧦 Tofu, voleur de chaussettes');
     if (st.catChase > 8) awards.push('🐈 Tofu, chasseur de chat');
     if (st.mudPrints > 30) awards.push('🐾 Tofu, artiste de la boue');
+    if ((st.paperUnrolled ?? 0) >= 20) awards.push('🧻 Tofu, champion du papier toilette');
     const o = el('div', 'screen dim');
-    o.innerHTML = `<div class="end-banner ${tofuWon ? '' : 'humans'}">${tofuWon ? '😈 TOFU A GAGNÉ !' : '🎉 LES HUMAINS ONT GAGNÉ !'}</div>
+    o.innerHTML = `<div class="end-banner ${tofuWon ? '' : 'humans'}">${tofuWon ? '😈 TOFU A GAGNÉ\u00a0!' : '🎉 LES HUMAINS ONT GAGNÉ\u00a0!'}</div>
       <div class="panel">
         <p style="text-align:center;font-size:1.2rem;font-weight:600">${reason}</p>
         <p style="text-align:center">Bêtises : <b>${Math.floor(S.chaos)} / ${S.chaosGoal}</b> · Propreté : <b>${Math.round(S.cleanliness)} %</b> · Tâches : <b>${S.tasks.filter((t) => t.done).length} / ${S.tasks.length}</b> · Temps : <b>${fmtTime(S.time)}</b></p>
@@ -695,6 +696,7 @@ export class Screens {
           <div>🚪 Portes fermées <b>${st.doorsClosed}</b></div>
           <div>🏃 Distance de Tofu <b>${Math.round(st.tofuDistance)} m</b></div>
           <div>✅ Tâches réussies <b>${st.tasksDone}</b></div>
+          <div>🧻 Papier déroulé <b>${st.paperUnrolled ?? 0}</b></div>
         </div>
         ${awards.length ? `<div class="awards">${awards.map((a) => `<span class="award">${a}</span>`).join('')}</div>` : ''}
         ${isNet ? `<div class="foot">
@@ -757,14 +759,15 @@ export class Screens {
       <h2>❓ Comment jouer</h2>
       <div class="cols">
         <div><h3>🐶 Tofu, le labrador</h3>
-          <p>Remplis la barre de <b>bêtises</b> (100 points) ou empêche les humains de finir avant la fin du temps.</p>
-          <p>Vole des chaussettes et cache-les dans ton panier, renverse les pots, poursuis le chat, roule-toi dans la boue puis cours dans la maison, renverse les poubelles, mange le goûter… Tu as 3 <b>défis secrets</b> qui rapportent gros !</p>
+          <p>Remplis la barre de <b>bêtises</b> (${CHAOS_GOAL_BY_HUMANS[1]} points, ${CHAOS_GOAL_BY_HUMANS[2]} contre deux humains) ou empêche les humains de finir avant la fin du temps.</p>
+          <p>Vole des chaussettes et cache-les dans ton panier, renverse les pots, poursuis le chat, roule-toi dans la boue puis cours dans la maison, renverse les poubelles, mange le goûter, déroule le papier toilette, allume l'aspirateur robot… Tu as 3 <b>défis secrets</b> qui rapportent gros !</p>
           <p>Les bêtises variées remplissent les <b>zoomies</b> : un sprint fou qui renverse tout.</p>
           <p>Tu passes par la chatière et par le trou de la haie, et sous les tables. Les portes fermées se poussent (maintenir Action).</p></div>
         <div><h3>🧹 Les humains</h3>
           <p>Finissez toutes les <b>tâches</b> de la liste et gardez la maison <b>propre</b> (barre verte au-dessus du trait) : les invités arrivent alors !</p>
           <p>Rattrapez Tofu pour <b>reprendre</b> ce qu'il porte, essuyez ses pattes, nettoyez les désordres (maintenir Action).</p>
-          <p>Lancez une <b>friandise</b> : Tofu ne résiste pas et lâche tout. Fermez les portes pour le ralentir. Attention : en courant, on peut glisser ou renverser des choses !</p></div>
+          <p>Lancez une <b>friandise</b> : Tofu ne résiste pas et lâche tout. Fermez les portes pour le ralentir. Attention : en courant, on peut glisser ou renverser des choses !</p>
+          <p>L'<b>aspirateur robot</b> du salon aspire la boue et le papier… mais bouscule tout sur son passage. On l'allume et on l'éteint avec Action.</p></div>
       </div>
       <h3>🎮 Commandes</h3>
       <table class="keys">

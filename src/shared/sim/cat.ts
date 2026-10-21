@@ -142,6 +142,13 @@ function pickWander(g: Game, cat: CatState): void {
   cat.timer = 1.5;
 }
 
+/** Something frightening nearby (the robot vacuum): run to a perch. */
+export function scareCat(g: Game): void {
+  const cat = g.state.cat;
+  if (g.state.phase !== 'play' || cat.mode === 'flee' || cat.y >= 0.35) return;
+  startFlee(g, cat);
+}
+
 export function updateCat(g: Game, dt: number): void {
   const S = g.state;
   const cat = S.cat;

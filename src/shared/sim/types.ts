@@ -106,6 +106,8 @@ export interface Character {
   stun: number;
   printAcc: number;
   printSide: number;
+  /** Distance since the last toilet paper strip. */
+  paperAcc: number;
   bedCd: number;
   innocentDone: number[];
   recentMischief: string[];
@@ -238,6 +240,19 @@ export interface CatState {
   stuckT: number;
 }
 
+export interface VacuumState {
+  mode: 'dock' | 'run' | 'home';
+  x: number;
+  z: number;
+  facing: number;
+  /** Time left in the current mode. */
+  t: number;
+  /** Time before the next random turn. */
+  turnT: number;
+  /** Character who switched it on (chaos attribution). */
+  by: number;
+}
+
 export interface CarrierState {
   active: boolean;
   x: number;
@@ -287,6 +302,7 @@ export interface Stats {
   humanAccidents: number;
   tasksDone: number;
   startles: number;
+  paperUnrolled: number;
 }
 
 export type Phase = 'countdown' | 'play' | 'end';
@@ -312,6 +328,7 @@ export interface GameState {
   treats: Treat[];
   cat: CatState;
   carrier: CarrierState;
+  vacuum: VacuumState;
   tasks: TaskState[];
   secrets: SecretState[];
   stats: Stats;
@@ -352,6 +369,8 @@ export type GameEvent =
   | { t: 'water'; station: number }
   | { t: 'dig'; station: number }
   | { t: 'innocent'; id: number }
+  | { t: 'paper'; id: number; x: number; z: number }
+  | { t: 'vacuum'; on: boolean; by: number; x: number; z: number }
   | { t: 'say'; id: number; text: string }
   | { t: 'pet'; id: number }
   | { t: 'carrier'; what: 'arrive' | 'scared' | 'leave' }

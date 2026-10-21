@@ -225,11 +225,13 @@ export class KeyboardDevice implements InputDevice {
       r.mx /= l;
       r.my /= l;
     }
-    if (anyDown(m.interact)) r.buttons |= BTN_INTERACT;
-    if (anyDown(m.sprint)) r.buttons |= BTN_SPRINT;
-    if (anyDown(m.special)) r.buttons |= BTN_SPECIAL;
-    if (anyDown(m.bark)) r.buttons |= BTN_BARK;
-    if (anyDown(m.sit)) r.buttons |= BTN_SIT;
+    // A key pressed and released between two frames still counts once.
+    const on = (codes: string[]) => anyDown(codes) || anyOnce(codes);
+    if (on(m.interact)) r.buttons |= BTN_INTERACT;
+    if (on(m.sprint)) r.buttons |= BTN_SPRINT;
+    if (on(m.special)) r.buttons |= BTN_SPECIAL;
+    if (on(m.bark)) r.buttons |= BTN_BARK;
+    if (on(m.sit)) r.buttons |= BTN_SIT;
     r.yaw = this.mouseYaw + ((anyDown(m.camLeft) ? 1 : 0) - (anyDown(m.camRight) ? 1 : 0)) * 2.2 * dt;
     r.pitch = this.mousePitch;
     r.zoom = this.wheel + ((anyDown(m.zoomOut) ? 1 : 0) - (anyDown(m.zoomIn) ? 1 : 0)) * 6 * dt;
@@ -337,6 +339,8 @@ export class TouchDevice implements InputDevice {
   private camYaw = 0;
   private camPitch = 0;
   private held = 0;
+  /** Buttons touched since the last poll (a quick tap between frames still counts). */
+  private tapped = 0;
   private pauseFlag = false;
   readonly el: HTMLDivElement;
   private knob: HTMLDivElement;
@@ -363,6 +367,7 @@ export class TouchDevice implements InputDevice {
         e.stopPropagation();
         b.setPointerCapture(e.pointerId);
         this.held |= bit;
+        this.tapped |= bit;
         b.classList.add('on');
       });
       const up = (e: PointerEvent) => {
@@ -455,7 +460,8 @@ export class TouchDevice implements InputDevice {
     const dzy = Math.abs(this.stick.y) < 0.12 ? 0 : this.stick.y;
     r.mx = dzx;
     r.my = dzy;
-    r.buttons = this.held;
+    r.buttons = this.held | this.tapped;
+    this.tapped = 0;
     r.yaw = this.camYaw;
     r.pitch = this.camPitch;
     this.camYaw = 0;

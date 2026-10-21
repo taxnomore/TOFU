@@ -42,6 +42,8 @@ export const PROP_TYPES: Record<PropType, PropTypeDef> = {
   washing_machine: { w: 0.6, d: 0.6, h: 0.85, col: 'box', mask: MASK_SOLID },
   bathtub: { w: 0.75, d: 1.7, h: 0.55, col: 'box', mask: MASK_SOLID },
   toilet: { w: 0.4, d: 0.65, h: 0.75, col: 'box', mask: MASK_SOLID },
+  roll_holder: { w: 0.22, d: 0.1, h: 0.1, col: 'none', mask: 0 },
+  vacuum_dock: { w: 0.34, d: 0.14, h: 0.12, col: 'none', mask: 0 },
   vanity: { w: 0.8, d: 0.5, h: 0.85, col: 'box', mask: MASK_SOLID },
   rug: { w: 2, d: 1.5, h: 0.01, col: 'none', mask: 0 },
   rug_round: { w: 2, d: 2, h: 0.01, col: 'none', mask: 0 },

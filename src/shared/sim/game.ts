@@ -3,7 +3,7 @@
 // for a given seed and input sequence.
 import {
   BAGUETTE_RESPAWN, BTN_BARK, CHAOS_GOAL_BY_HUMANS, BTN_INTERACT, BTN_SPECIAL, CHAOS, CHAOS_GOAL, CLEAN_GOAL,
-  COUNTDOWN_TIME, DOG, GUARD_TIME, GUESTS_COUNTDOWN, HUMAN, KNOCK_RESTORE_CD, SIM_DT, ZOOM_GAIN,
+  COUNTDOWN_TIME, DOG, GUARD_TIME, GUESTS_COUNTDOWN, HUMAN, KNOCK_RESTORE_CD, SIM_DT, ZOOM_GAIN, PAPER,
 } from '../constants';
 import { Rng, clamp, dist } from '../math';
 import { ITEM_TYPES, MESS_TYPES, MessKind } from '../world/itemTypes';
@@ -11,6 +11,7 @@ import { DOORS, ITEMS, PUDDLES, SPAWNS, STATIONS, STREET_ZONES, OUTSIDE_PROPERTY
 import { MASK_ITEM } from '../world/types';
 import { catHearsBark, initialCat, updateCat } from './cat';
 import { carrierHearsBark, initialCarrier, updateCarrier } from './carrier';
+import { initialVacuum, updateVacuum } from './vacuum';
 import { executeInteraction, listInteractions } from './interactions';
 import { MoveContext, applyMovement, moveCharacter, resolveCircle, separateCharacters } from './movement';
 import { chooseSecrets, chooseTasks, computeCleanliness, evaluateTasks, secretDef } from './rules';
@@ -26,7 +27,7 @@ function newStats(): Stats {
   return {
     laundryStolen: 0, itemsStolen: 0, knocks: 0, binsTipped: 0, mudPrints: 0, catChase: 0, barks: 0, eaten: 0,
     stashed: 0, messesCleaned: 0, recovered: 0, pawsWiped: 0, treatsThrown: 0, slips: 0, doorsClosed: 0, zoomies: 0,
-    tofuDistance: 0, humanAccidents: 0, tasksDone: 0, startles: 0,
+    tofuDistance: 0, humanAccidents: 0, tasksDone: 0, startles: 0, paperUnrolled: 0,
   };
 }
 
@@ -36,7 +37,7 @@ function newCharacter(id: number, slot: PlayerSlot, x: number, z: number, facing
     x, z, vx: 0, vz: 0, facing, speed: 0, stamina: 1, sprinting: false, exhausted: false,
     hold: [], act: null, anim: Anim.Idle, animT: 0, lastButtons: 0, idleT: 0, lockT: 0,
     mud: 0, zoom: 0, zoomT: 0, pantT: 0, barkCd: 0, sitT: 0, lureKind: '', lureIdx: -1, lureT: 0, lureImmune: 0,
-    noPickup: 0, stun: 0, printAcc: 0, printSide: 1, bedCd: 0, innocentDone: [], recentMischief: [],
+    noPickup: 0, stun: 0, printAcc: 0, printSide: 1, paperAcc: 0, bedCd: 0, innocentDone: [], recentMischief: [],
     treats: HUMAN.treatsStart, throwCd: 0, treatJarCd: 0, slipCd: 0, startleCd: 0, takeCd: 0, say: '', sayT: 0,
   };
 }
@@ -50,7 +51,8 @@ export class Game {
   rng: Rng;
   readonly tofuId: number;
   private events: GameEvent[] = [];
-  private mudCells = new Map<string, number>();
+  /** Mud and paper trails: one mess per 2 m cell ("kind:x,z" -> mess id). */
+  private trailCells = new Map<string, number>();
   ctx: MoveContext;
   private chaosText = 0;
 
@@ -80,7 +82,7 @@ export class Game {
         idx, id: p.id, type: p.type, state: st >= 0 ? 'stored' : t.knock ? 'home' : 'free',
         x, y, z, rot: p.rot ?? 0, tilt: 0, vx: 0, vy: 0, vz: 0, spin: 0, holder: -1, station: st, slot: -1, bounces: 0,
         disturbed: false, mess: -1, knockCd: 0, homeX: x, homeY: y, homeZ: z, homeRot: p.rot ?? 0, grabbedIn: '',
-        lastStealT: -999, stashed: false, streetScored: false, charge: p.type === 'watering_can' ? 2 : 0, respawnT: 0, by: -1, guardT: 0, rev: 0,
+        lastStealT: -999, stashed: false, streetScored: false, charge: p.type === 'watering_can' ? 2 : p.type === 'toilet_roll' ? PAPER.length : 0, respawnT: 0, by: -1, guardT: 0, rev: 0,
       } as Item;
     });
     this.state = {
@@ -90,7 +92,7 @@ export class Game {
       guestsT: 0, winner: null, endReason: '',
       chars, items, messes: [], stations,
       doors: DOORS.map((d, idx) => ({ idx, open: d.open, push: 0, rev: 0 })),
-      treats: [], cat: null as never, carrier: initialCarrier(),
+      treats: [], cat: null as never, carrier: initialCarrier(), vacuum: initialVacuum(),
       tasks: [], secrets: [], stats: newStats(), charStats: {}, nextMessId: 1, nextTreatId: 1, rngState: 0,
     };
     for (const it of items) {
@@ -174,6 +176,11 @@ export class Game {
     it.rev++;
   }
 
+  /** Marks a mess as changed (for network snapshots) after an outside edit. */
+  touchMess(m: Mess): void {
+    this.bump(m);
+  }
+
   private stat(id: number, key: string, n = 1) {
     const s = this.state.charStats[id] ?? (this.state.charStats[id] = {});
     s[key] = (s[key] ?? 0) + n;
@@ -218,6 +225,7 @@ export class Game {
     this.updateTreats(dt);
     updateCat(this, dt);
     updateCarrier(this, dt);
+    updateVacuum(this, dt);
     this.updateMesses(dt);
     if (S.tick % 6 === 0) this.evaluate();
     if (S.guestsT > 0) {
@@ -414,6 +422,15 @@ export class Game {
           }
         } else {
           c.mud = Math.max(0, c.mud - DOG.mudDecayOutdoor * dt);
+        }
+      }
+      // A carried toilet roll unrolls behind Tofu.
+      const roll = c.hold.map((i) => S.items[i]).find((it) => it.type === 'toilet_roll' && it.charge > 0);
+      if (roll && c.speed > 0.5) {
+        c.paperAcc += c.speed * dt;
+        if (c.paperAcc >= PAPER.spacing) {
+          c.paperAcc = 0;
+          this.addPaperStrip(c, roll, zn ? zn.id : '');
         }
       }
       // Bumps knock things over.
@@ -715,9 +732,9 @@ export class Game {
         it.respawnT -= dt;
         if (it.respawnT <= 0) {
           it.respawnT = 0;
-          const bakery = this.world.stationIndex.get('boulangerie')!;
+          const home = this.world.stationIndex.get(ITEM_TYPES[it.type].respawnAt ?? 'boulangerie')!;
           it.disturbed = false;
-          this.putInStation(it, bakery);
+          this.putInStation(it, home);
         }
       }
     }
@@ -811,7 +828,7 @@ export class Game {
       it.state = 'knocked';
       it.tilt = t.knock.lie === 'flat' ? 0 : Math.PI / 2;
       const byTofu = it.by === this.tofuId;
-      const m = this.createMess(t.knock.mess, it.x, it.z, { item: it.idx, byTofu: byTofu || it.by === -2 });
+      const m = this.createMess(t.knock.mess, it.x, it.z, { item: it.idx, byTofu: byTofu || it.by === -2 || it.by === -4 });
       it.mess = m.id;
       this.emit({ t: 'land', item: it.idx, x: it.x, z: it.z, hard: true });
     } else {
@@ -904,6 +921,9 @@ export class Game {
     } else if (by === -2) {
       amount *= CHAOS.catAccidentMul;
       reason = 'Le chat a tout renversé !';
+    } else if (by === -4) {
+      amount *= CHAOS.catAccidentMul;
+      reason = "L'aspirateur a tout renversé !";
     } else {
       amount *= CHAOS.accidentMul;
       reason = 'Oups ! Accident humain !';
@@ -945,6 +965,8 @@ export class Game {
     it.y = p.y;
     it.z = p.z;
     it.tilt = 0;
+    // A roll put back on its holder is a fresh one.
+    if (STATIONS[si].kind === 'roll_holder') it.charge = PAPER.length;
     this.bump(it);
     this.bump(st);
   }
@@ -1006,6 +1028,8 @@ export class Game {
         return cat === 'food';
       case 'console':
         return cat === 'paper';
+      case 'roll_holder':
+        return it.type === 'toilet_roll';
       case 'street_bin':
         return it.type === 'trash_bag';
       case 'bakery':
@@ -1435,8 +1459,8 @@ export class Game {
     const m = this.messById(id);
     if (!m) return;
     S.messes = S.messes.filter((x) => x.id !== id);
-    if (m.kind === 'mud') {
-      for (const [k, v] of this.mudCells) if (v === id) this.mudCells.delete(k);
+    if (m.kind === 'mud' || m.kind === 'paper') {
+      for (const [k, v] of this.trailCells) if (v === id) this.trailCells.delete(k);
     }
     if (m.item >= 0) {
       const it = S.items[m.item];
@@ -1478,26 +1502,57 @@ export class Game {
     this.removeMess(id, c.id);
   }
 
+  /** Adds a mark (paw print, paper strip) to the trail mess of its 2 m cell. */
+  private addTrailMark(kind: 'mud' | 'paper', px: number, pz: number, rot: number): Mess {
+    const key = `${kind}:${Math.floor(px / 2)},${Math.floor(pz / 2)}`;
+    const mid = this.trailCells.get(key);
+    let m = mid !== undefined ? this.messById(mid) : undefined;
+    if (!m) {
+      const cx = (Math.floor(px / 2) + 0.5) * 2;
+      const cz = (Math.floor(pz / 2) + 0.5) * 2;
+      m = this.createMess(kind, cx, cz, { byTofu: true, r: 1.15 });
+      this.trailCells.set(key, m.id);
+    }
+    if (m.prints.length >= 36) m.prints.splice(0, 3);
+    m.prints.push(Math.round(px * 100) / 100, Math.round(pz * 100) / 100, Math.round(rot * 100) / 100);
+    m.progress = 0;
+    this.bump(m);
+    return m;
+  }
+
+  /** One strip of toilet paper behind Tofu; an empty roll goes back to its holder later. */
+  private addPaperStrip(c: Character, roll: Item, zoneId: string) {
+    const S = this.state;
+    const px = c.x - Math.sin(c.facing) * 0.35;
+    const pz = c.z - Math.cos(c.facing) * 0.35;
+    this.addTrailMark('paper', px, pz, c.facing + (this.rng.next() - 0.5) * 0.8);
+    if (roll.charge === PAPER.length) this.emit({ t: 'paper', id: c.id, x: c.x, z: c.z });
+    roll.charge--;
+    this.bump(roll);
+    S.stats.paperUnrolled++;
+    this.addChaos(CHAOS.paper, '', px, pz, true);
+    this.progressSecret('papier', 1);
+    if (S.stats.paperUnrolled % 8 === 1) this.addZoom(c, 'paper');
+    if (roll.charge <= 0) {
+      // Used up: Tofu drops the empty tube, a new roll appears on the holder later.
+      c.hold = c.hold.filter((i) => i !== roll.idx);
+      roll.state = 'gone';
+      roll.holder = -1;
+      roll.disturbed = false;
+      roll.respawnT = PAPER.respawn;
+      this.bump(roll);
+      this.addChaos(2, 'Plus de papier !', c.x, c.z);
+    }
+    void zoneId;
+  }
+
   private addMudPrint(c: Character, zoneId: string) {
     const S = this.state;
     const side = c.printSide;
     c.printSide = -side;
     const px = c.x + Math.cos(c.facing) * 0.11 * side;
     const pz = c.z - Math.sin(c.facing) * 0.11 * side;
-    const key = `${Math.floor(px / 2)},${Math.floor(pz / 2)}`;
-    let mid = this.mudCells.get(key);
-    let m = mid !== undefined ? this.messById(mid) : undefined;
-    if (!m) {
-      const cx = (Math.floor(px / 2) + 0.5) * 2;
-      const cz = (Math.floor(pz / 2) + 0.5) * 2;
-      m = this.createMess('mud', cx, cz, { byTofu: true, r: 1.15 });
-      this.mudCells.set(key, m.id);
-      mid = m.id;
-    }
-    if (m.prints.length >= 36) m.prints.splice(0, 3);
-    m.prints.push(Math.round(px * 100) / 100, Math.round(pz * 100) / 100, Math.round(c.facing * 100) / 100);
-    m.progress = 0;
-    this.bump(m);
+    this.addTrailMark('mud', px, pz, c.facing);
     c.mud = Math.max(0, c.mud - DOG.mudPerPrint);
     S.stats.mudPrints++;
     this.addChaos(CHAOS.print, '', px, pz, true);

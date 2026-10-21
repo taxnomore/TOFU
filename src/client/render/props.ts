@@ -335,6 +335,15 @@ const B: Partial<Record<PropType, Builder>> = {
     b.sphere(0.04, { x: 0.1, y: h + 0.11, z: 0.25 }, 0xf9ca24);
     b.cone(0.015, 0.04, { x: 0.1, y: h + 0.105, z: 0.3, rx: Math.PI / 2 }, 0xf0932b);
   },
+  vacuum_dock({ b }) {
+    b.rbox(0.32, 0.11, 0.1, 0.03, { y: 0.055, z: -0.03 }, 0x2c3e50);
+    b.box(0.28, 0.008, 0.18, { y: 0.004, z: 0.07 }, 0x5d6d7e);
+    b.sphere(0.012, { y: 0.1, z: 0.02 }, 0x58d68d, 'lo');
+  },
+  roll_holder({ b }) {
+    b.box(0.2, 0.07, 0.015, { y: 0.62, z: -0.04 }, 0xdfe6e9);
+    b.cylU(0.009, 0.16, { y: 0.62, z: 0.0, rz: Math.PI / 2 }, 0xb2bec3, 6);
+  },
   toilet({ b, w, d }) {
     b.cyl(0.18, 0.13, 0.4, { y: 0.2, z: 0.08 }, 0xf8f9fa, 12);
     b.cyl(0.2, 0.2, 0.05, { y: 0.42, z: 0.08 }, 0xecf0f1, 14);

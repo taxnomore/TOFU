@@ -4,6 +4,8 @@ import type { Game } from '../shared/sim/game';
 import type { Character, GameEvent, GameState } from '../shared/sim/types';
 import { Anim } from '../shared/sim/types';
 import { ITEM_TYPES } from '../shared/world/itemTypes';
+import { zoneAt } from '../shared/world/map';
+import { DOG } from '../shared/constants';
 import { sfx } from './audio/sfx';
 import { endFrame } from './input/devices';
 import { CameraRig } from './render/camera';
@@ -21,6 +23,8 @@ export interface AppHooks {
 }
 
 const tmpV = new THREE.Vector3();
+/** Tofu runs (longer paw stride) above this speed. */
+const DOG_RUN = DOG.walk + 0.3;
 
 export class App {
   readonly gr: GameRenderer;
@@ -450,6 +454,12 @@ export class App {
           break;
         case 'carrier':
           break;
+        case 'paper':
+          if (!quiet) sfx.play('unroll', this.vol(e.x, e.z));
+          break;
+        case 'vacuum':
+          if (!quiet) sfx.play(e.on ? 'vacuumOn' : 'vacuumOff', this.vol(e.x, e.z));
+          break;
         case 'end':
           sfx.setTense(false);
           if (!quiet) {
@@ -464,8 +474,36 @@ export class App {
     }
   }
 
+  private stepAcc: number[] = [];
+  /** Footstep sounds near the local players (stride depends on speed). */
+  private footsteps(S: GameState, dt: number) {
+    if (this.attract || !this.session) return;
+    for (const c of S.chars) {
+      if (c.speed < 0.6 || c.stun > 0) {
+        this.stepAcc[c.id] = 0;
+        continue;
+      }
+      const dog = c.role === 'tofu';
+      const stride = dog ? (c.speed > DOG_RUN ? 0.8 : 0.55) : c.speed > 4.3 ? 0.95 : 0.72;
+      const acc = (this.stepAcc[c.id] ?? 0) + c.speed * dt;
+      if (acc < stride) {
+        this.stepAcc[c.id] = acc;
+        continue;
+      }
+      this.stepAcc[c.id] = acc - stride;
+      const d = this.nearestListener(c.x, c.z);
+      if (d > 14) continue;
+      const v = (d < 4 ? 1 : 1 - (d - 4) / 10) * Math.min(1, 0.5 + c.speed / 8);
+      const zone = zoneAt(c.x, c.z);
+      const soft = !!zone && (zone.id === 'jardin' || zone.id === 'square');
+      if (dog) sfx.play(c.mud > 0.3 && zone?.indoor ? 'pawMud' : soft ? 'pawGrass' : 'paw', v);
+      else sfx.play(soft ? 'stepGrass' : 'step', v);
+    }
+  }
+
   private dustT = 0;
   private ambientEffects(S: GameState, dt: number) {
+    this.footsteps(S, dt);
     this.dustT += dt;
     if (this.dustT < 0.06) return;
     this.dustT = 0;
