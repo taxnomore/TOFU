@@ -1,0 +1,33 @@
+{
+  "name": "tofu-qui-a-fait-ca",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "TOFU ! QUI A FAIT ÇA ? Jeu de fête asymétrique en 3D pour navigateur (solo, écran partagé, réseau local).",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "dev": "node scripts/check-node.mjs && tsx server/main.ts --dev",
+    "build": "node scripts/check-node.mjs && tsc --noEmit && vite build && node scripts/build-server.mjs",
+    "start": "node scripts/check-node.mjs && node dist-server/main.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ws": "8.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.18.12",
+    "@types/three": "0.180.0",
+    "@types/ws": "8.18.1",
+    "esbuild": "0.28.2",
+    "qrcode-generator": "1.4.4",
+    "three": "0.180.0",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vite": "7.3.7",
+    "vitest": "3.2.7"
+  }
+}
