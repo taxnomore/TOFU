@@ -5,7 +5,9 @@ import { faceTo, hold, makeGame, place, press, steps, walk } from './helpers';
 import { BAGUETTE_RESPAWN, CAN, DOG } from '../src/shared/constants';
 import { listInteractions } from '../src/shared/sim/interactions';
 import { chooseSecrets } from '../src/shared/sim/rules';
-import { CAT_NODES, ITEMS, STATIONS } from '../src/shared/world/map';
+import { getMap } from '../src/shared/world/maps';
+
+const { catNodes: CAT_NODES, items: ITEMS, stations: STATIONS } = getMap('quartier');
 import { Rng } from '../src/shared/math';
 import { getWorld } from '../src/shared/sim/world';
 import type { Game } from '../src/shared/sim/game';
@@ -293,8 +295,8 @@ describe('market day', () => {
     expect(cheese.state).toBe('stored');
     expect(cheese.station).toBe(si);
     const s = STATIONS[si];
-    expect(getWorld('marche').humanNav.isFree(s.x, s.z)).toBe(false);
-    expect(getWorld('ete').humanNav.isFree(s.x, s.z)).toBe(true);
+    expect(getWorld('quartier', 'marche').humanNav.isFree(s.x, s.z)).toBe(false);
+    expect(getWorld('quartier', 'ete').humanNav.isFree(s.x, s.z)).toBe(true);
     expect(market.state.secrets.some((x) => x.id === 'marche')).toBe(true);
   });
 
@@ -366,13 +368,13 @@ describe('ambiance setup', () => {
   it('each ambiance offers its own secret challenge', () => {
     for (const [v, id] of [['automne', 'feuilles'], ['hiver', 'bonhomme'], ['marche', 'marche']] as const) {
       for (let seed = 1; seed < 6; seed++) {
-        const s = chooseSecrets(new Rng(seed), 1, v);
+        const s = chooseSecrets(new Rng(seed), 1, v, getMap('quartier'));
         expect(s.length).toBe(3);
         expect(s.map((x) => x.id)).toContain(id);
       }
     }
     for (let seed = 1; seed < 20; seed++) {
-      const ids = chooseSecrets(new Rng(seed), 1, 'ete').map((x) => x.id);
+      const ids = chooseSecrets(new Rng(seed), 1, 'ete', getMap('quartier')).map((x) => x.id);
       expect(ids.some((x) => ['feuilles', 'bonhomme', 'marche'].includes(x))).toBe(false);
     }
   });

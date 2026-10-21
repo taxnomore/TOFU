@@ -1,6 +1,5 @@
 // Path following for AI characters: A* on the nav grid, door handling,
 // stuck detection with side-steps and re-planning.
-import { DOORS } from '../world/map';
 import type { NavGrid, PathPoint } from '../world/nav';
 import type { Game } from '../sim/game';
 import type { Character } from '../sim/types';
@@ -47,7 +46,7 @@ export class Navigator {
   doorCost = (i: number): number => {
     if (this.g.state.doors[i].open) return 0;
     if (this.me.role === 'human') return 1.5;
-    return DOORS[i].dogCanPush ? 3 : Infinity;
+    return this.g.map.doors[i].dogCanPush ? 3 : Infinity;
   };
 
   setGoal(x: number, z: number, reach = 0.5, force = false) {

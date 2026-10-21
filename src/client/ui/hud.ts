@@ -4,10 +4,10 @@ import { BTN_BARK, BTN_INTERACT, BTN_SIT, BTN_SPECIAL, BTN_SPRINT, DOG, HUMAN } 
 import type { Game } from '../../shared/sim/game';
 import { listInteractions } from '../../shared/sim/interactions';
 import { objectivesFor } from '../../shared/sim/objectives';
-import { SECRET_DEFS, TASK_DEFS } from '../../shared/sim/rules';
+import { TASK_DEFS, secretInfo } from '../../shared/sim/rules';
 import type { Character, GameEvent, GameState } from '../../shared/sim/types';
 import { ITEM_TYPES, MESS_TYPES } from '../../shared/world/itemTypes';
-import { BUILDINGS, DOORS, PROPS, STATIONS, WALLS, ZONES, WORLD_BOUNDS, zoneAt } from '../../shared/world/map';
+import type { GameMap } from '../../shared/world/mapTypes';
 import { Variant, presentIn } from '../../shared/world/variants';
 import type { InputDevice, PadAction } from '../input/devices';
 import { KEYMAPS, PADMAP, keyLabel, padButtonLabel } from '../input/devices';
@@ -50,6 +50,11 @@ export function glyph(dev: InputDevice | undefined, button: number): string {
   return codes.length ? keyLabel(codes[0]) : '—';
 }
 
+/** First letter in upper case ("l'aspirateur" -> "L'aspirateur"). */
+export function cap(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 // ---------------------------------------------------------------------------
 // Event messages
 // ---------------------------------------------------------------------------
@@ -59,23 +64,23 @@ export interface Toast {
   kind: 'good' | 'bad' | 'info' | 'big';
 }
 
-export function eventToast(e: GameEvent, viewer: Character, S: GameState): Toast | null {
+export function eventToast(e: GameEvent, viewer: Character, S: GameState, map: GameMap): Toast | null {
   const dog = viewer.role === 'tofu';
   const itemName = (i: number) => ITEM_TYPES[S.items[i]?.type]?.name ?? 'un objet';
   switch (e.t) {
     case 'steal':
       return dog ? null : { text: `🐶 Tofu a pris ${itemName(e.item)} !`, kind: 'bad' };
     case 'vacuum':
-      if (!e.on) return e.by === viewer.id ? { text: "🤖 Aspirateur éteint : il rentre à sa base.", kind: 'info' } : null;
-      if (S.chars[e.by]?.role === 'tofu') return dog ? { text: '🤖 Vrrrr ! L\'aspirateur part en balade !', kind: 'good' } : { text: "🤖 Tofu a allumé l'aspirateur robot !", kind: 'bad' };
-      return { text: "🤖 L'aspirateur nettoie… et bouscule tout !", kind: 'info' };
+      if (!e.on) return e.by === viewer.id ? { text: `🤖 ${cap(map.vacuum.name)} est éteint : il rentre à sa base.`, kind: 'info' } : null;
+      if (S.chars[e.by]?.role === 'tofu') return dog ? { text: `🤖 Vrrrr ! ${cap(map.vacuum.name)} part en balade !`, kind: 'good' } : { text: `🤖 Tofu a allumé ${map.vacuum.name} !`, kind: 'bad' };
+      return { text: `🤖 ${cap(map.vacuum.name)} nettoie… et bouscule tout !`, kind: 'info' };
     case 'paper':
       return dog ? { text: '🧻 Ça se déroule tout seul !', kind: 'good' } : { text: '🧻 Tofu déroule le papier toilette !', kind: 'bad' };
     case 'recover':
       return e.id === viewer.id ? { text: `👍 Tu as repris ${itemName(e.item)} !`, kind: 'good' } : dog ? { text: `😤 On t'a repris ${itemName(e.item)} !`, kind: 'bad' } : null;
     case 'knock':
       if (e.by === -2) return { text: '🐈 Le chat a tout renversé !', kind: dog ? 'good' : 'bad' };
-      if (e.by === -4) return { text: "🤖 L'aspirateur a tout renversé !", kind: dog ? 'good' : 'bad' };
+      if (e.by === -4) return { text: `🤖 ${cap(map.vacuum.name)} a tout renversé !`, kind: dog ? 'good' : 'bad' };
       if (S.chars[e.by]?.role === 'human') return { text: `😅 ${S.chars[e.by].name} a fait tomber quelque chose !`, kind: dog ? 'good' : 'bad' };
       return dog ? null : { text: `💥 Tofu a renversé ${itemName(e.item)} !`, kind: 'bad' };
     case 'task': {
@@ -86,17 +91,18 @@ export function eventToast(e: GameEvent, viewer: Character, S: GameState): Toast
     }
     case 'secret': {
       const s = S.secrets[e.idx];
-      const def = SECRET_DEFS.find((d) => d.id === s.id)!;
+      const def = secretInfo(map, s.id);
       return dog ? { text: `🤫 Défi secret réussi : ${def.text} (+20)`, kind: 'big' } : { text: '🤫 Tofu a réussi un défi secret…', kind: 'bad' };
     }
     case 'guests':
-      return e.on ? { text: '🔔 Ding dong ! Les invités arrivent !', kind: 'big' } : { text: '😱 Oh non ! La maison n\'est plus prête !', kind: 'bad' };
+      return e.on ? { text: `🔔 ${map.story.ding}`, kind: 'big' } : { text: `😱 ${map.story.notReady}`, kind: 'bad' };
     case 'zoomies':
       return e.on ? { text: dog ? '🌀 ZOOMIES !' : '🌀 Attention : Tofu fait des zoomies !', kind: dog ? 'big' : 'bad' } : null;
     case 'lured':
       return dog ? { text: e.kind === 'treat' ? '🦴 Une friandise ! Impossible de résister…' : '🎾 La balle ! La balle !', kind: 'info' } : { text: e.kind === 'treat' ? '🦴 Tofu a vu la friandise !' : '🎾 Tofu court après la balle !', kind: 'good' };
     case 'muddy':
-      return dog ? { text: '🐾 Pattes pleines de boue ! Va dans la maison…', kind: 'info' } : { text: '🐾 Tofu s\'est roulé dans la boue !', kind: 'bad' };
+      if (e.kind === 'wet') return dog ? { text: `💧 Pattes trempées ! Va ${map.story.inside}…`, kind: 'info' } : { text: '💧 Tofu a pataugé dans l\'eau !', kind: 'bad' };
+      return dog ? { text: `🐾 Pattes pleines de boue ! Va ${map.story.inside}…`, kind: 'info' } : { text: '🐾 Tofu s\'est roulé dans la boue !', kind: 'bad' };
     case 'paws':
       return dog ? { text: '🧽 On t\'a essuyé les pattes !', kind: 'bad' } : e.by === viewer.id ? { text: '🧽 Pattes propres !', kind: 'good' } : null;
     case 'eat':
@@ -110,8 +116,8 @@ export function eventToast(e: GameEvent, viewer: Character, S: GameState): Toast
       if (e.what === 'boop') return dog ? { text: '🐈 Pfff ! Coup de patte du chat !', kind: 'info' } : null;
       return null;
     case 'carrier':
-      if (e.what === 'arrive') return dog ? { text: '📮 La factrice passe dans la rue !', kind: 'info' } : null;
-      if (e.what === 'scared') return { text: '📮 Tofu a fait peur à la factrice !', kind: dog ? 'good' : 'bad' };
+      if (e.what === 'arrive') return dog ? { text: `📮 ${cap(map.carrier.name)} passe par là !`, kind: 'info' } : null;
+      if (e.what === 'scared') return { text: `📮 Tofu a fait peur à ${map.carrier.name} !`, kind: dog ? 'good' : 'bad' };
       return null;
     case 'innocent':
       return dog ? { text: '😇 Qui, moi ? (+3)', kind: 'good' } : null;
@@ -144,7 +150,7 @@ export class TopBar {
     parent.appendChild(this.el);
   }
 
-  update(S: GameState) {
+  update(S: GameState, map: GameMap) {
     const remaining = S.duration - S.time;
     const key = `${Math.ceil(remaining)}|${Math.floor(S.chaos)}|${Math.round(S.cleanliness)}|${S.guestsT > 0 ? Math.ceil(S.guestsT) : 0}|${S.phase}`;
     if (key === this.last) return;
@@ -160,7 +166,7 @@ export class TopBar {
     this.cleanText.innerHTML = `<i>Propreté</i>${Math.round(S.cleanliness)} %`;
     this.clean.classList.toggle('low', S.cleanliness < S.cleanGoal);
     this.guests.style.display = S.guestsT > 0 ? '' : 'none';
-    if (S.guestsT > 0) this.guests.textContent = `🔔 Les invités arrivent dans ${Math.ceil(S.guestsT)} s !`;
+    if (S.guestsT > 0) this.guests.textContent = `🔔 ${map.story.arriving} dans ${Math.ceil(S.guestsT)} s !`;
   }
 }
 
@@ -168,17 +174,22 @@ export class TopBar {
 // Minimap
 // ---------------------------------------------------------------------------
 
-const mapCanvas = new Map<Variant, HTMLCanvasElement>();
+const mapCanvas = new Map<string, HTMLCanvasElement>();
 const MAP_SCALE = 4;
+/** Minimap colors of the outdoor floors (lawn shows through elsewhere). */
+const FLOOR_COL: Partial<Record<string, string>> = {
+  asphalt: '#6b6f76', sidewalk: '#c9c3b8', gravel: '#d6c8a8', terrace: '#d9cfbd', pavers: '#cfc3ad', sand: '#e6d39c',
+  soil: '#8a6a4a', crosswalk: '#6b6f76', white_tiles: '#ece7de', cement_tiles: '#e6dccb',
+};
 /** Lawn color of the minimap per ambiance. */
 const MAP_LAWN: Record<Variant, [string, string]> = {
   ete: ['#86b867', '#5d8a4a'], marche: ['#86b867', '#5d8a4a'], automne: ['#a7a95a', '#7d7d44'], hiver: ['#e9eef3', '#c9d3dc'],
 };
 
-function mapBase(variant: Variant): HTMLCanvasElement {
-  const cached = mapCanvas.get(variant);
+function mapBase(M: GameMap, variant: Variant): HTMLCanvasElement {
+  const cached = mapCanvas.get(`${M.id}:${variant}`);
   if (cached) return cached;
-  const B = WORLD_BOUNDS;
+  const B = M.bounds;
   const w = Math.ceil((B.x1 - B.x0) * MAP_SCALE);
   const h = Math.ceil((B.z1 - B.z0) * MAP_SCALE);
   const c = document.createElement('canvas');
@@ -194,19 +205,21 @@ function mapBase(variant: Variant): HTMLCanvasElement {
     ctx.fillStyle = col;
     ctx.fillRect(a, b, cc - a, d - b);
   };
-  const floorCol: Record<string, string> = { rue: '#6b6f76', trottoir_s: '#c9c3b8', trottoir_n: '#c9c3b8', boulangerie: '#d8c9b0', allee: '#d6c8a8', terrasse: '#d9cfbd' };
-  for (const z of [...ZONES].reverse()) {
+  for (const z of [...M.zones].reverse()) {
     if (z.indoor) rect(z.x0, z.z0, z.x1, z.z1, '#f3e6cf');
-    else if (floorCol[z.id]) rect(z.x0, z.z0, z.x1, z.z1, floorCol[z.id]);
   }
-  for (const b of BUILDINGS) rect(b.x0, b.z0, b.x1, b.z1, '#b9a88f');
+  for (const f of M.floors) {
+    const col = FLOOR_COL[f.kind];
+    if (col) rect(f.x0, f.z0, f.x1, f.z1, col);
+  }
+  for (const b of M.buildings) rect(b.x0, b.z0, b.x1, b.z1, '#b9a88f');
   // Market stalls.
-  for (const p of PROPS) {
+  for (const p of M.props) {
     if (p.type !== 'market_stall' || !presentIn(p.only, variant)) continue;
     rect(p.x - 1.1, p.z - 0.45, p.x + 1.1, p.z + 0.45, '#e2a03f');
   }
   ctx.strokeStyle = '#4b3b2e';
-  for (const wdef of WALLS) {
+  for (const wdef of M.walls) {
     const t = wallThickness(wdef);
     ctx.lineWidth = Math.max(1.5, t * MAP_SCALE);
     ctx.strokeStyle = wdef.style === 'hedge' ? '#3f7a32' : wdef.style.startsWith('house') ? '#4b3b2e' : '#8a7a62';
@@ -219,7 +232,7 @@ function mapBase(variant: Variant): HTMLCanvasElement {
   }
   // Door gaps in light color.
   ctx.lineWidth = 3;
-  for (const d of DOORS) {
+  for (const d of M.doors) {
     ctx.strokeStyle = '#f3e6cf';
     const [a, b] = P(d.axis === 'x' ? d.x - d.width / 2 : d.x, d.axis === 'x' ? d.z : d.z - d.width / 2);
     const [cc, dd] = P(d.axis === 'x' ? d.x + d.width / 2 : d.x, d.axis === 'x' ? d.z : d.z + d.width / 2);
@@ -228,7 +241,7 @@ function mapBase(variant: Variant): HTMLCanvasElement {
     ctx.lineTo(cc, dd);
     ctx.stroke();
   }
-  mapCanvas.set(variant, c);
+  mapCanvas.set(`${M.id}:${variant}`, c);
   return c;
 }
 
@@ -242,7 +255,7 @@ export class Minimap {
     parent.appendChild(this.canvas);
   }
 
-  draw(S: GameState, me: Character, yaw: number, objectives: { x: number; z: number }[], size: number, variant: Variant = 'ete') {
+  draw(S: GameState, me: Character, yaw: number, objectives: { x: number; z: number }[], size: number, map: GameMap, variant: Variant = 'ete') {
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     if (this.size !== size || this.canvas.width !== Math.round(size * dpr)) {
       this.size = size;
@@ -253,8 +266,8 @@ export class Minimap {
     }
     const ctx = this.ctx;
     const W = this.canvas.width;
-    const base = mapBase(variant);
-    const B = WORLD_BOUNDS;
+    const base = mapBase(map, variant);
+    const B = map.bounds;
     const viewMeters = 34;
     const k = W / viewMeters;
     ctx.save();
@@ -467,16 +480,16 @@ export class PlayerHud {
     let listHtml = '';
     if (dog) {
       listHtml = '<h4>Défis secrets</h4>' + S.secrets.map((s) => {
-        const d = SECRET_DEFS.find((q) => q.id === s.id)!;
+        const d = secretInfo(g.map, s.id);
         const prog = s.goal > 1 ? ` <em>${Math.floor(s.progress)}/${s.goal}</em>` : '';
         return `<div class="${s.done ? 'done' : ''}">${s.done ? '✅' : d.icon} ${d.text}${s.done ? '' : prog}</div>`;
       }).join('');
     } else {
-      listHtml = '<h4>À faire avant les invités</h4>' + S.tasks.map((t) => {
+      listHtml = `<h4>${g.map.story.listTitle}</h4>` + S.tasks.map((t) => {
         const d = TASK_DEFS[t.kind];
         const prog = t.total > 1 ? ` <em>${t.progress}/${t.total}</em>` : '';
         return `<div class="${t.done ? 'done' : ''}">${t.done ? '✅' : d.icon} ${d.title}${t.done ? '' : prog}</div>`;
-      }).join('') + `<div class="cleanreq ${S.cleanliness >= S.cleanGoal ? 'done' : ''}">${S.cleanliness >= S.cleanGoal ? '✅' : '🧹'} Maison propre (${S.cleanGoal} % min.)</div>`;
+      }).join('') + `<div class="cleanreq ${S.cleanliness >= S.cleanGoal ? 'done' : ''}">${S.cleanliness >= S.cleanGoal ? '✅' : '🧹'} ${g.map.story.cleanLabel} (${S.cleanGoal} % min.)</div>`;
     }
     if (listHtml !== this.listKey) {
       this.listKey = listHtml;
@@ -523,7 +536,7 @@ export class PlayerHud {
     if (me.lureKind) status = me.lureKind === 'treat' ? '🦴 Trop tentant…' : '🎾 La balle !';
     else if (me.stun > 0) status = dog ? '💫 Aïe…' : '💫 Oups…';
     else if (dog && me.mud > 0.05) {
-      const what = me.pawKind === 'snow' ? '❄️ Pattes mouillées' : me.pawKind === 'leaves' ? '🍂 Feuilles dans les poils' : '🐾 Boue';
+      const what = me.pawKind === 'snow' ? '❄️ Pattes mouillées' : me.pawKind === 'wet' ? '💧 Pattes trempées' : me.pawKind === 'leaves' ? '🍂 Feuilles dans les poils' : '🐾 Boue';
       status = `${what} : ${Math.round(me.mud * 100)} %`;
     }
     else if (!dog && me.hold.length) status = '🧺 ' + me.hold.map((i) => ITEM_TYPES[S.items[i].type].short).join(', ');
@@ -533,7 +546,7 @@ export class PlayerHud {
     // Objectives (humans) for arrows + minimap.
     const objectives = dog ? [] : objectivesFor(g, me);
     const mm = compact ? Math.max(90, Math.min(130, rect.h * 0.26)) : 150;
-    this.minimap.draw(S, me, this.lp.rig.yaw, objectives, mm, g.variant);
+    this.minimap.draw(S, me, this.lp.rig.yaw, objectives, mm, g.map, g.variant);
 
     // Off-screen arrows.
     const targets: { x: number; z: number; cls: string; icon: string }[] = [];
@@ -602,7 +615,7 @@ export class PlayerHud {
         this.tip.classList.remove('show');
       }
     }
-    this.contextTips(S, me, dev, inter?.kind);
+    this.contextTips(g, S, me, dev, inter?.kind);
   }
 
   private drawArrows(targets: { x: number; z: number; cls: string; icon: string }[], cam: THREE.PerspectiveCamera, rect: { w: number; h: number }) {
@@ -649,30 +662,33 @@ export class PlayerHud {
     });
   }
 
-  private contextTips(S: GameState, me: Character, dev: InputDevice, interKind?: string) {
+  private contextTips(g: Game, S: GameState, me: Character, dev: InputDevice, interKind?: string) {
     if (S.phase !== 'play') return;
+    const M = g.map;
+    const market = S.stations.some((st) => !st.disabled && M.stations[st.idx].kind === 'market');
     const A = glyph(dev, BTN_INTERACT);
     if (me.role === 'tofu') {
       this.tipOnce('tofu-start', `Tu es <b>Tofu</b> ! Fais des bêtises pour remplir la barre 😈. Vole des chaussettes, renverse des pots, poursuis le chat… Bouton <kbd>${A}</kbd> pour agir.`);
       if (interKind === 'take' || interKind === 'pickup') this.tipOnce('tofu-take', `Appuie sur <kbd>${A}</kbd> pour l'attraper dans ta gueule, puis va le cacher dans ton panier ou dans la rue !`);
-      if (me.mud > 0.5 && me.pawKind === 'mud') this.tipOnce('tofu-mud', 'Pattes boueuses ! Cours dans la maison pour laisser des traces 🐾.');
-      if (me.mud > 0.2 && me.pawKind === 'snow') this.tipOnce('tofu-snow', 'Pattes pleines de neige ! Dans la maison, elles laissent des traces mouillées 💧.');
-      if (me.mud > 0.3 && me.pawKind === 'leaves') this.tipOnce('tofu-leaves', 'Des feuilles plein les poils ! Rentre vite les semer dans la maison 🍂.');
-      if (me.hold.some((i) => S.items[i]?.type === 'watering_can')) this.tipOnce('tofu-can', "L'arrosoir fuit ! Cours dans la maison pour mettre de l'eau partout 💧.");
+      if (me.mud > 0.5 && me.pawKind === 'mud') this.tipOnce('tofu-mud', `Pattes boueuses ! Cours ${M.story.inside} pour laisser des traces 🐾.`);
+      if (me.mud > 0.2 && me.pawKind === 'snow') this.tipOnce('tofu-snow', `Pattes pleines de neige ! ${cap(M.story.inside)}, elles laissent des traces mouillées 💧.`);
+      if (me.mud > 0.3 && me.pawKind === 'leaves') this.tipOnce('tofu-leaves', `Des feuilles plein les poils ! Rentre vite les semer ${M.story.inside} 🍂.`);
+      if (me.mud > 0.2 && me.pawKind === 'wet') this.tipOnce('tofu-wet', `Pattes trempées ! Cours ${M.story.inside} pour laisser des traces d'eau 💧.`);
+      if (me.hold.some((i) => S.items[i]?.type === 'watering_can')) this.tipOnce('tofu-can', `L'arrosoir fuit ! Cours ${M.story.inside} pour mettre de l'eau partout 💧.`);
       if (S.items.some((it) => it.type === 'leaf_pile' && it.state === 'home')) this.tipOnce('tofu-pile', 'Automne : fonce dans les tas de feuilles pour les éparpiller 🍂.');
       if (S.items.some((it) => it.type === 'snowman' && it.state === 'home')) this.tipOnce('tofu-snowman', `Hiver : maintiens <kbd>${A}</kbd> contre un bonhomme de neige pour le démolir ⛄.`);
-      if (S.stations.some((st) => !st.disabled && STATIONS[st.idx].kind === 'market')) this.tipOnce('tofu-market', 'Jour de marché sur le square : fromage, saucisson et poulet rôti t\'attendent 🧀. Passe par le trou de la haie !');
+      if (market) this.tipOnce('tofu-market', 'Jour de marché sur le square : fromage, saucisson et poulet rôti t\'attendent 🧀. Passe par le trou de la haie !');
       if (me.zoom >= 1) this.tipOnce('tofu-zoom', `Zoomies prêts ! Appuie sur <kbd>${glyph(dev, BTN_SPECIAL)}</kbd> pour foncer et tout renverser 🌀.`);
       if (interKind === 'push_door') this.tipOnce('tofu-door', `Porte fermée : maintiens <kbd>${A}</kbd> pour la pousser.`);
       if (S.time > 25) this.tipOnce('tofu-sit', `Astuce : reste immobile ou appuie sur <kbd>${glyph(dev, BTN_SIT)}</kbd> pour t'asseoir l'air innocent 😇. <kbd>${glyph(dev, BTN_BARK)}</kbd> pour aboyer !`);
     } else {
-      this.tipOnce('human-start', `Préparez la maison avant l'arrivée des invités ! Suivez la liste et gardez la maison propre. Bouton <kbd>${A}</kbd> pour agir.`);
+      this.tipOnce(`human-start-${M.id}`, `${M.story.tipStart} Suivez la liste et gardez tout propre. Bouton <kbd>${A}</kbd> pour agir.`);
       if (S.chars.some((c) => c.role === 'tofu' && c.hold.length)) this.tipOnce('human-steal', `Tofu a volé quelque chose ! Rattrape-le et appuie sur <kbd>${A}</kbd> pour le reprendre.`);
       if (S.messes.length) this.tipOnce('human-mess', `Un désordre ! Maintiens <kbd>${A}</kbd> à côté pour nettoyer 🧹.`);
       if (S.time > 20) this.tipOnce('human-treat', `Lance une friandise avec <kbd>${glyph(dev, BTN_SPECIAL)}</kbd> : Tofu ne peut pas résister et lâche ce qu'il porte 🦴.`);
       if (interKind === 'door') this.tipOnce('human-door', 'Ferme les portes ! Tofu doit les pousser longtemps pour passer.');
       if (S.chars.some((c) => c.role === 'tofu' && c.hold.some((i) => S.items[i]?.type === 'watering_can'))) this.tipOnce('human-can', "Tofu a pris l'arrosoir et il fuit ! Les traces d'eau sèchent toutes seules, mais attention, ça glisse.");
-      if (S.stations.some((st) => !st.disabled && STATIONS[st.idx].kind === 'market') && S.time > 30) this.tipOnce('human-market', 'Jour de marché : si Tofu vole sur un étal, rapportez la marchandise au bon marchand.');
+      if (market && S.time > 30) this.tipOnce('human-market', 'Jour de marché : si Tofu vole sur un étal, rapportez la marchandise au bon marchand.');
       if (S.time > 60) this.tipOnce('human-sprint', `Maintiens <kbd>${glyph(dev, BTN_SPRINT)}</kbd> pour courir… mais attention aux flaques et aux jouets par terre !`);
     }
   }
@@ -687,4 +703,4 @@ export function messLabel(kind: keyof typeof MESS_TYPES): string {
   return MESS_TYPES[kind].name;
 }
 
-export { HUMAN, STATIONS, zoneAt };
+export { HUMAN };

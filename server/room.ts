@@ -12,6 +12,7 @@ import {
   ServerMsg, parseClientMsg,
 } from '../src/shared/net/protocol';
 import { SnapshotEncoder } from '../src/shared/net/snapshot';
+import { DEFAULT_MAP, getMap } from '../src/shared/world/maps';
 import { lanAddresses } from './net-util';
 
 const HUMAN_NAMES = ['Maman', 'Papa', 'Léa', 'Hugo'];
@@ -55,7 +56,7 @@ export class Room {
   clients = new Map<string, Client>();
   order: string[] = [];
   hostId = '';
-  settings: LobbySettings = { duration: DEFAULT_DURATION, fillAI: true, difficulty: 1, variant: 'ete' };
+  settings: LobbySettings = { duration: DEFAULT_DURATION, fillAI: true, difficulty: 1, variant: 'ete', map: DEFAULT_MAP };
   private assigned = new Map<string, 'tofu' | 'human'>();
   phase: 'lobby' | 'game' = 'lobby';
   game: Game | null = null;
@@ -303,6 +304,8 @@ export class Room {
       case 'settings':
         if (!isHost) return;
         Object.assign(this.settings, msg.settings);
+        // Each place offers its own ambiances.
+        if (!getMap(this.settings.map).variants.includes(this.settings.variant)) this.settings.variant = 'ete';
         this.broadcastLobby();
         return;
       case 'assign':
@@ -464,7 +467,7 @@ export class Room {
     if (!tofuP && !humansP.length) return;
     this.cfg = {
       seed: randomBytes(4).readUInt32LE(0), duration: this.settings.duration, players, difficulty: this.settings.difficulty,
-      countdown: this.opts.countdown ?? COUNTDOWN_TIME + INTRO_TIME, variant: this.settings.variant,
+      countdown: this.opts.countdown ?? COUNTDOWN_TIME + INTRO_TIME, variant: this.settings.variant, map: this.settings.map,
     };
     this.game = new Game(this.cfg);
     this.ais.clear();

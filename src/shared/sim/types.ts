@@ -1,6 +1,7 @@
 // Game state shapes. Plain JSON-friendly objects so snapshots serialize easily.
 import type { MessKind } from '../world/itemTypes';
 import type { Variant } from '../world/variants';
+import type { MapId } from '../world/mapTypes';
 
 export type Role = 'tofu' | 'human';
 export type Winner = 'tofu' | 'humans';
@@ -27,6 +28,8 @@ export interface GameConfig {
   countdown?: number;
   /** Ambiance (season or market day). Default: summer. */
   variant?: Variant;
+  /** Map. Default: the neighborhood. */
+  map?: MapId;
 }
 
 export interface InputFrame {
@@ -131,7 +134,7 @@ export interface Character {
   sayT: number;
 }
 
-export type PawKind = 'mud' | 'snow' | 'leaves';
+export type PawKind = 'mud' | 'snow' | 'leaves' | 'wet';
 
 export type ItemState = 'home' | 'free' | 'held' | 'stored' | 'air' | 'knocked' | 'gone';
 
@@ -275,7 +278,8 @@ export interface CarrierState {
   next: number;
 }
 
-export type TaskKind = 'linge' | 'jouets' | 'table' | 'gouter' | 'poubelle' | 'courrier' | 'lit' | 'fleurs';
+/** Job id, defined by each map (see MapDef.tasks). */
+export type TaskKind = string;
 
 export interface TaskState {
   kind: TaskKind;
@@ -369,7 +373,7 @@ export type GameEvent =
   | { t: 'mess'; mess: number; kind: MessKind; x: number; z: number; zone: string }
   | { t: 'cleaned'; mess: number; kind: MessKind; by: number; x: number; z: number }
   | { t: 'door'; door: number; open: boolean; by: number }
-  | { t: 'muddy'; id: number }
+  | { t: 'muddy'; id: number; kind?: PawKind }
   | { t: 'paws'; by: number }
   | { t: 'cat'; what: 'flee' | 'hiss' | 'boop' | 'meow' | 'perch'; x: number; z: number }
   | { t: 'zoomies'; id: number; on: boolean }

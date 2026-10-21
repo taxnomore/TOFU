@@ -1,8 +1,10 @@
 // WebGL renderer wrapper: one canvas, one scene, N viewports (split screen
 // uses scissor rectangles). Shadows are computed once per frame.
 import * as THREE from 'three';
-import { inHouse } from '../../shared/world/map';
+import type { GameMap, MapId } from '../../shared/world/mapTypes';
+import { DEFAULT_MAP, getMap } from '../../shared/world/maps';
 import { DEFAULT_VARIANT, Variant } from '../../shared/world/variants';
+import { CameraRig } from './camera';
 import { cutUniforms, materials } from './materials';
 import { skyTexture } from './textures';
 import { WorldMeshes, buildWorld } from './worldView';
@@ -25,6 +27,8 @@ export class GameRenderer {
   quality: Quality;
   /** Ambiance the world is currently built for. */
   variant: Variant = DEFAULT_VARIANT;
+  /** Map the world is currently built for. */
+  map: GameMap = getMap(DEFAULT_MAP);
   private shadowsDirty = true;
 
   constructor(readonly canvas: HTMLCanvasElement, quality: Quality) {
@@ -69,7 +73,8 @@ export class GameRenderer {
 
   private buildWorld() {
     const mats = materials(this.renderer.capabilities.getMaxAnisotropy());
-    this.world = buildWorld(mats, this.quality, this.variant);
+    this.world = buildWorld(mats, this.quality, this.variant, this.map);
+    CameraRig.bounds = this.map.bounds;
     this.scene.add(this.world.root);
     if (this.quality === 'low') {
       this.world.root.traverse((o) => {
@@ -79,10 +84,11 @@ export class GameRenderer {
     this.shadowsDirty = true;
   }
 
-  /** Switches the ambiance: seasonal world, sky, fog and light. */
-  setVariant(v: Variant) {
-    if (v === this.variant) return;
+  /** Switches the map and the ambiance: world, sky, fog and light. */
+  setWorld(mapId: MapId, v: Variant) {
+    if (v === this.variant && mapId === this.map.id) return;
     this.variant = v;
+    this.map = getMap(mapId);
     this.scene.remove(this.world.root);
     this.world.root.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
     this.buildWorld();
@@ -118,7 +124,7 @@ export class GameRenderer {
     cutUniforms.uCutCam.value.copy(cam.position);
     cutUniforms.uCutTarget.value.copy(focus);
     cutUniforms.uCutOn.value = cutOn ? 1 : 0;
-    this.world.roof.visible = !inHouse(focus.x, focus.z);
+    this.world.roof.visible = !this.map.underRoof(focus.x, focus.z);
     if (this.shadowsDirty && r.shadowMap.enabled) {
       r.shadowMap.needsUpdate = true;
       this.shadowsDirty = false;

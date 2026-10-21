@@ -1,10 +1,14 @@
 import { StationKind } from './types';
 
-export type ItemCategory = 'laundry' | 'toy' | 'food' | 'paper' | 'trash' | 'dishes' | 'ball' | 'tool' | 'knockable' | 'roll' | 'market';
+export type ItemCategory = 'laundry' | 'toy' | 'food' | 'paper' | 'trash' | 'dishes' | 'ball' | 'tool' | 'knockable' | 'roll' | 'market' | 'gift';
 
 export type MessKind =
   | 'water' | 'soil' | 'blocks' | 'cushion' | 'trash' | 'gnome' | 'mud' | 'crumbs' | 'shards' | 'dig'
-  | 'muddy_bed' | 'muddy_sofa' | 'paper' | 'wet' | 'leaves' | 'leaf_trail' | 'snow' | 'apples' | 'coffee';
+  | 'muddy_bed' | 'muddy_sofa' | 'paper' | 'wet' | 'leaves' | 'leaf_trail' | 'snow' | 'apples' | 'coffee' | 'muddy_cushions'
+  | 'muddy_blanket' | 'paint' | 'books' | 'mannequin' | 'cans' | 'cart' | 'lemonade';
+
+/** Dirty-paws messes on "make" stations (bed, reading corner, picnic blanket). */
+export const MAKE_MESSES: ReadonlySet<MessKind> = new Set<MessKind>(['muddy_bed', 'muddy_cushions', 'muddy_blanket']);
 
 /** Messes made of many small marks along a path (paw prints, paper strips, drops). */
 export const TRAIL_KINDS: readonly MessKind[] = ['mud', 'paper', 'wet', 'leaf_trail'];
@@ -46,9 +50,18 @@ export interface ItemTypeDef {
   size: number;
   /** Station id where the item comes back after being eaten or used up. */
   respawnAt?: string;
+  /** Tofu can tear it open on the floor (trash bag, cardboard). */
+  rip?: { verb: string; text: string };
 }
 
-const LAUNDRY_HOMES: StationKind[] = ['hamper', 'dresser', 'clothesline'];
+const LAUNDRY_HOMES: StationKind[] = ['hamper', 'dresser', 'clothesline', 'coat_hooks', 'clothes_rack'];
+/** Lost clothes of the school: the lost-and-found box or the coat hooks. */
+const SCHOOL_CLOTHES: StationKind[] = ['hamper', 'coat_hooks'];
+/** Clothes of the shop. */
+const SHOP_CLOTHES: StationKind[] = ['clothes_rack'];
+const CLOTHES = { dog: true, human: true, stack: 3, slow: 0.02 };
+const TOY = { dog: true, human: true, stack: 3, slow: 0.02 };
+const TOY_HOMES: StationKind[] = ['toybox', 'shop_shelf'];
 
 export const ITEM_TYPES: Record<string, ItemTypeDef> = {
   sock: { name: 'la chaussette', short: 'chaussette', category: 'laundry', icon: '🧦', size: 0.15,
@@ -64,13 +77,45 @@ export const ITEM_TYPES: Record<string, ItemTypeDef> = {
   slipper: { name: 'le chausson', short: 'chausson', category: 'laundry', icon: '🥿', size: 0.16,
     carry: { dog: true, human: true, stack: 3, slow: 0.02 }, homes: ['bedside', 'shoe_rack', 'hamper', 'dresser'] },
   teddy: { name: 'le nounours', short: 'nounours', category: 'toy', icon: '🧸', size: 0.2,
-    carry: { dog: true, human: true, stack: 3, slow: 0.02 }, homes: ['toybox'] },
+    carry: { dog: true, human: true, stack: 3, slow: 0.02 }, homes: TOY_HOMES },
   toycar: { name: 'la petite voiture', short: 'petite voiture', category: 'toy', icon: '🚗', size: 0.16,
-    carry: { dog: true, human: true, stack: 3, slow: 0.02 }, homes: ['toybox'] },
+    carry: { dog: true, human: true, stack: 3, slow: 0.02 }, homes: TOY_HOMES },
   duck: { name: 'le canard en plastique', short: 'canard', category: 'toy', icon: '🦆', size: 0.14,
-    carry: { dog: true, human: true, stack: 3, slow: 0.02 }, homes: ['toybox'] },
+    carry: { dog: true, human: true, stack: 3, slow: 0.02 }, homes: TOY_HOMES },
   dino: { name: 'le dinosaure', short: 'dinosaure', category: 'toy', icon: '🦖', size: 0.18,
-    carry: { dog: true, human: true, stack: 3, slow: 0.02 }, homes: ['toybox'] },
+    carry: { dog: true, human: true, stack: 3, slow: 0.02 }, homes: TOY_HOMES },
+  // École: lost clothes, school supplies, balls, the poster of the party.
+  beanie: { name: 'le bonnet', short: 'bonnet', category: 'laundry', icon: '🧶', size: 0.14, carry: CLOTHES, homes: SCHOOL_CLOTHES },
+  scarf: { name: "l'écharpe", short: 'écharpe', category: 'laundry', icon: '🧣', size: 0.2, carry: CLOTHES, homes: SCHOOL_CLOTHES },
+  mitten: { name: 'la moufle', short: 'moufle', category: 'laundry', icon: '🧤', size: 0.12, carry: CLOTHES, homes: SCHOOL_CLOTHES },
+  cardigan: { name: 'le gilet', short: 'gilet', category: 'laundry', icon: '🧥', size: 0.24, carry: CLOTHES, homes: SCHOOL_CLOTHES },
+  pencil_pot: { name: 'le pot de crayons', short: 'pot de crayons', category: 'toy', icon: '✏️', size: 0.1, carry: TOY, homes: ['toybox'] },
+  glue: { name: 'le tube de colle', short: 'colle', category: 'toy', icon: '🧴', size: 0.08, carry: TOY, homes: ['toybox'] },
+  paint_box: { name: 'la boîte de peinture', short: 'boîte de peinture', category: 'toy', icon: '🎨', size: 0.14, carry: TOY, homes: ['toybox'] },
+  notebook: { name: 'le cahier', short: 'cahier', category: 'toy', icon: '📒', size: 0.13, carry: TOY, homes: ['toybox'] },
+  football: { name: 'le ballon de foot', short: 'ballon de foot', category: 'toy', icon: '⚽', size: 0.13, carry: TOY, homes: ['toybox'] },
+  basketball: { name: 'le ballon de basket', short: 'ballon de basket', category: 'toy', icon: '🏀', size: 0.14, carry: TOY, homes: ['toybox'] },
+  poster: { name: "l'affiche de la fête", short: 'affiche', category: 'paper', icon: '📜', size: 0.18,
+    carry: { dog: true, human: true, stack: 1, slow: 0 }, homes: ['notice_board', 'counter'] },
+  cake: { name: 'le gâteau au chocolat', short: 'gâteau', category: 'food', icon: '🎂', size: 0.2,
+    carry: { dog: true, human: true, stack: 1, slow: 0.03 }, edible: true, homes: ['counter', 'garden_table', 'gift_table', 'bakery'] },
+  // Centre commercial: clothes of the boutique, cardboard, cash box.
+  dress: { name: 'la robe à fleurs', short: 'robe', category: 'laundry', icon: '👗', size: 0.25, carry: CLOTHES, homes: SHOP_CLOTHES },
+  jeans: { name: 'le jean', short: 'jean', category: 'laundry', icon: '👖', size: 0.25, carry: CLOTHES, homes: SHOP_CLOTHES },
+  hat: { name: 'le chapeau de paille', short: 'chapeau', category: 'laundry', icon: '👒', size: 0.18, carry: CLOTHES, homes: [...SHOP_CLOTHES, 'coat_hooks'] },
+  cap: { name: 'la casquette', short: 'casquette', category: 'laundry', icon: '🧢', size: 0.14, carry: CLOTHES, homes: [...SHOP_CLOTHES, 'coat_hooks', 'hamper'] },
+  cardboard: { name: 'la pile de cartons', short: 'cartons', category: 'trash', icon: '📦', size: 0.32,
+    carry: { dog: false, human: true, stack: 1, slow: 0.12 }, homes: ['street_bin'],
+    rip: { verb: 'Déchiqueter les cartons', text: 'Cartons déchiquetés !' } },
+  cash_box: { name: 'le fond de caisse', short: 'fond de caisse', category: 'paper', icon: '💶', size: 0.14,
+    carry: { dog: true, human: true, stack: 1, slow: 0.02 }, homes: ['checkout', 'cupboard'] },
+  // Parc: presents, beach toys.
+  gift: { name: 'le cadeau', short: 'cadeau', category: 'gift', icon: '🎁', size: 0.17,
+    carry: { dog: true, human: true, stack: 2, slow: 0.03 }, homes: ['gift_table', 'cupboard'] },
+  sand_bucket: { name: 'le seau de plage', short: 'seau', category: 'toy', icon: '🪣', size: 0.12, carry: TOY, homes: ['toybox'] },
+  shovel: { name: 'la pelle', short: 'pelle', category: 'toy', icon: '⛏️', size: 0.15, carry: TOY, homes: ['toybox'] },
+  beach_ball: { name: 'le ballon de plage', short: 'ballon de plage', category: 'toy', icon: '🏐', size: 0.16, carry: TOY, homes: ['toybox'] },
+  frisbee: { name: 'le frisbee', short: 'frisbee', category: 'toy', icon: '🥏', size: 0.13, carry: TOY, homes: ['toybox'] },
   croissants: { name: 'le sachet de croissants', short: 'croissants', category: 'food', icon: '🥐', size: 0.2,
     carry: { dog: true, human: true, stack: 1, slow: 0.02 }, edible: true, homes: ['counter', 'garden_table', 'bakery'] },
   baguette: { name: 'la baguette', short: 'baguette', category: 'food', icon: '🥖', size: 0.35,
@@ -80,7 +125,8 @@ export const ITEM_TYPES: Record<string, ItemTypeDef> = {
   letter: { name: 'le courrier', short: 'courrier', category: 'paper', icon: '✉️', size: 0.15,
     carry: { dog: true, human: true, stack: 3, slow: 0 }, homes: ['mailbox', 'console'] },
   trash_bag: { name: 'le sac poubelle', short: 'sac poubelle', category: 'trash', icon: '🗑️', size: 0.3,
-    carry: { dog: false, human: true, stack: 1, slow: 0.12 }, homes: ['street_bin'] },
+    carry: { dog: false, human: true, stack: 1, slow: 0.12 }, homes: ['street_bin'],
+    rip: { verb: 'Déchirer le sac poubelle', text: 'Sac poubelle éventré !' } },
   dishes: { name: 'la vaisselle', short: 'vaisselle', category: 'dishes', icon: '🍽️', size: 0.25,
     carry: { dog: false, human: true, stack: 1, slow: 0.08 }, homes: ['cupboard', 'dining_table'] },
   ball: { name: 'la balle', short: 'balle', category: 'ball', icon: '🎾', size: 0.1,
@@ -127,6 +173,21 @@ export const ITEM_TYPES: Record<string, ItemTypeDef> = {
   // Winter: heavy, Tofu pushes it over (or runs into it at full speed).
   snowman: { name: 'le bonhomme de neige', short: 'bonhomme de neige', category: 'knockable', icon: '⛄', size: 0.42,
     knock: { mess: 'snow', chaos: 5, minSpeed: 6.5, push: 0.8, lie: 'scatter', height: 1.25, text: 'Bonhomme de neige démoli !' } },
+  // École.
+  paint_pot: { name: 'le pot de peinture', short: 'pot de peinture', category: 'knockable', icon: '🎨', size: 0.12,
+    knock: { mess: 'paint', chaos: 4, minSpeed: 0.8, push: 0, lie: 'side', height: 0.18, text: 'De la peinture partout !' } },
+  book_pile: { name: 'la pile de livres', short: 'pile de livres', category: 'knockable', icon: '📚', size: 0.2,
+    knock: { mess: 'books', chaos: 3, minSpeed: 0.8, push: 0, lie: 'scatter', height: 0.45, text: 'Les livres dégringolent !' } },
+  // Centre commercial.
+  mannequin: { name: 'le mannequin', short: 'mannequin', category: 'knockable', icon: '🧍', size: 0.25,
+    knock: { mess: 'mannequin', chaos: 4, minSpeed: 2.5, push: 0.4, lie: 'side', height: 1.7, text: 'Le mannequin est tombé !' } },
+  can_pyramid: { name: 'la pyramide de conserves', short: 'pyramide de conserves', category: 'knockable', icon: '🥫', size: 0.32,
+    knock: { mess: 'cans', chaos: 5, minSpeed: 0.8, push: 0, lie: 'scatter', height: 0.9, text: 'Les conserves roulent partout !' } },
+  cart: { name: 'le caddie', short: 'caddie', category: 'knockable', icon: '🛒', size: 0.38,
+    knock: { mess: 'cart', chaos: 3, minSpeed: 3.0, push: 0.5, lie: 'side', height: 1.0, text: 'Caddie renversé !' } },
+  // Parc.
+  lemonade: { name: 'la carafe de citronnade', short: 'carafe', category: 'knockable', icon: '🍋', size: 0.1,
+    knock: { mess: 'lemonade', chaos: 3, minSpeed: 0.6, push: 0, lie: 'side', height: 0.25, text: 'La citronnade ! Ça colle !' } },
   // Market day.
   apple_crate: { name: 'le cageot de pommes', short: 'cageot de pommes', category: 'knockable', icon: '🍎', size: 0.3,
     knock: { mess: 'apples', chaos: 4, minSpeed: 1.2, push: 0, lie: 'side', height: 0.3, text: 'Les pommes roulent partout !' } },
@@ -164,4 +225,12 @@ export const MESS_TYPES: Record<MessKind, MessTypeDef> = {
   snow: { name: 'un bonhomme de neige démoli', dirt: 4, clean: 2.5, icon: '⛄', verb: 'Refaire le bonhomme' },
   apples: { name: 'des pommes par terre', dirt: 5, clean: 1.8, icon: '🍎', verb: 'Ramasser les pommes', slippery: true },
   coffee: { name: 'du café renversé', dirt: 5, clean: 1.6, icon: '☕', verb: 'Éponger le café', slippery: true },
+  muddy_cushions: { name: 'des coussins boueux', dirt: 6, clean: 2.0, icon: '🛋️', verb: 'Brosser les coussins' },
+  muddy_blanket: { name: 'une nappe boueuse', dirt: 6, clean: 2.0, icon: '🧺', verb: 'Secouer la nappe' },
+  paint: { name: 'de la peinture renversée', dirt: 7, clean: 2.2, icon: '🎨', verb: 'Nettoyer la peinture', slippery: true },
+  books: { name: 'des livres par terre', dirt: 5, clean: 1.8, icon: '📚', verb: 'Ranger les livres' },
+  mannequin: { name: 'un mannequin renversé', dirt: 4, clean: 1.2, icon: '🧍', verb: 'Relever le mannequin' },
+  cans: { name: 'des conserves par terre', dirt: 6, clean: 2.2, icon: '🥫', verb: 'Empiler les conserves', slippery: true },
+  cart: { name: 'un caddie renversé', dirt: 3, clean: 1.0, icon: '🛒', verb: 'Relever le caddie' },
+  lemonade: { name: 'de la citronnade renversée', dirt: 5, clean: 1.6, icon: '🍋', verb: 'Éponger la citronnade', slippery: true },
 };

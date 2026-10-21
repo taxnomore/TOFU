@@ -1,13 +1,13 @@
 // AI for the humans: chase Tofu to recover stolen objects, clean messes, do the
 // household jobs, refill treats, close doors behind them, coordinate with the
 // other human through shared claims.
-import { BTN_INTERACT, BTN_SPECIAL, BTN_SPRINT, HUMAN, VACUUM } from '../constants';
+import { BTN_INTERACT, BTN_SPECIAL, BTN_SPRINT, HUMAN } from '../constants';
 import { Rng, angleDiff, dist } from '../math';
 import { ITEM_TYPES, MESS_TYPES, isTrail } from '../world/itemTypes';
-import { DOORS, STATIONS, inHouse, zoneAt } from '../world/map';
 import type { Game } from '../sim/game';
 import { IKind, listInteractions } from '../sim/interactions';
 import { objectivesFor } from '../sim/objectives';
+import { TASK_DEFS } from '../sim/rules';
 import type { Character, InputFrame, Item } from '../sim/types';
 import { EMPTY_INPUT } from '../sim/types';
 import { Navigator } from './navigator';
@@ -31,22 +31,20 @@ const DIFF = [
   { decide: 0.3, react: 0.2, treat: 0.95, chaseMax: 28, careful: 1 },
 ];
 
-/** Stations whose content Tofu can steal back to undo a finished job. */
-const PROTECT_STATION: Partial<Record<string, string>> = {
-  jouets: 'coffre_jouets',
-  gouter: 'table_jardin',
-  courrier: 'console',
-  table: 'table_salon',
-};
+/** Station whose content Tofu can steal back (or knock over) to undo a finished job. */
+function protectStation(g: Game, kind: string): string | null {
+  const spec = TASK_DEFS[kind].spec;
+  if (spec.type !== 'collect' && spec.type !== 'deliver') return null;
+  const s = g.map.stations[g.world.stationIndex.get(spec.dest)!];
+  return s.dogReach || s.kind === 'dining_table' ? s.id : null;
+}
 
-/** Ways into the house for a muddy dog (back door flap, bay window). */
-const HOUSE_DOORS: [number, number][] = [[-6.5, 6.6], [0.75, 6.6]];
-
-const PROTECTED_DOORS: Record<string, (g: Game) => boolean> = {
-  porte_enfants: (g) => g.state.tasks.some((t) => t.kind === 'jouets' && t.done),
-  porte_chambre: (g) => g.state.tasks.some((t) => t.kind === 'lit' && t.done),
-  porte_sdb: () => true,
-};
+/** Does this door get closed behind us now (a finished job behind it)? */
+function protectedDoor(g: Game, doorId: string): boolean {
+  const rule = g.map.ai.protectedDoors[doorId];
+  if (!rule) return false;
+  return rule === '*' || g.state.tasks.some((t) => t.kind === rule && t.done);
+}
 
 export class HumanAI implements AIController {
   private nav: Navigator;
@@ -169,7 +167,7 @@ export class HumanAI implements AIController {
         this.goal = null;
         this.decideT = 0;
       }
-      const far = st.dist > 9 && !inHouse(me.x, me.z);
+      const far = st.dist > 9 && !this.g.map.messy(me.x, me.z);
       if ((goal.sprint && st.dist > 2) || (far && me.stamina > 0.5 && this.rng.next() < this.p.careful)) {
         buttons |= BTN_SPRINT;
       }
@@ -263,8 +261,8 @@ export class HumanAI implements AIController {
     }
     // 2. Dirty paws inside the house, or at the door before he comes in
     // (outside in winter, they get snowy again at once).
-    const atDoor = tofu.pawKind !== 'snow' && tofu.mud > 0.4 && HOUSE_DOORS.some(([x, z]) => dist(tofu.x, tofu.z, x, z) < 3.5);
-    if (tofu.mud > 0.25 && dT < 9 && (inHouse(tofu.x, tofu.z) || atDoor || (dT < 4 && tofu.pawKind !== 'snow'))) {
+    const atDoor = tofu.pawKind !== 'snow' && tofu.mud > 0.4 && g.map.ai.entrances.some(([x, z]) => dist(tofu.x, tofu.z, x, z) < 3.5);
+    if (tofu.mud > 0.25 && dT < 9 && (g.map.messy(tofu.x, tofu.z) || atDoor || (dT < 4 && tofu.pawKind !== 'snow'))) {
       add(70 - dT * 2, {
         key: 'paws', want: { kind: 'paws', target: tofu.id }, x: tofu.x, z: tofu.z, sprint: dT > 3, timeout: 8,
         track: () => (tofu.mud > 0.08 ? { x: tofu.x + tofu.vx * 0.3, z: tofu.z + tofu.vz * 0.3 } : null),
@@ -296,11 +294,12 @@ export class HumanAI implements AIController {
         track: () => (S.vacuum.mode === 'run' ? { x: S.vacuum.x, z: S.vacuum.z } : null),
       });
     } else if (v.mode === 'dock' && v.t <= 0 && dv < 14 && dist(tofu.x, tofu.z, v.x, v.z) > 5) {
+      const dock = g.map.vacuum;
       let marks = 0;
       for (const m of S.messes) {
-        if (isTrail(m.kind) && m.kind !== 'wet' && dist(m.x, m.z, VACUUM.dock.x, VACUUM.dock.z) < 5) marks += m.prints.length / 3;
+        if (isTrail(m.kind) && m.kind !== 'wet' && dist(m.x, m.z, dock.x, dock.z) < 5) marks += m.prints.length / 3;
       }
-      if (marks >= 15 && this.fragileNear(VACUUM.dock.x, VACUUM.dock.z, 3) <= 1) {
+      if (marks >= 15 && this.fragileNear(dock.x, dock.z, 3) <= 1) {
         add(40 + Math.min(20, marks) - dv * 1.2, { key: 'vacuum-on', want: { kind: 'vacuum', target: 0 }, x: v.x, z: v.z, timeout: 10 });
       }
     }
@@ -316,7 +315,7 @@ export class HumanAI implements AIController {
           if (it.state === 'held') continue; // carried by Tofu: handled by "recover"
           goal = { key: `item:${it.idx}`, want: this.itemWant(it), x: it.x, z: it.z, timeout: 25 };
         } else if (o.target >= 0) {
-          const s = STATIONS[o.target];
+          const s = g.map.stations[o.target];
           const want = this.stationWant(o.target);
           if (!want) continue;
           goal = { key: `station:${o.target}`, want, x: s.x, z: s.z, timeout: 25 };
@@ -331,25 +330,35 @@ export class HumanAI implements AIController {
     if (g.canCarryAny(me)) {
       for (const it of S.items) {
         if (!it.disturbed || ITEM_TYPES[it.type].neverMess) continue;
-        const inBasket = it.state === 'stored' && STATIONS[it.station].kind === 'dog_basket';
+        const inBasket = it.state === 'stored' && g.map.stations[it.station].kind === 'dog_basket';
         if (it.state !== 'free' && !inBasket) continue;
         if (!g.canCarry(me, it)) continue;
         const d = dist(me.x, me.z, it.x, it.z);
         add(44 - d * 1.0 + cleanUrgency * 0.5 - (this.playerOnIt(it.x, it.z) ? 20 : 0), { key: `item:${it.idx}`, want: this.itemWant(it), x: it.x, z: it.z, timeout: 20 });
       }
     }
-    // 7. Treat refill.
+    // 7. Treat refill at the nearest jar.
     if (me.treats === 0 && me.treatJarCd <= 0) {
-      const si = g.world.stationIndex.get('bocal')!;
-      const s = STATIONS[si];
-      add(28 - dist(me.x, me.z, s.x, s.z) * 0.5, { key: 'treats', want: { kind: 'treats', target: si }, x: s.x, z: s.z, timeout: 20 });
+      let si = -1;
+      let bd = Infinity;
+      g.map.stations.forEach((s, i) => {
+        const d = dist(me.x, me.z, s.x, s.z);
+        if (s.kind === 'treat_jar' && d < bd) {
+          bd = d;
+          si = i;
+        }
+      });
+      if (si >= 0) {
+        const s = g.map.stations[si];
+        add(28 - bd * 0.5, { key: 'treats', want: { kind: 'treats', target: si }, x: s.x, z: s.z, timeout: 20 });
+      }
     }
     // 7b. Protect finished jobs when Tofu sneaks toward them.
     for (const t of S.tasks) {
       if (!t.done) continue;
-      const sid = PROTECT_STATION[t.kind];
+      const sid = protectStation(g, t.kind);
       if (!sid) continue;
-      const s = STATIONS[g.world.stationIndex.get(sid)!];
+      const s = g.map.stations[g.world.stationIndex.get(sid)!];
       const dTs = dist(tofu.x, tofu.z, s.x, s.z);
       if (dTs < 7 && !tofu.hold.length) {
         const dMe = dist(me.x, me.z, s.x, s.z);
@@ -385,7 +394,8 @@ export class HumanAI implements AIController {
   }
 
   private stationWant(si: number): { kind: IKind; target: number } | null {
-    const s = STATIONS[si];
+    const s = this.g.map.stations[si];
+    if (this.g.restockable(si)) return { kind: 'buy', target: si };
     switch (s.kind) {
       case 'flowerbed':
         // A dug bed must be filled in first (its hole is a mess to clean).
@@ -394,10 +404,6 @@ export class HumanAI implements AIController {
         return { kind: 'fill', target: si };
       case 'bed':
         return { kind: 'bed', target: si };
-      case 'bakery': {
-        const cr = this.g.itemById('croissants');
-        return cr && cr.state === 'gone' ? { kind: 'buy', target: si } : { kind: 'store', target: si };
-      }
       default:
         return { kind: 'store', target: si };
     }
@@ -411,60 +417,44 @@ export class HumanAI implements AIController {
     if (!me.hold.length) return null;
     const it = S.items[me.hold[me.hold.length - 1]];
     const t = ITEM_TYPES[it.type];
-    const taskOpen = (k: string) => S.tasks.some((x) => x.kind === k && !x.done);
+    if (t.category === 'ball') return null; // kept to lure Tofu
+    const chosen = new Set(S.tasks.map((x) => x.kind));
     let ids: string[] = [];
-    switch (t.category) {
-      case 'laundry':
-        // The hamper has a lid Tofu cannot open: always the safest place.
-        ids = it.type === 'slipper' ? ['pied_lit', 'meuble_chaussures', 'panier_linge'] : ['panier_linge'];
-        break;
-      case 'toy':
-        ids = ['coffre_jouets'];
-        break;
-      case 'roll':
-        ids = ['derouleur'];
-        break;
-      case 'dishes':
-        ids = taskOpen('table') || S.tasks.every((x) => x.kind !== 'table') ? ['table_salon'] : ['placard'];
-        break;
-      case 'food':
-        ids = taskOpen('gouter') ? ['table_jardin'] : ['plan_travail'];
-        break;
-      case 'paper':
-        ids = ['console'];
-        break;
-      case 'trash':
-        ids = ['poubelle_rue'];
-        break;
-      case 'tool': {
+    let job = false;
+    // A job object goes where the job wants it (picked this round, or set up
+    // in its "done" place when the job was not picked).
+    for (const kind of g.map.taskIds) {
+      const spec = TASK_DEFS[kind].spec;
+      if (spec.type === 'collect' && spec.items.includes(it.id)) ids = [spec.dest];
+      else if (spec.type === 'deliver' && spec.item === it.id && (chosen.has(kind) || !spec.keep)) ids = [spec.dest];
+      else if (spec.type === 'water' && spec.can === it.id) {
         // Watering can: water the beds, or refill.
-        if (taskOpen('fleurs')) {
-          if (it.charge <= 0) ids = ['robinet'];
-          else ids = ['massif_est', 'massif_sud'].filter((id) => {
+        if (chosen.has(kind) && !S.tasks.find((x) => x.kind === kind)!.done) {
+          ids = it.charge <= 0 ? [spec.tap] : spec.beds.filter((id) => {
             const st = g.stationById(id)!;
             return !st.watered || st.dug;
           });
         }
-        if (!ids.length) return { key: 'drop', want: { kind: 'drop', target: it.idx }, x: me.x, z: me.z, timeout: 3 };
-        break;
-      }
-      case 'market':
-        // Back to its own stall.
-        ids = t.respawnAt ? [t.respawnAt] : [];
-        break;
-      case 'ball':
-        return null; // kept to lure Tofu
+        job = true;
+      } else continue;
+      job = true;
+      break;
+    }
+    if (!ids.length && t.category === 'tool') return { key: 'drop', want: { kind: 'drop', target: it.idx }, x: me.x, z: me.z, timeout: 3 };
+    if (!job || !ids.length) {
+      // Its usual places (a market stall takes back its own goods).
+      ids = g.map.stations.filter((s) => (t.homes ?? []).includes(s.kind) || t.respawnAt === s.id).map((s) => s.id);
     }
     let best: Goal | null = null;
     let bd = Infinity;
     for (const id of ids) {
       const si = g.world.stationIndex.get(id)!;
-      const s = STATIONS[si];
+      const s = g.map.stations[si];
       const want = this.stationWant(si);
       if (!want) continue;
       if (want.kind === 'store' && !g.accepts(si, it)) continue;
-      // Prefer going via items of the same job nearby (laundry/toys stacks).
-      const d = dist(me.x, me.z, s.x, s.z);
+      // Places Tofu cannot reach (hamper with a lid) are worth a detour.
+      const d = dist(me.x, me.z, s.x, s.z) + (s.dogReach && !job ? 8 : 0);
       if (d < bd) {
         bd = d;
         best = { key: `station:${si}`, want, x: s.x, z: s.z, timeout: 30 };
@@ -491,20 +481,20 @@ export class HumanAI implements AIController {
     const me = this.me;
     const tofu = g.tofu;
     if (me.hold.length && this.goal?.key.startsWith('station')) return -1;
-    for (let i = 0; i < DOORS.length; i++) {
-      const d = DOORS[i];
-      const rule = PROTECTED_DOORS[d.id];
-      if (!rule || !g.state.doors[i].open || !rule(g)) continue;
+    const doors = g.map.doors;
+    for (let i = 0; i < doors.length; i++) {
+      const d = doors[i];
+      if (!g.state.doors[i].open || !protectedDoor(g, d.id)) continue;
       if (dist(me.x, me.z, d.x, d.z) > 1.3) continue;
       // Which side is the room? The room is the zone on the swing side.
       const nx = d.axis === 'x' ? 0 : d.swing;
       const nz = d.axis === 'x' ? d.swing : 0;
-      const room = zoneAt(d.x + nx * 0.8, d.z + nz * 0.8);
-      const meZone = zoneAt(me.x, me.z);
-      const tofuZone = zoneAt(tofu.x, tofu.z);
+      const room = g.map.zoneAt(d.x + nx * 0.8, d.z + nz * 0.8);
+      const meZone = g.map.zoneAt(me.x, me.z);
+      const tofuZone = g.map.zoneAt(tofu.x, tofu.z);
       if (!room || meZone?.id === room.id || tofuZone?.id === room.id) continue;
       // Don't close it in front of ourselves if our goal is inside.
-      const gz = this.goal ? zoneAt(this.goal.x, this.goal.z) : null;
+      const gz = this.goal ? g.map.zoneAt(this.goal.x, this.goal.z) : null;
       if (gz?.id === room.id) continue;
       if (this.rng.next() < 0.5) return i;
     }

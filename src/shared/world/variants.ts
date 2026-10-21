@@ -33,5 +33,3 @@ export function presentIn(only: readonly Variant[] | undefined, v: Variant): boo
   return !only || only.includes(v);
 }
 
-/** Outdoor zones covered with snow in winter (the street is cleared). */
-export const SNOWY_ZONES = ['jardin', 'terrasse', 'devant', 'allee', 'square', 'voisins'];

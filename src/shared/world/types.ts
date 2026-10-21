@@ -41,6 +41,10 @@ export interface Zone {
   floor?: FloorKind;
   /** Interior wall paint for faces looking into this zone. */
   wallColor?: number;
+  /** Hard floor outside where water drops show (terrace). */
+  drips?: boolean;
+  /** Outdoors, but dirty paws leave prints here like inside (picnic deck, bandstand). */
+  prints?: boolean;
 }
 
 export type WallStyle = 'house_ext' | 'house_int' | 'hedge' | 'stone' | 'fence' | 'low_wall' | 'facade' | 'garden_fence';
@@ -109,7 +113,14 @@ export type PropType =
   | 'planter' | 'veg_patch' | 'flowerbed' | 'bike' | 'roadsign' | 'cafe_table' | 'awning' | 'mailbox_post'
   | 'dog_bowl' | 'pot_decor' | 'swing_set' | 'hydrant' | 'bus_shelter' | 'kennel'
   | 'toybox' | 'hamper' | 'dog_basket' | 'bakery_stand' | 'clothesline_basket' | 'roll_holder' | 'vacuum_dock'
-  | 'market_stall';
+  | 'market_stall'
+  // École
+  | 'blackboard' | 'school_desk' | 'teacher_desk' | 'coat_hooks' | 'easel' | 'notice_board' | 'basket_hoop' | 'pillar'
+  | 'lunch_table' | 'lost_box' | 'ball_bin' | 'trestle_table'
+  // Centre commercial
+  | 'clothes_rack' | 'shop_shelf' | 'checkout' | 'fountain' | 'cart_shelter' | 'display_table' | 'fitting_room' | 'escalator'
+  // Parc
+  | 'picnic_table' | 'pool' | 'pond' | 'carousel' | 'drinking_fountain' | 'cooler';
 
 export interface PropDef {
   type: PropType;
@@ -132,7 +143,33 @@ export interface PropDef {
 export type StationKind =
   | 'hamper' | 'dresser' | 'clothesline' | 'toybox' | 'dining_table' | 'garden_table' | 'console'
   | 'street_bin' | 'mailbox' | 'cupboard' | 'counter' | 'treat_jar' | 'bakery' | 'bed' | 'sofa'
-  | 'flowerbed' | 'dog_basket' | 'tap' | 'shoe_rack' | 'bedside' | 'roll_holder' | 'market';
+  | 'flowerbed' | 'dog_basket' | 'tap' | 'shoe_rack' | 'bedside' | 'roll_holder' | 'market'
+  | 'coat_hooks' | 'notice_board' | 'clothes_rack' | 'shop_shelf' | 'gift_table' | 'checkout';
+
+/** What a "make" station looks like and says (bed, picnic blanket, ribbon...). */
+export interface MakeDef {
+  /** Human prompt: "Faire le lit". */
+  verb: string;
+  /** Tofu prompt: "Sauter sur le lit". */
+  jump: string;
+  /** Chaos message when Tofu undoes it: "Lit défait !". */
+  undone: string;
+  look: 'duvet' | 'blanket' | 'ribbon' | 'balloons' | 'cushions';
+  /** Mess left by dirty paws (none: dirty paws change nothing). */
+  mess?: 'muddy_bed' | 'muddy_cushions' | 'muddy_blanket';
+  /** Chaos messages for dirty paws: mud, water/snow, leaves. */
+  dirty?: [string, string, string];
+}
+
+/** The family bed (default of every "bed" station). */
+export const BED_MAKE: MakeDef = {
+  verb: 'Faire le lit', jump: 'Sauter sur le lit', undone: 'Lit défait !', look: 'duvet', mess: 'muddy_bed',
+  dirty: ['Des draps pleins de boue !', 'Des draps tout mouillés !', 'Des feuilles plein les draps !'],
+};
+
+export function makeDef(s: StationDef): MakeDef {
+  return s.make ?? BED_MAKE;
+}
 
 export interface StationDef {
   id: string;
@@ -157,6 +194,8 @@ export interface StationDef {
   capacity?: number;
   /** Only in these ambiances (disabled otherwise). */
   only?: Variant[];
+  /** "bed" stations: what is made and undone. */
+  make?: MakeDef;
 }
 
 export interface BuildingDef {
@@ -194,6 +233,10 @@ export interface Puddle {
   x: number;
   z: number;
   r: number;
+  /** Mud (default) or clear water (fountain, paddling pool): wet paws. */
+  kind?: 'mud' | 'water';
+  /** Not drawn by the generic puddle mesh (a prop shows the water). */
+  hidden?: boolean;
 }
 
 export interface FloorPatch {

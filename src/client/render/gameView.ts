@@ -4,11 +4,13 @@ import * as THREE from 'three';
 import type { GameState, Item } from '../../shared/sim/types';
 import { Anim } from '../../shared/sim/types';
 import { ITEM_TYPES } from '../../shared/world/itemTypes';
-import { DOORS, STATIONS, PROPS } from '../../shared/world/map';
-import { CatModel, DogModel, HumanModel } from './characters';
+import type { GameMap } from '../../shared/world/mapTypes';
+import type { DoorDef } from '../../shared/world/types';
+import { CatModel, DogModel, HumanModel, PASSER_LOOK } from './characters';
 import { GeoBuilder } from './geo';
 import { buildItemGeometry, buildMessGeometry, buildSetTableGeometry, treatGeometry, waterGeometry } from './itemModels';
 import { materials } from './materials';
+import { StationViews } from './stationViews';
 import { dotTexture, leafTexture, pawTexture, paperTexture } from './textures';
 
 /** Positions captured before the latest simulation step (for render interpolation). */
@@ -29,6 +31,8 @@ export function captureSnapshot(S: GameState, out?: PrevSnapshot): PrevSnapshot 
 }
 
 const HIDDEN_KINDS = new Set(['hamper', 'dresser', 'toybox', 'mailbox', 'cupboard', 'street_bin']);
+/** Stations where clothes hang (coat hooks, shop rails). */
+const HANGING_KINDS = new Set(['coat_hooks', 'clothes_rack']);
 const MAX_PRINTS = 900;
 const MAX_PAPER = 400;
 const MAX_DROPS = 500;
@@ -48,7 +52,7 @@ export class GameView {
   dog: DogModel;
   humans = new Map<number, HumanModel>();
   cat = new CatModel();
-  carrier = new HumanModel(4);
+  carrier: HumanModel;
   private vacuum = new THREE.Group();
   private vacuumLed!: THREE.Mesh;
   private items: THREE.Mesh[] = [];
@@ -65,17 +69,18 @@ export class GameView {
   private leaves: THREE.InstancedMesh;
   private leavesKey = '';
   private treats: THREE.Mesh[] = [];
-  private duvet: THREE.Mesh;
-  private duvetT = 0;
-  private wet: THREE.Mesh[] = [];
+  private stationViews: StationViews;
+  /** Facing of the toilet roll on its holder, per station. */
+  private rollRot = new Map<number, number>();
   private tmpV = new THREE.Vector3();
   private tmpM = new THREE.Matrix4();
   private tmpQ = new THREE.Quaternion();
   private highlight: THREE.Mesh[] = [];
   time = 0;
 
-  constructor(scene: THREE.Scene, S: GameState) {
+  constructor(scene: THREE.Scene, S: GameState, readonly map: GameMap) {
     scene.add(this.root);
+    this.carrier = new HumanModel(PASSER_LOOK[map.carrier.look]);
     const mats = materials();
     this.dog = new DogModel();
     this.root.add(this.dog.root);
@@ -114,7 +119,7 @@ export class GameView {
     this.root.add(this.setTable);
 
     // Doors.
-    DOORS.forEach((d) => this.doors.push(this.buildDoor(d)));
+    map.doors.forEach((d) => this.doors.push(this.buildDoor(d)));
 
     // Paw prints.
     const pg = new THREE.PlaneGeometry(0.17, 0.17);
@@ -165,53 +170,28 @@ export class GameView {
       this.root.add(m);
     }
 
-    // Bed duvet (made / unmade).
-    const bed = STATIONS.find((s) => s.id === 'lit')!;
-    const db = new GeoBuilder();
-    db.rbox(1.25, 0.1, 1.82, 0.05, {}, 0xe9a3a0);
-    db.box(1.27, 0.03, 0.3, { y: 0.05, x: -0.45 }, 0xffffff);
-    for (let i = 0; i < 5; i++) db.sphere(0.04, { x: 0.1 + (i % 3) * 0.3, y: 0.05, z: -0.6 + i * 0.3, sy: 0.3 }, 0xffffff, 'lo');
-    this.duvet = new THREE.Mesh(db.build(), mats.vc);
-    this.duvet.castShadow = true;
-    this.duvet.position.set(bed.x + 0.25, 0.56, bed.z);
-    this.duvet.rotation.y = Math.PI / 2;
-    this.root.add(this.duvet);
-
-    // Clothesline rope + pins.
-    const line = STATIONS.find((s) => s.id === 'fil_linge')!;
-    const rb = new GeoBuilder();
-    rb.box(6.8, 0.015, 0.015, { x: line.x, y: 1.83, z: line.z }, 0xf5f5f5);
-    for (const sl of line.slots ?? []) rb.box(0.02, 0.06, 0.03, { x: line.x + sl[0], y: 1.81, z: line.z }, 0xe67e22);
-    this.root.add(rb.mesh(mats.vc, false));
-
-    // Treat jar and family mailbox decor.
-    const jar = STATIONS.find((s) => s.id === 'bocal')!;
-    const jb = new GeoBuilder();
-    jb.cylU(0.1, 0.22, { x: jar.x, y: jar.y + 0.11, z: jar.z }, 0xdff9fb, 12);
-    jb.cylU(0.11, 0.04, { x: jar.x, y: jar.y + 0.24, z: jar.z }, 0xc0392b, 12);
-    for (let i = 0; i < 5; i++) jb.box(0.08, 0.025, 0.03, { x: jar.x + (i % 2 ? 0.03 : -0.03), y: jar.y + 0.04 + i * 0.035, z: jar.z, ry: i }, 0xc98a3e);
-    const mb = STATIONS.find((s) => s.id === 'boite_lettres')!;
-    jb.rbox(0.4, 0.32, 0.36, 0.04, { x: mb.x, y: 1.05, z: mb.z }, 0x2e5e8a);
-    jb.box(0.25, 0.03, 0.01, { x: mb.x, y: 1.12, z: mb.z - 0.185 }, 0x1b3a57);
-    jb.box(0.12, 0.06, 0.01, { x: mb.x, y: 0.97, z: mb.z - 0.185 }, 0xffffff);
-    this.root.add(jb.mesh(mats.vc));
-
-    // Wet soil overlays for the flowerbeds.
-    for (const id of ['massif_est', 'massif_sud']) {
-      const s = STATIONS.find((q) => q.id === id)!;
-      const g = new THREE.PlaneGeometry((s.hw ?? 0.5) * 2, (s.hd ?? 0.5) * 2);
-      g.rotateX(-Math.PI / 2);
-      const m = new THREE.Mesh(g, new THREE.MeshPhongMaterial({ color: 0x3e2a1d, shininess: 60, transparent: true, opacity: 0.55, depthWrite: false }));
-      m.position.set(s.x, 0.115, s.z);
-      m.visible = false;
-      this.wet.push(m);
-      this.root.add(m);
-    }
+    // Make stations (bed, blanket, ribbon...), clothesline, jars, watered beds.
+    this.stationViews = new StationViews(map);
+    this.root.add(this.stationViews.root);
+    map.stations.forEach((st, si) => {
+      if (st.kind !== 'roll_holder') return;
+      let best = 0;
+      let bd = Infinity;
+      for (const p of map.props) {
+        if (p.type !== 'roll_holder') continue;
+        const d = Math.hypot(p.x - st.x, p.z - st.z);
+        if (d < bd) {
+          bd = d;
+          best = ((p.rot ?? 0) * Math.PI) / 2;
+        }
+      }
+      this.rollRot.set(si, best);
+    });
 
     // Interaction highlight rings (one per local player, created on demand).
   }
 
-  private buildDoor(d: (typeof DOORS)[number]): DoorVis {
+  private buildDoor(d: DoorDef): DoorVis {
     const mats = materials();
     const vis: DoorVis = { pivots: [], sign: [], angle: d.open ? 1 : 0 };
     const along = d.axis === 'x';
@@ -340,37 +320,29 @@ export class GameView {
       const v = this.doors[i];
       const target = ds.open ? 1 : 0;
       v.angle += (target - v.angle) * (1 - Math.exp(-dt * 9));
+      const D = this.map.doors[i];
       if (v.slide) {
-        const w = DOORS[i].width / 2;
-        const along = DOORS[i].axis === 'x';
+        const w = D.width / 2;
+        const along = D.axis === 'x';
         v.slide.forEach((g, k) => {
           const base = k === 0 ? -w / 2 : w / 2;
           const off = (k === 0 ? -1 : 1) * v.angle * (w - 0.1);
-          if (along) g.position.x = DOORS[i].x + base + off;
-          else g.position.z = DOORS[i].z + base + off;
+          if (along) g.position.x = D.x + base + off;
+          else g.position.z = D.z + base + off;
         });
       }
       v.pivots.forEach((p, k) => {
         p.rotation.y = v.sign[k] * v.angle * (Math.PI / 2) * 0.97;
       });
       if (v.flap) {
-        const dd = Math.hypot(tofu.x - DOORS[i].x, tofu.z - DOORS[i].z);
+        const dd = Math.hypot(tofu.x - D.x, tofu.z - D.z);
         const swing = dd < 0.7 ? Math.sin(this.time * 18) * 0.6 * (1 - dd / 0.7) : 0;
         v.flap.rotation.x += (swing - v.flap.rotation.x) * 0.3;
       }
     });
 
-    // Bed duvet.
-    const bed = S.stations[STATIONS.findIndex((s) => s.id === 'lit')];
-    this.duvetT += ((bed.made ? 0 : 1) - this.duvetT) * (1 - Math.exp(-dt * 6));
-    const bd = STATIONS.find((s) => s.id === 'lit')!;
-    this.duvet.position.set(bd.x + 0.25 + this.duvetT * 0.35, 0.56 + this.duvetT * 0.04, bd.z + this.duvetT * 0.45);
-    this.duvet.rotation.set(this.duvetT * 0.18, Math.PI / 2 + this.duvetT * 0.5, this.duvetT * -0.12);
-    // Flowerbeds.
-    ['massif_est', 'massif_sud'].forEach((id, i) => {
-      const st = S.stations[STATIONS.findIndex((s) => s.id === id)];
-      this.wet[i].visible = st.watered && !st.dug;
-    });
+    // Beds, blankets, ribbons, watered flowerbeds.
+    this.stationViews.update(S, dt);
 
     this.syncMesses(S);
     // Treats.
@@ -420,7 +392,7 @@ export class GameView {
         return;
       }
       case 'stored': {
-        const st = STATIONS[it.station];
+        const st = this.map.stations[it.station];
         if (HIDDEN_KINDS.has(st.kind)) {
           m.visible = false;
           return;
@@ -443,7 +415,12 @@ export class GameView {
           this.lieFlat(m, it, t.category);
         } else if (st.kind === 'roll_holder') {
           // The roll hangs on its bar along the wall.
-          m.rotation.y = ((PROPS.find((p) => p.type === 'roll_holder')?.rot ?? 0) * Math.PI) / 2;
+          m.rotation.y = this.rollRot.get(it.station) ?? 0;
+        } else if (HANGING_KINDS.has(st.kind)) {
+          // Clothes hang from their hook or rail (slot height is the hook).
+          m.rotation.y = st.kind === 'clothes_rack' ? Math.PI / 2 * ((st.hw ?? 1) >= (st.hd ?? 0) ? 0 : 1) : 0;
+          m.position.y = it.y - 0.32 * (t.size > 0.2 ? 1.1 : 0.7);
+          m.rotation.z = Math.sin(this.time * 1.2 + it.idx) * 0.04;
         }
         return;
       }
@@ -526,7 +503,7 @@ export class GameView {
         w.renderOrder = 1;
         g.add(w);
       }
-      if (m.kind === 'muddy_bed') g.position.y = 0.67;
+      if (m.station >= 0 && this.map.stations[m.station]?.kind === 'bed') g.position.y = StationViews.messY(this.map.stations[m.station]);
       if (m.kind === 'muddy_sofa') g.position.y = 0.52;
       const geo = buildMessGeometry(m.kind, m.seed, m.r);
       if (geo) {

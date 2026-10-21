@@ -2,7 +2,7 @@
 // the see-through shader, so the camera never gets "trapped" behind walls.
 import * as THREE from 'three';
 import { clamp, damp, lerpAngle } from '../../shared/math';
-import { WORLD_BOUNDS } from '../../shared/world/map';
+import type { Rect } from '../../shared/world/mapTypes';
 
 export class CameraRig {
   readonly camera = new THREE.PerspectiveCamera(50, 1, 0.1, 260);
@@ -17,6 +17,8 @@ export class CameraRig {
   private shake = 0;
   /** Screen shake on big crashes (can be turned off in the settings). */
   static shakeOn = true;
+  /** Playable area of the current map (the camera stays above it). */
+  static bounds: Rect = { x0: -30, z0: -30, x1: 30, z1: 30 };
 
   /** Unit forward vector on the ground plane (x,z). */
   forward(): { x: number; z: number } {
@@ -59,8 +61,9 @@ export class CameraRig {
     let cz = this.target.z - Math.cos(this.yaw) * cp * dist;
     const cy = this.target.y + Math.sin(pitch) * dist;
     // Keep the camera above the playable world (no peeking from the void).
-    cx = clamp(cx, WORLD_BOUNDS.x0 - 8, WORLD_BOUNDS.x1 + 8);
-    cz = clamp(cz, WORLD_BOUNDS.z0 - 8, WORLD_BOUNDS.z1 + 10);
+    const B = CameraRig.bounds;
+    cx = clamp(cx, B.x0 - 8, B.x1 + 8);
+    cz = clamp(cz, B.z0 - 8, B.z1 + 10);
     let sx = 0;
     let sy = 0;
     if (this.shake > 0) {

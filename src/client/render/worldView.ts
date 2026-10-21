@@ -1,13 +1,14 @@
 // Builds the static 3D world (architecture, floors, props, buildings, sky,
 // backdrop) from the shared map data. Static geometry is merged by material.
 import * as THREE from 'three';
-import { BUILDINGS, FLOORS, HOUSE_RECT, PROPS, PUDDLES, WALLS, WORLD_BOUNDS, zoneAt } from '../../shared/world/map';
+import type { GameMap, RoofDef } from '../../shared/world/mapTypes';
 import { PROP_TYPES } from '../../shared/world/propTypes';
 import { wallHeight, wallThickness } from '../../shared/world/colliders';
 import type { BuildingDef, FloorKind, Opening, WallDef } from '../../shared/world/types';
 import { DEFAULT_VARIANT, Variant, presentIn } from '../../shared/world/variants';
 import { FaceColors, GeoBuilder, hash, mix, shade } from './geo';
 import { Materials } from './materials';
+import { DECOR } from './decor';
 import { buildProp, setPropSeason } from './props';
 import { floorTexture, textTexture } from './textures';
 
@@ -23,6 +24,8 @@ const SNOW = 0xf3f7fb;
 
 /** Ambiance the world is being built for (seasonal colors, snow). */
 let season: Variant = DEFAULT_VARIANT;
+/** Map being built. */
+let M: GameMap;
 
 /** Leaves of the distant trees and hedges for the season. */
 function leafColor(base: number, i = 0): number {
@@ -38,7 +41,7 @@ export interface WorldMeshes {
 }
 
 function sideColor(x: number, z: number, style: WallDef['style'], wall: WallDef): number {
-  const zn = zoneAt(x, z);
+  const zn = M.zoneAt(x, z);
   if (zn && zn.indoor && (style === 'house_ext' || style === 'house_int')) return zn.wallColor ?? 0xf3ead8;
   if (style === 'house_ext' || style === 'house_int') return wall.color ?? EXT_WALL;
   switch (style) {
@@ -50,8 +53,9 @@ function sideColor(x: number, z: number, style: WallDef['style'], wall: WallDef)
   }
 }
 
-export function buildWorld(mats: Materials, quality: 'high' | 'medium' | 'low', variant: Variant = DEFAULT_VARIANT): WorldMeshes {
+export function buildWorld(mats: Materials, quality: 'high' | 'medium' | 'low', variant: Variant, map: GameMap): WorldMeshes {
   season = variant;
+  M = map;
   setPropSeason(variant);
   const root = new THREE.Group();
   root.name = 'world';
@@ -63,17 +67,16 @@ export function buildWorld(mats: Materials, quality: 'high' | 'medium' | 'low', 
 
   buildGround(root, mats);
   buildFloors(root, mats);
-  for (const w of WALLS) buildWall(w, opaque, occl, glassG);
-  buildHouseDetails(opaque, occl);
-  buildRoof(roofG);
-  for (const b of BUILDINGS) buildBuilding(b, occl, glassG, root, mats);
-  for (const p of PROPS) {
+  for (const w of M.walls) buildWall(w, opaque, occl, glassG);
+  for (const r of M.roofs) buildRoof(roofG, r);
+  for (const b of M.buildings) buildBuilding(b, occl, glassG, root, mats);
+  for (const p of M.props) {
     if (!presentIn(p.only, variant)) continue;
     const t = PROP_TYPES[p.type];
     buildProp(p, opaque, t.tall ? occl : opaque);
   }
   buildPuddles(root, mats);
-  buildSigns(root, mats);
+  DECOR[M.decor]?.({ opaque, occl, glass: glassG, roof: roofG, root, mats, map: M, season });
   buildBackdrop(occl, quality);
 
   const om = opaque.mesh(mats.vc);
@@ -119,14 +122,23 @@ function buildGround(root: THREE.Group, mats: Materials) {
 
 function buildFloors(root: THREE.Group, mats: Materials) {
   const byKind = new Map<FloorKind, number[][]>();
-  FLOORS.forEach((f, i) => {
+  M.floors.forEach((f, i) => {
     const arr = byKind.get(f.kind) ?? [];
     arr.push([f.x0, f.z0, f.x1, f.z1, f.y ?? 0.012 + (i % 5) * 0.0015, f.rot ?? 0]);
     byKind.set(f.kind, arr);
   });
-  // Extend the street visually beyond the barriers.
-  byKind.get('asphalt')!.push([-90, -23, -30.5, -16, 0.011, 0], [32.5, -23, 95, -16, 0.011, 0]);
-  byKind.get('sidewalk')!.push([-90, -16, -30.5, -13, 0.012, 0], [32.5, -16, 95, -13, 0.012, 0], [-90, -27.5, -30.5, -23, 0.012, 0], [32.5, -27.5, 95, -23, 0.012, 0]);
+  // Extend the street visually beyond the ends of the map.
+  const road = M.road;
+  const B = M.bounds;
+  if (road) {
+    const add = (kind: FloorKind, z0: number, z1: number, y: number) => {
+      const arr = byKind.get(kind) ?? [];
+      arr.push([-90, z0, B.x0, z1, y, 0], [B.x1, z0, 95, z1, y, 0]);
+      byKind.set(kind, arr);
+    };
+    add('asphalt', road.z0, road.z1, 0.011);
+    for (const [z0, z1] of road.walks) add('sidewalk', z0, z1, 0.012);
+  }
   for (const [kind, rects] of byKind) {
     const { tile } = floorTexture(kind, 4, season);
     const pos: number[] = [];
@@ -156,15 +168,17 @@ function buildFloors(root: THREE.Group, mats: Materials) {
     if (kind === 'crosswalk') m.renderOrder = 1;
     root.add(m);
   }
+  if (!road) return;
   // Curbs along the road.
   const curbs = new GeoBuilder();
-  for (const z of [-16, -23]) curbs.box(185, 0.12, 0.25, { x: 2.5, y: 0.06, z }, 0xd9d4ca);
+  for (const z of [road.z1, road.z0]) curbs.box(185, 0.12, 0.25, { x: 2.5, y: 0.06, z }, 0xd9d4ca);
   root.add(curbs.mesh(mats.vc, false));
-  // Road markings (dashed center line).
+  // Road markings (dashed center line, interrupted at the crossings).
   const marks = new GeoBuilder();
+  const mid = (road.z0 + road.z1) / 2;
   for (let x = -88; x < 93; x += 4) {
-    if (x > -8.5 && x < -3.5) continue;
-    marks.box(2.0, 0.01, 0.14, { x: x + 1, y: 0.018, z: -19.5 }, 0xf2efe6);
+    if (road.crossings.some(([a, b]) => x > a && x < b)) continue;
+    marks.box(2.0, 0.01, 0.14, { x: x + 1, y: 0.018, z: mid }, 0xf2efe6);
   }
   root.add(marks.mesh(mats.vc, false));
 }
@@ -342,7 +356,7 @@ function outwardSign(w: WallDef, cx: number, cz: number): number {
   const alongX = Math.abs(w.z1 - w.z0) < 1e-6;
   const px = alongX ? cx : cx + 0.5;
   const pz = alongX ? cz + 0.5 : cz;
-  const zn = zoneAt(px, pz);
+  const zn = M.zoneAt(px, pz);
   return zn && zn.indoor ? -1 : 1;
 }
 
@@ -491,46 +505,34 @@ function skirting(w: WallDef, opaque: GeoBuilder, t: number, L: number, cuts: Op
   }
 }
 
-function buildHouseDetails(_opaque: GeoBuilder, occl: GeoBuilder) {
-  const opaque = occl;
-  const H = HOUSE_RECT;
-  // Corner stones (chaînes d'angle) on the four corners.
-  for (const [x, z, sx, sz] of [[H.x0, H.z0, -1, -1], [H.x1, H.z0, 1, -1], [H.x0, H.z1, -1, 1], [H.x1, H.z1, 1, 1]]) {
-    for (let k = 0; k < 6; k++) {
-      const y = 0.5 + k * 0.36;
-      const long = k % 2 === 0;
-      occl.box(long ? 0.5 : 0.3, 0.3, 0.06, { x: x - sx * (long ? 0.1 : 0.0), y, z: z + sz * 0.18 }, 0xe0d2b4);
-      occl.box(0.06, 0.3, long ? 0.3 : 0.5, { x: x + sx * 0.18, y, z: z - sz * (long ? 0.0 : 0.1) }, 0xe0d2b4);
-    }
-  }
-  // House number plate next to the front door.
-  opaque.box(0.24, 0.16, 0.02, { x: -5.4, y: 1.8, z: -6.17 }, 0x2e5e8a);
-  opaque.box(0.18, 0.1, 0.01, { x: -5.4, y: 1.8, z: -6.185 }, 0xffffff);
-  // Outdoor tap on the back wall.
-  opaque.box(0.08, 0.16, 0.1, { x: 5.6, y: 0.8, z: 6.2 }, 0xb8c2c8);
-  opaque.cylU(0.02, 0.12, { x: 5.6, y: 0.7, z: 6.25 }, 0xb8c2c8, 8);
-  opaque.torus(0.25, 0.04, { x: 5.6, y: 0.35, z: 6.3, ry: 0 }, 0x27ae60);
-  // Dog flap in the back door is drawn by the door itself (dynamic).
-}
-
-function buildRoof(g: GeoBuilder) {
-  const H = HOUSE_RECT;
+function buildRoof(g: GeoBuilder, R: RoofDef) {
   const o = 0.45;
-  const x0 = H.x0 - o;
-  const x1 = H.x1 + o;
-  const z0 = H.z0 - o;
-  const z1 = H.z1 + o;
-  const y0 = 2.7;
-  const halfD = (z1 - z0) / 2;
-  const rise = 2.5;
-  const ridgeY = y0 + rise;
-  const rx0 = x0 + halfD;
-  const rx1 = x1 - halfD;
-  const zm = (z0 + z1) / 2;
-  const bands = 9;
+  const x0 = R.x0 - o;
+  const x1 = R.x1 + o;
+  const z0 = R.z0 - o;
+  const z1 = R.z1 + o;
+  const y0 = R.y ?? 2.7;
   const snowy = season === 'hiver';
-  const c1 = snowy ? 0xf1f5f9 : 0xc4613a;
-  const c2 = snowy ? 0xe2e9f0 : 0xb4552f;
+  const zm = (z0 + z1) / 2;
+  if (R.style === 'flat') {
+    // Flat roof with a low parapet (schools, shops).
+    const top = snowy ? 0xf1f5f9 : R.color ?? 0x9aa3a8;
+    g.box(x1 - x0, 0.2, z1 - z0, { x: (x0 + x1) / 2, y: y0 + 0.1, z: zm }, top);
+    const par = 0xd8d2c6;
+    for (const z of [z0, z1]) g.box(x1 - x0, 0.45, 0.2, { x: (x0 + x1) / 2, y: y0 + 0.32, z }, par);
+    for (const x of [x0, x1]) g.box(0.2, 0.45, z1 - z0, { x, y: y0 + 0.32, z: zm }, par);
+    g.box(x1 - x0, 0.04, z1 - z0, { x: (x0 + x1) / 2, y: y0 - 0.02, z: zm }, 0xe9e1d2);
+    return;
+  }
+  const halfD = (z1 - z0) / 2;
+  const rise = Math.min(2.5, halfD * 0.7);
+  const ridgeY = y0 + rise;
+  const hip = R.style === 'hip';
+  const rx0 = hip ? x0 + halfD : x0;
+  const rx1 = hip ? x1 - halfD : x1;
+  const bands = 9;
+  const c1 = snowy ? 0xf1f5f9 : R.color ?? 0xc4613a;
+  const c2 = snowy ? 0xe2e9f0 : shade(R.color ?? 0xc4613a, 0.92);
   const lerp = (a: number[], b: number[], t: number) => a.map((v, i) => v + (b[i] - v) * t);
   // Two trapezoids (north/south) split into bands for a tiled look.
   for (const side of [-1, 1]) {
@@ -545,13 +547,17 @@ function buildRoof(g: GeoBuilder) {
       g.quad4(lerp(A, D, t0), lerp(B, C, t0), lerp(B, C, t1), lerp(A, D, t1), i % 2 ? c1 : c2);
     }
   }
-  // Two triangles (east/west hips).
+  // East/west: hips, or gable walls.
   for (const side of [-1, 1]) {
     const ex = side < 0 ? x0 : x1;
     const rx = side < 0 ? rx0 : rx1;
     const A = [ex, y0, z0];
     const B = [ex, y0, z1];
     const C = [rx, ridgeY, zm];
+    if (!hip) {
+      g.tris([ex, y0, z0, ex, y0, z1, ex, ridgeY, zm], EXT_WALL);
+      continue;
+    }
     for (let i = 0; i < bands; i++) {
       const t0 = i / bands;
       const t1 = (i + 1) / bands;
@@ -559,17 +565,11 @@ function buildRoof(g: GeoBuilder) {
     }
   }
   // Ridge and gutters.
-  g.box(rx1 - rx0 + 0.1, 0.12, 0.18, { x: (rx0 + rx1) / 2, y: ridgeY + 0.04, z: zm }, snowy ? 0xf7fafc : 0xa04a2a);
+  g.box(rx1 - rx0 + 0.1, 0.12, 0.18, { x: (rx0 + rx1) / 2, y: ridgeY + 0.04, z: zm }, snowy ? 0xf7fafc : shade(c1, 0.8));
   for (const z of [z0, z1]) g.box(x1 - x0, 0.1, 0.12, { x: (x0 + x1) / 2, y: y0 - 0.03, z }, 0xdfe6e9);
   for (const x of [x0, x1]) g.box(0.12, 0.1, z1 - z0, { x, y: y0 - 0.03, z: zm }, 0xdfe6e9);
   // Soffit (underside) so the roof looks solid from below.
   g.box(x1 - x0, 0.04, z1 - z0, { x: (x0 + x1) / 2, y: y0 - 0.02, z: zm }, 0xe9e1d2);
-  // Chimney.
-  g.box(0.7, 1.6, 0.7, { x: -10.5, y: ridgeY - 0.1, z: zm + 1.2 }, 0xe0d2b4);
-  g.box(0.85, 0.12, 0.85, { x: -10.5, y: ridgeY + 0.75, z: zm + 1.2 }, 0xb9ac92);
-  g.cylU(0.1, 0.3, { x: -10.6, y: ridgeY + 0.95, z: zm + 1.2 }, 0xc4613a, 8);
-  // Roof window (velux).
-  g.box(0.8, 0.05, 1.0, { x: 1.5, y: y0 + rise * 0.5, z: zm + halfD * 0.5, rx: Math.atan2(rise, halfD) }, 0x5d6d7e);
 }
 
 function buildBuilding(b: BuildingDef, occl: GeoBuilder, glass: GeoBuilder, root: THREE.Group, mats: Materials) {
@@ -653,7 +653,7 @@ function buildBuilding(b: BuildingDef, occl: GeoBuilder, glass: GeoBuilder, root
 }
 
 function buildPuddles(root: THREE.Group, mats: Materials) {
-  for (const p of PUDDLES) {
+  for (const p of M.puddles) {
     const shape = new THREE.Shape();
     const n = 14;
     for (let i = 0; i <= n; i++) {
@@ -680,47 +680,8 @@ function buildPuddles(root: THREE.Group, mats: Materials) {
   }
 }
 
-function buildSigns(root: THREE.Group, mats: Materials) {
-  // French street name plate (blue, white border).
-  const tex = textTexture('RUE DES TILLEULS', { w: 768, h: 192, bg: '#2a4f8f', fg: '#ffffff', border: '#ffffff', font: 'bold 82px Arial, sans-serif' });
-  const plate = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.3), mats.sign(tex));
-  plate.position.set(-13.6, 2.35, -13.47);
-  plate.rotation.y = Math.PI;
-  root.add(plate);
-  const plate2 = plate.clone();
-  plate2.rotation.y = 0;
-  plate2.position.z = -13.53;
-  root.add(plate2);
-  const tex3 = textTexture('TOFU', { w: 256, h: 96, bg: '#ffffff', fg: '#c0392b', font: 'bold 70px Arial, sans-serif' });
-  const kennel = new THREE.Mesh(new THREE.PlaneGeometry(0.46, 0.13), mats.sign(tex3));
-  kennel.position.set(-12.6, 0.63, 8.115);
-  root.add(kennel);
-  const tex4 = textTexture('Travaux', { w: 384, h: 128, bg: '#f1c40f', fg: '#2d3436', border: '#e74c3c', font: 'bold 70px Arial, sans-serif' });
-  const works = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.4), mats.sign(tex4));
-  works.position.set(-29.4, 1.35, -19.5);
-  works.rotation.y = Math.PI / 2;
-  root.add(works);
-  const tex5 = textTexture('Square des Tilleuls', { w: 768, h: 128, bg: '#2f5d50', fg: '#f8f1e0', font: 'bold 64px Georgia, serif' });
-  const sq = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.45), mats.sign(tex5));
-  sq.position.set(-21.5, 2.6, -13.2);
-  sq.rotation.y = Math.PI;
-  root.add(sq);
-  const arch = new GeoBuilder();
-  for (const x of [-24.6, -18.4]) arch.cylU(0.06, 2.8, { x, y: 1.4, z: -13.2 }, 0x2f5d50, 8);
-  arch.box(6.4, 0.08, 0.08, { x: -21.5, y: 2.85, z: -13.2 }, 0x2f5d50);
-  root.add(arch.mesh(mats.vc));
-  const tex6 = textTexture('Voie sans issue', { w: 512, h: 128, bg: '#2a4f8f', fg: '#ffffff', font: 'bold 60px Arial, sans-serif' });
-  const vsi = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.3), mats.sign(tex6));
-  vsi.position.set(31.5, 2.2, -13.6);
-  vsi.rotation.y = -Math.PI / 2;
-  root.add(vsi);
-  const post = new GeoBuilder();
-  post.cylU(0.04, 2.4, { x: 31.55, y: 1.2, z: -13.6 }, 0x95a5a6, 8);
-  root.add(post.mesh(mats.vc));
-}
-
 function buildBackdrop(occl: GeoBuilder, quality: string) {
-  const B = WORLD_BOUNDS;
+  const B = M.bounds;
   const seedTrees: [number, number][] = [];
   // Gardens and houses beyond the south hedges.
   for (let x = -40; x <= 40; x += 6) {
@@ -741,11 +702,12 @@ function buildBackdrop(occl: GeoBuilder, quality: string) {
     occl.ico(r, { x, y: 2.6 + r * 0.6, z }, shade(leaf, 0.85 + hash(Math.round(x), Math.round(z)) * 0.3), 0.1);
     if (quality !== 'low') occl.ico(r * 0.7, { x: x + r * 0.4, y: 2.4 + r * 0.4, z: z - r * 0.3 }, shade(leafColor(0x5c9a48, Math.round(x * 3 + z) + 1), 0.95), 0.1);
   }
-  // Distant houses (simple volumes) behind the gardens.
-  const houses: [number, number, number, number, number][] = [
-    [-24, 34, 9, 7, 0xe8d8c0], [-6, 36, 10, 8, 0xf0dcc5], [12, 33, 8, 7, 0xe3cdb0], [28, 35, 9, 7, 0xefe2cc],
-    [44, -2, 7, 9, 0xe9d6bf], [46, 14, 8, 8, 0xf2e3cf], [-42, 4, 8, 9, 0xe6d3bb], [-44, 20, 8, 8, 0xf0dfc8],
-    [-42, -8, 7, 7, 0xead9c2],
+  // Distant houses (simple volumes) around the map.
+  const cols = [0xe8d8c0, 0xf0dcc5, 0xe3cdb0, 0xefe2cc, 0xe9d6bf, 0xf2e3cf];
+  const houses: [number, number, number, number, number][] = M.backdrop ?? [
+    ...[-0.35, 0, 0.35].map((f, i): [number, number, number, number, number] => [(B.x0 + B.x1) / 2 + f * (B.x1 - B.x0), B.z1 + 12, 9, 7, cols[i]]),
+    ...[-0.25, 0.25].map((f, i): [number, number, number, number, number] => [B.x1 + 12, (B.z0 + B.z1) / 2 + f * (B.z1 - B.z0), 7, 9, cols[3 + i]]),
+    ...[-0.25, 0.25].map((f, i): [number, number, number, number, number] => [B.x0 - 12, (B.z0 + B.z1) / 2 + f * (B.z1 - B.z0), 7, 9, cols[i + 1]]),
   ];
   for (const [x, z, w, d, col] of houses) {
     const h = 5.4;

@@ -1,6 +1,6 @@
 // Derives static collision shapes from the map data and provides fast queries.
 import { clamp } from '../math';
-import { BUILDINGS, PROPS, WALLS, WALL_HEIGHT, WORLD_BOUNDS } from './map';
+import type { GameMap } from './mapTypes';
 import { PROP_TYPES, propExtents } from './propTypes';
 import { DEFAULT_VARIANT, Variant, presentIn } from './variants';
 import {
@@ -26,6 +26,8 @@ export interface Circle {
   h: number;
   tag: string;
 }
+
+const WALL_HEIGHT = 2.7;
 
 export const WALL_STYLE: Record<WallStyle, { t: number; h: number }> = {
   house_ext: { t: 0.3, h: WALL_HEIGHT },
@@ -104,17 +106,19 @@ export class StaticColliders {
   private boxCells: number[][] = [];
   private circleCells: number[][] = [];
 
-  constructor(readonly variant: Variant = DEFAULT_VARIANT) {
-    this.gx0 = WORLD_BOUNDS.x0 - 2;
-    this.gz0 = WORLD_BOUNDS.z0 - 10;
-    this.gw = Math.ceil((WORLD_BOUNDS.x1 + 2 - this.gx0) / this.cell);
-    this.gh = Math.ceil((WORLD_BOUNDS.z1 + 2 - this.gz0) / this.cell);
+  constructor(readonly map: GameMap, readonly variant: Variant = DEFAULT_VARIANT) {
+    const B = map.bounds;
+    this.gx0 = B.x0 - 2;
+    this.gz0 = B.z0 - 10;
+    this.gw = Math.ceil((B.x1 + 2 - this.gx0) / this.cell);
+    this.gh = Math.ceil((B.z1 + 2 - this.gz0) / this.cell);
     this.build();
     this.index();
   }
 
   private build() {
-    for (const w of WALLS) {
+    const map = this.map;
+    for (const w of map.walls) {
       const h = wallHeight(w);
       for (const s of wallSpans(w)) {
         const b = wallSpanBox(w, s.a, s.b, true);
@@ -126,10 +130,10 @@ export class StaticColliders {
         }
       }
     }
-    for (const bd of BUILDINGS) {
+    for (const bd of map.buildings) {
       this.boxes.push({ x0: bd.x0, z0: bd.z0, x1: bd.x1, z1: bd.z1, mask: MASK_ALL, h: 3 * bd.storeys, tag: 'building:' + bd.id });
     }
-    for (const p of PROPS) {
+    for (const p of map.props) {
       const t = PROP_TYPES[p.type];
       if (t.col === 'none' || t.mask === 0 || !presentIn(p.only, this.variant)) continue;
       if (t.col === 'circle') {
@@ -144,7 +148,7 @@ export class StaticColliders {
       }
     }
     // Outer bounds: thick invisible walls far outside the natural boundaries (safety net only).
-    const B = WORLD_BOUNDS;
+    const B = map.bounds;
     const T = 2;
     this.boxes.push({ x0: B.x0 - T, x1: B.x1 + T, z0: B.z0 - T, z1: B.z0, mask: MASK_ALL, h: 3, tag: 'bounds' });
     this.boxes.push({ x0: B.x0 - T, x1: B.x1 + T, z0: B.z1, z1: B.z1 + T, mask: MASK_ALL, h: 3, tag: 'bounds' });

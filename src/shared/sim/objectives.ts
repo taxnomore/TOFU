@@ -1,8 +1,8 @@
-// Where should a human go next for each household job? Used by the HUD
-// (arrows, minimap markers) and by the human AI.
+// Where should a human go next for each job? Used by the HUD (arrows, minimap
+// markers) and by the human AI. Derived from the job patterns of the map.
 import { ITEM_TYPES } from '../world/itemTypes';
-import { STATIONS } from '../world/map';
 import type { Game } from './game';
+import { TASK_DEFS } from './rules';
 import type { Character, Item, TaskKind } from './types';
 
 export interface Objective {
@@ -15,12 +15,9 @@ export interface Objective {
   label: string;
 }
 
-const LINE_ITEMS = ['linge_1', 'linge_2', 'linge_3', 'linge_4'];
-const TOYS = ['jouet_nounours', 'jouet_voiture', 'jouet_canard', 'jouet_dino'];
-
 function st(g: Game, id: string) {
   const i = g.world.stationIndex.get(id)!;
-  return { i, s: STATIONS[i], state: g.state.stations[i] };
+  return { i, s: g.map.stations[i], state: g.state.stations[i] };
 }
 
 function itemTarget(g: Game, it: Item, task: TaskKind, label: string): Objective | null {
@@ -47,18 +44,15 @@ export function objectivesFor(g: Game, c: Character): Objective[] {
   const S = g.state;
   for (const t of S.tasks) {
     if (t.done) continue;
-    switch (t.kind) {
-      case 'linge':
-      case 'jouets': {
-        const ids = t.kind === 'linge' ? LINE_ITEMS : TOYS;
-        const dest = t.kind === 'linge' ? 'panier_linge' : 'coffre_jouets';
-        const pending = ids.map((id) => g.itemById(id)!).filter((it) => {
+    const spec = TASK_DEFS[t.kind].spec;
+    switch (spec.type) {
+      case 'collect': {
+        const pending = spec.items.map((id) => g.itemById(id)!).filter((it) => {
           if (it.state !== 'stored') return true;
-          const k = STATIONS[it.station].kind;
-          return t.kind === 'linge' ? k !== 'hamper' && k !== 'dresser' : k !== 'toybox';
+          return !(spec.kinds as string[]).includes(g.map.stations[it.station].kind);
         });
         if (pending.some((it) => holds(c, it))) {
-          out.push(stationTarget(g, dest, t.kind, t.kind === 'linge' ? 'Panier à linge' : 'Coffre à jouets'));
+          out.push(stationTarget(g, spec.dest, t.kind, spec.destLabel));
         } else {
           let best: Objective | null = null;
           let bd = Infinity;
@@ -75,65 +69,38 @@ export function objectivesFor(g: Game, c: Character): Objective[] {
         }
         break;
       }
-      case 'table': {
-        const it = g.itemById('vaisselle')!;
-        if (holds(c, it)) out.push(stationTarget(g, 'table_salon', 'table', 'Table du salon'));
+      case 'deliver': {
+        const it = g.itemById(spec.item)!;
+        if (holds(c, it)) out.push(stationTarget(g, spec.dest, t.kind, spec.destLabel));
         else if (it.state === 'gone') {
-          // Broken: the shards must be cleaned first.
+          // Broken: the shards must be cleaned first. Eaten: buy a new one.
           const m = S.messes.find((mm) => mm.item === it.idx);
-          if (m) out.push({ task: 'table', kind: 'station', target: -1, x: m.x, z: m.z, label: 'Vaisselle cassée' });
+          if (m) out.push({ task: t.kind, kind: 'station', target: -1, x: m.x, z: m.z, label: `${spec.itemLabel} cassée` });
+          else if (spec.restock) out.push(stationTarget(g, spec.restock.station, t.kind, spec.restock.label));
         } else {
-          const o = itemTarget(g, it, 'table', 'Vaisselle');
+          const o = itemTarget(g, it, t.kind, spec.itemLabel);
           if (o) out.push(o);
         }
         break;
       }
-      case 'gouter': {
-        const it = g.itemById('croissants')!;
-        if (holds(c, it)) out.push(stationTarget(g, 'table_jardin', 'gouter', 'Table du jardin'));
-        else if (it.state === 'gone') out.push(stationTarget(g, 'boulangerie', 'gouter', 'Boulangerie'));
-        else {
-          const o = itemTarget(g, it, 'gouter', 'Croissants');
-          if (o) out.push(o);
-        }
+      case 'make':
+        out.push(stationTarget(g, spec.station, t.kind, spec.label));
         break;
-      }
-      case 'poubelle': {
-        const it = g.itemById('sac_poubelle')!;
-        if (holds(c, it)) out.push(stationTarget(g, 'poubelle_rue', 'poubelle', 'Poubelle de la rue'));
-        else {
-          const o = itemTarget(g, it, 'poubelle', 'Sac poubelle');
-          if (o) out.push(o);
-        }
-        break;
-      }
-      case 'courrier': {
-        const it = g.itemById('courrier')!;
-        if (holds(c, it)) out.push(stationTarget(g, 'console', 'courrier', 'Console'));
-        else {
-          const o = itemTarget(g, it, 'courrier', 'Courrier');
-          if (o) out.push(o);
-        }
-        break;
-      }
-      case 'lit':
-        out.push(stationTarget(g, 'lit', 'lit', 'Lit'));
-        break;
-      case 'fleurs': {
-        const can = g.itemById('arrosoir')!;
+      case 'water': {
+        const can = g.itemById(spec.can)!;
         if (holds(c, can)) {
-          if (can.charge <= 0) out.push(stationTarget(g, 'robinet', 'fleurs', 'Robinet'));
+          if (can.charge <= 0) out.push(stationTarget(g, spec.tap, t.kind, spec.tapLabel));
           else {
-            for (const id of ['massif_est', 'massif_sud']) {
+            for (const id of spec.beds) {
               const s = st(g, id);
               if (!s.state.watered || s.state.dug) {
-                out.push(stationTarget(g, id, 'fleurs', 'Massif'));
+                out.push(stationTarget(g, id, t.kind, spec.bedLabel));
                 break;
               }
             }
           }
         } else {
-          const o = itemTarget(g, can, 'fleurs', 'Arrosoir');
+          const o = itemTarget(g, can, t.kind, ITEM_TYPES[can.type].short.replace(/^./, (ch) => ch.toUpperCase()));
           if (o) out.push(o);
         }
         break;

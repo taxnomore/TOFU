@@ -1,8 +1,6 @@
 // Grid navigation (A* + string pulling) for AI agents. Built from static colliders,
 // with closed doors handled dynamically through a per-door cost callback.
-import { DOORS, WORLD_BOUNDS } from './map';
 import { StaticColliders, doorBox } from './colliders';
-import { ITEMS } from './map';
 import { ITEM_TYPES } from './itemTypes';
 
 export interface PathPoint {
@@ -89,10 +87,12 @@ export class NavGrid {
   private heap = new MinHeap();
 
   constructor(cols: StaticColliders, readonly mask: number, readonly radius: number) {
-    this.x0 = WORLD_BOUNDS.x0;
-    this.z0 = WORLD_BOUNDS.z0;
-    this.w = Math.ceil((WORLD_BOUNDS.x1 - WORLD_BOUNDS.x0) / this.cell);
-    this.h = Math.ceil((WORLD_BOUNDS.z1 - WORLD_BOUNDS.z0) / this.cell);
+    const map = cols.map;
+    const B = map.bounds;
+    this.x0 = B.x0;
+    this.z0 = B.z0;
+    this.w = Math.ceil((B.x1 - B.x0) / this.cell);
+    this.h = Math.ceil((B.z1 - B.z0) / this.cell);
     const n = this.w * this.h;
     this.blocked = new Uint8Array(n);
     this.doorAt = new Int16Array(n).fill(-1);
@@ -104,7 +104,7 @@ export class NavGrid {
 
     // Standing knockables with colliders are treated as permanent soft obstacles.
     const knockSpots: { x: number; z: number; r: number }[] = [];
-    for (const it of ITEMS) {
+    for (const it of map.items) {
       const t = ITEM_TYPES[it.type];
       if (t.knock && (it.y ?? 0) < 0.1 && it.x !== undefined && it.z !== undefined) {
         knockSpots.push({ x: it.x, z: it.z, r: t.size });
@@ -131,7 +131,7 @@ export class NavGrid {
       }
     }
     // Door cells.
-    DOORS.forEach((d, di) => {
+    map.doors.forEach((d, di) => {
       const bx = doorBox(d);
       if (!(bx.mask & mask)) return; // e.g. dog flap: the door never blocks this agent
       const pad = r + 0.05;

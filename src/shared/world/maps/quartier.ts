@@ -1,4 +1,4 @@
-// The whole playable world as data: house interior, garden, neighborhood.
+// "Le quartier": the family house, its garden and the neighborhood.
 //
 // Coordinates are meters. x grows east, z grows south, y is up.
 // The street runs east-west at z in [-23,-16]. The family house sits at
@@ -14,23 +14,22 @@
 //           |  jardin  |       |
 //      S (z+)                                       <- z = 22
 
+import type { MapDef } from '../mapTypes';
 import type {
   BuildingDef, CatEdge, CatNode, DoorDef, FloorPatch, ItemPlacement, PropDef, Puddle, Spawn, StationDef,
   WallDef, Zone,
-} from './types';
+} from '../types';
 
-export const WORLD_BOUNDS = { x0: -30.5, z0: -27.5, x1: 32.5, z1: 22.5 };
+const BOUNDS = { x0: -30.5, z0: -27.5, x1: 32.5, z1: 22.5 };
 
-export const WALL_HEIGHT = 2.7;
-
-export const ZONES: Zone[] = [
+const ZONES: Zone[] = [
   { id: 'chambre', name: 'la chambre', label: 'Chambre', indoor: true, x0: -14, z0: -6, x1: -8, z1: 0, floor: 'parquet', wallColor: 0xc5d6b0 },
   { id: 'enfants', name: 'la chambre des enfants', label: 'Chambre des enfants', indoor: true, x0: -14, z0: 0, x1: -8, z1: 6, floor: 'carpet', wallColor: 0xf7d9a8 },
   { id: 'entree', name: "l'entrée", label: 'Entrée', indoor: true, x0: -8, z0: -6, x1: -5, z1: 6, floor: 'cement_tiles', wallColor: 0xf1e6cf },
   { id: 'cuisine', name: 'la cuisine', label: 'Cuisine', indoor: true, x0: -5, z0: -6, x1: 1.5, z1: 0, floor: 'tomettes', wallColor: 0xd2e6ee },
   { id: 'buanderie', name: 'la buanderie', label: 'Salle de bain', indoor: true, x0: 1.5, z0: -6, x1: 6, z1: 0, floor: 'white_tiles', wallColor: 0xbde4dd },
   { id: 'salon', name: 'le salon', label: 'Salon', indoor: true, x0: -5, z0: 0, x1: 6, z1: 6, floor: 'parquet_light', wallColor: 0xf5e2cc },
-  { id: 'terrasse', name: 'la terrasse', label: 'Terrasse', indoor: false, x0: -5, z0: 6, x1: 6, z1: 9.5 },
+  { id: 'terrasse', name: 'la terrasse', label: 'Terrasse', indoor: false, x0: -5, z0: 6, x1: 6, z1: 9.5, drips: true },
   { id: 'jardin', name: 'le jardin', label: 'Jardin', indoor: false, x0: -14, z0: 6, x1: 10.5, z1: 22 },
   { id: 'allee', name: "l'allée", label: 'Allée', indoor: false, x0: 6, z0: -13, x1: 10.5, z1: 6 },
   { id: 'devant', name: 'le devant de la maison', label: 'Devant la maison', indoor: false, x0: -14, z0: -13, x1: 6, z1: -6 },
@@ -43,11 +42,11 @@ export const ZONES: Zone[] = [
 ];
 
 /** Zones that count as "the street" for mischief objectives. */
-export const STREET_ZONES = ['rue', 'trottoir_s', 'trottoir_n', 'boulangerie'];
+const STREET_ZONES = ['rue', 'trottoir_s', 'trottoir_n', 'boulangerie'];
 /** Zones outside the family property. */
-export const OUTSIDE_PROPERTY_ZONES = ['rue', 'trottoir_s', 'trottoir_n', 'boulangerie', 'square', 'voisins'];
+const OUTSIDE_PROPERTY_ZONES = ['rue', 'trottoir_s', 'trottoir_n', 'boulangerie', 'square', 'voisins'];
 
-export const FLOORS: FloorPatch[] = [
+const FLOORS: FloorPatch[] = [
   // Interior floors.
   { kind: 'parquet', x0: -14, z0: -6, x1: -8, z1: 0 },
   { kind: 'carpet', x0: -14, z0: 0, x1: -8, z1: 6 },
@@ -82,7 +81,7 @@ export const FLOORS: FloorPatch[] = [
 
 const EXT_SHUTTER = 0x5d86a6;
 
-export const WALLS: WallDef[] = [
+const WALLS: WallDef[] = [
   // --- House exterior ---
   { id: 'w_front', x0: -14, z0: -6, x1: 6, z1: -6, style: 'house_ext', shutter: EXT_SHUTTER, openings: [
     { at: 3, width: 1.4, kind: 'window', sill: 0.9, top: 2.1 },
@@ -153,7 +152,7 @@ export const WALLS: WallDef[] = [
   { id: 'e_east', x0: 32.8, z0: -27.5, x1: 32.8, z1: -13, style: 'hedge', height: 2.4 },
 ];
 
-export const BUILDINGS: BuildingDef[] = [
+const BUILDINGS: BuildingDef[] = [
   { id: 'b_voisins', x0: 12, z0: -5, x1: 28, z1: 7, front: 'n', storeys: 2, color: 0xf0dbbd, shutter: 0x6f9a6b, door: 0x8b5a3c, doorX: 20 },
   { id: 'b_n1', x0: -31, z0: -36, x1: -19.4, z1: -27.5, front: 's', storeys: 2, color: 0xe7d6c2, shutter: 0x7ea2c8, door: 0x40566b, doorX: -25 },
   { id: 'b_n2', x0: -19.4, z0: -36, x1: -8.5, z1: -27.5, front: 's', storeys: 2, color: 0xdcb596, shutter: 0xf0ebe0, door: 0x6c3b2a, doorX: -12 },
@@ -162,7 +161,7 @@ export const BUILDINGS: BuildingDef[] = [
   { id: 'b_n4', x0: 19.5, z0: -36, x1: 33, z1: -27.5, front: 's', storeys: 2, color: 0xe3e0d3, shutter: 0xb06447, door: 0x5b3a2a, doorX: 26 },
 ];
 
-export const DOORS: DoorDef[] = [
+const DOORS: DoorDef[] = [
   { id: 'porte_entree', name: "la porte d'entrée", kind: 'exterior', x: -6.5, z: -6, axis: 'x', width: 1.2, hinge: -1, swing: 1, dogCanPush: false, dogFlap: false, open: false, color: 0x3f7cac },
   { id: 'porte_arriere', name: 'la porte du jardin', kind: 'exterior', x: -6.5, z: 6, axis: 'x', width: 1.2, hinge: -1, swing: -1, dogCanPush: false, dogFlap: true, open: false, color: 0x5f9460 },
   { id: 'baie', name: 'la baie vitrée', kind: 'bay', x: 0.75, z: 6, axis: 'x', width: 3.5, hinge: 1, swing: 1, dogCanPush: false, dogFlap: false, open: true },
@@ -175,7 +174,7 @@ export const DOORS: DoorDef[] = [
   { id: 'portillon', name: 'le portillon du jardin', kind: 'gate', x: 8.25, z: 6, axis: 'x', width: 2.6, hinge: -1, swing: 1, dogCanPush: false, dogFlap: false, open: false, color: 0x9a7b54 },
 ];
 
-export const PROPS: PropDef[] = [
+const PROPS: PropDef[] = [
   // --- Chambre ---
   { type: 'bed_double', x: -12.8, z: -3.0, rot: 1, color: 0xf6f1e7, color2: 0x8e6e53 },
   { type: 'nightstand', x: -13.6, z: -4.25, rot: 1 },
@@ -324,7 +323,7 @@ export const PROPS: PropDef[] = [
 ];
 
 /** Interaction stations. */
-export const STATIONS: StationDef[] = [
+const STATIONS: StationDef[] = [
   { id: 'derouleur', kind: 'roll_holder', name: 'le dérouleur de papier', x: 4.95, z: -0.14, y: 0.56, r: 0.8, dogReach: true, capacity: 1 },
   { id: 'panier_linge', kind: 'hamper', name: 'le panier à linge', x: 2.95, z: -5.45, y: 0.62, r: 1.0, dogReach: false, capacity: 12 },
   { id: 'commode', kind: 'dresser', name: 'la commode', x: -10.6, z: -0.4, y: 0.9, r: 0.9, hw: 0.6, hd: 0.25, dogReach: true, capacity: 12 },
@@ -362,7 +361,7 @@ export const STATIONS: StationDef[] = [
     slots: [[-0.45, 0.92, 0.05], [0.45, 0.92, 0.05]], only: ['marche'] },
 ];
 
-export const ITEMS: ItemPlacement[] = [
+const ITEMS: ItemPlacement[] = [
   // Laundry
   { id: 'papier_toilette', type: 'toilet_roll', station: 'derouleur' },
   { id: 'chaussette_1', type: 'sock', station: 'panier_linge' },
@@ -429,12 +428,12 @@ export const ITEMS: ItemPlacement[] = [
   { id: 'cageot', type: 'apple_crate', x: -16.6, z: 9.9, rot: 0.2, only: ['marche'] },
 ];
 
-export const PUDDLES: Puddle[] = [
+const PUDDLES: Puddle[] = [
   { id: 'flaque_jardin', x: 1.6, z: 18.3, r: 1.35 },
   { id: 'flaque_square', x: -19.6, z: 18.4, r: 1.05 },
 ];
 
-export const SPAWNS: { tofu: Spawn; humans: Spawn[] } = {
+const SPAWNS: { tofu: Spawn; humans: Spawn[] } = {
   tofu: { x: -4.25, z: 5.0, facing: Math.PI * 0.75 },
   humans: [
     { x: -6.5, z: -2.0, facing: 0 },
@@ -443,7 +442,7 @@ export const SPAWNS: { tofu: Spawn; humans: Spawn[] } = {
 };
 
 // --- Cat navigation graph (hand authored, validated by tests) ---
-export const CAT_NODES: CatNode[] = [
+const CAT_NODES: CatNode[] = [
   // Neighbors
   { id: 'n_drive', x: 16.5, z: -12.0, y: 0 },
   { id: 'n_lawn', x: 24.0, z: -9.5, y: 0 },
@@ -516,7 +515,7 @@ export const CAT_NODES: CatNode[] = [
   { id: 'h_living', x: 0.0, z: 4.0, y: 0, indoor: true },
 ];
 
-export const CAT_EDGES: CatEdge[] = [
+const CAT_EDGES: CatEdge[] = [
   { a: 'n_drive', b: 'n_lawn' }, { a: 'n_drive', b: 'n_corner' }, { a: 'n_lawn', b: 'n_door' }, { a: 'n_door', b: 'n_drive' },
   { a: 'n_drive', b: 'n_car_roof', jump: true }, { a: 'n_lawn', b: 'n_wall_top', jump: true },
   { a: 'n_wall_top', b: 's_far_east', jump: true },
@@ -556,28 +555,121 @@ export const CAT_EDGES: CatEdge[] = [
   { a: 'h_living', b: 'g_terrace', door: 'baie' },
 ];
 
-export const CAT_START = 'n_lawn';
+const CAT_START = 'n_lawn';
 
-/** Returns the zone at a position (first match), or null outside every zone. */
-export function zoneAt(x: number, z: number): Zone | null {
-  for (const zn of ZONES) {
-    if (x >= zn.x0 && x < zn.x1 && z >= zn.z0 && z < zn.z1) return zn;
-  }
-  return null;
-}
+/** Footprint of the house (roof). */
+const HOUSE_RECT = { x0: -14, z0: -6, x1: 6, z1: 6 };
 
-export function zoneById(id: string): Zone | undefined {
-  return ZONES.find((z) => z.id === id);
-}
-
-export function isIndoor(x: number, z: number): boolean {
-  const zn = zoneAt(x, z);
-  return !!zn && zn.indoor;
-}
-
-/** House footprint used for roof hiding and "inside the house" checks. */
-export const HOUSE_RECT = { x0: -14, z0: -6, x1: 6, z1: 6 };
-
-export function inHouse(x: number, z: number): boolean {
-  return x > HOUSE_RECT.x0 && x < HOUSE_RECT.x1 && z > HOUSE_RECT.z0 && z < HOUSE_RECT.z1;
-}
+export const QUARTIER: MapDef = {
+  id: 'quartier',
+  name: 'Le quartier',
+  icon: '🏡',
+  desc: 'La maison de la famille, son jardin, la rue et le square.',
+  story: {
+    prepare: 'prépare la maison',
+    arriving: 'Les invités arrivent',
+    ding: 'Ding dong ! Les invités arrivent !',
+    notReady: "Oh non ! La maison n'est plus prête !",
+    ready: 'La maison est prête : les invités sont ravis ! 🎉',
+    late: "Le temps est écoulé et la maison n'est pas prête…",
+    chaos: 'Trop de bêtises dans la maison ! 😈',
+    humans: 'Les invités arrivent. Finissez toutes les tâches et gardez la maison propre',
+    listTitle: 'À faire avant les invités',
+    cleanLabel: 'Maison propre',
+    inside: 'dans la maison',
+    tipStart: "Préparez la maison avant l'arrivée des invités !",
+    humanRole: 'Prépare la maison et surveille Tofu !',
+  },
+  bounds: BOUNDS,
+  wallHeight: 2.7,
+  zones: ZONES,
+  streetZones: STREET_ZONES,
+  outsideZones: OUTSIDE_PROPERTY_ZONES,
+  snowyZones: ['jardin', 'terrasse', 'devant', 'allee', 'square', 'voisins'],
+  muddyZones: ['chambre', 'enfants'],
+  floors: FLOORS,
+  walls: WALLS,
+  buildings: BUILDINGS,
+  doors: DOORS,
+  props: PROPS,
+  stations: STATIONS,
+  items: ITEMS,
+  puddles: PUDDLES,
+  spawns: SPAWNS,
+  catNodes: CAT_NODES,
+  catEdges: CAT_EDGES,
+  catStart: CAT_START,
+  variants: ['ete', 'automne', 'hiver', 'marche'],
+  tasks: {
+    linge: {
+      title: 'Rentrer le linge', icon: '🧺',
+      hint: "Décroche le linge du jardin et range-le dans le panier à linge de la salle de bain (Tofu ne sait pas l'ouvrir !).",
+      spec: { type: 'collect', items: ['linge_1', 'linge_2', 'linge_3', 'linge_4'], kinds: ['hamper', 'dresser'], dest: 'panier_linge', destLabel: 'Panier à linge' },
+    },
+    jouets: {
+      title: 'Ranger les jouets', icon: '🧸',
+      hint: 'Mets les 4 jouets dans le coffre de la chambre des enfants.',
+      spec: { type: 'collect', items: ['jouet_nounours', 'jouet_voiture', 'jouet_canard', 'jouet_dino'], kinds: ['toybox'], dest: 'coffre_jouets', destLabel: 'Coffre à jouets' },
+    },
+    table: {
+      title: 'Mettre la table', icon: '🍽️',
+      hint: 'Prends la vaisselle dans le placard de la cuisine et mets la table du salon.',
+      spec: { type: 'deliver', item: 'vaisselle', dest: 'table_salon', destLabel: 'Table du salon', itemLabel: 'Vaisselle' },
+    },
+    gouter: {
+      title: 'Servir le goûter', icon: '🥐',
+      hint: 'Pose les croissants de la cuisine sur la table du jardin. Si Tofu les mange, rachète-en à la boulangerie !',
+      spec: {
+        type: 'deliver', item: 'croissants', dest: 'table_jardin', destLabel: 'Table du jardin', itemLabel: 'Croissants',
+        restock: { station: 'boulangerie', label: 'Boulangerie', verb: 'Acheter des croissants', thanks: 'Merci madame la boulangère !' },
+        keep: true,
+      },
+    },
+    poubelle: {
+      title: 'Sortir la poubelle', icon: '🗑️',
+      hint: 'Jette le sac poubelle de la cuisine dans la grande poubelle sur le trottoir.',
+      spec: { type: 'deliver', item: 'sac_poubelle', dest: 'poubelle_rue', destLabel: 'Poubelle de la rue', itemLabel: 'Sac poubelle' },
+    },
+    courrier: {
+      title: 'Relever le courrier', icon: '✉️',
+      hint: "Prends le courrier dans la boîte aux lettres (près du portail) et pose-le sur la console de l'entrée.",
+      spec: { type: 'deliver', item: 'courrier', dest: 'console', destLabel: 'Console', itemLabel: 'Courrier' },
+    },
+    lit: {
+      title: 'Faire le lit', icon: '🛏️',
+      hint: 'Va dans la chambre et fais le lit (maintiens le bouton).',
+      spec: { type: 'make', station: 'lit', label: 'Lit' },
+    },
+    fleurs: {
+      title: 'Arroser les fleurs', icon: '🌷',
+      hint: "Prends l'arrosoir sur la terrasse et arrose les 2 massifs du jardin.",
+      spec: { type: 'water', beds: ['massif_est', 'massif_sud'], can: 'arrosoir', tap: 'robinet', bedLabel: 'Massif', tapLabel: 'Robinet' },
+    },
+  },
+  secrets: [
+    'voleur', 'tresor', 'rue', 'casse', 'boue_chambre', 'chat', 'poubelles', 'gourmand', 'innocent', 'zoomies', 'lit_sale',
+    'baguette', 'creuse', 'aboie', 'facteur', 'papier', 'chaine', 'arrosoir',
+  ],
+  vacuum: { x: 1.35, z: 0.38, facing: 0, name: "l'aspirateur robot" },
+  carrier: { z: -14.45, x0: -29.6, x1: 32.2, stopX: 5.3, name: 'la factrice', scared: 'La factrice a eu peur !', look: 'carrier' },
+  ai: {
+    indoorSpots: [
+      [-11, -2.5, 'chambre'], [-10.5, 2.5, 'enfants'], [-6.5, -3, 'entree'], [-6.5, 3, 'entree'],
+      [-2.5, -2.2, 'cuisine'], [3.5, -3, 'buanderie'], [-0.5, 3.5, 'salon'], [3.2, 4.4, 'salon'],
+    ],
+    escapes: [
+      [-10.5, 19.5], [-22, 10], [-20, -6], [5, -19], [-6, -19], [8, 14], [-2.6, 2.9], [-11, 2.8], [3, 17], [20, -9],
+    ],
+    streetDrops: [[-6, -19.5], [6, -18.5], [-14, -18.8], [14, -19]],
+    entrances: [[-6.5, 6.6], [0.75, 6.6]],
+    protectedDoors: { porte_enfants: 'jouets', porte_chambre: 'lit', porte_sdb: '*' },
+  },
+  roofs: [{ ...HOUSE_RECT, style: 'hip' }],
+  road: { z0: -23, z1: -16, walks: [[-16, -13], [-27.5, -23]], crossings: [[-8.5, -3.5]] },
+  backdrop: [
+    [-24, 34, 9, 7, 0xe8d8c0], [-6, 36, 10, 8, 0xf0dcc5], [12, 33, 8, 7, 0xe3cdb0], [28, 35, 9, 7, 0xefe2cc],
+    [44, -2, 7, 9, 0xe9d6bf], [46, 14, 8, 8, 0xf2e3cf], [-42, 4, 8, 9, 0xe6d3bb], [-44, 20, 8, 8, 0xf0dfc8],
+    [-42, -8, 7, 7, 0xead9c2],
+  ],
+  decor: 'quartier',
+};

@@ -163,7 +163,6 @@ export const VACUUM = {
   homeTime: 12,
   /** Charging time on the dock before it can run again. */
   rest: 20,
-  dock: { x: 1.35, z: 0.38, facing: 0 },
   /** Cat runs away when the vacuum gets this close. */
   catFear: 2.2,
 };

@@ -4,6 +4,7 @@
 import { CHAOS, VACUUM } from '../constants';
 import { approachAngle, dist } from '../math';
 import { ITEM_TYPES, MESS_TYPES } from '../world/itemTypes';
+import type { GameMap } from '../world/mapTypes';
 import { MASK_DOG, MASK_ITEM } from '../world/types';
 import { scareCat } from './cat';
 import type { Game } from './game';
@@ -16,8 +17,8 @@ export const VACUUM_KNOCK = -4;
 /** Low and flat: it rolls under tables like Tofu, but no dog flap for it. */
 const MASK = MASK_DOG | MASK_ITEM;
 
-export function initialVacuum(): VacuumState {
-  const d = VACUUM.dock;
+export function initialVacuum(map: GameMap): VacuumState {
+  const d = map.vacuum;
   return { mode: 'dock', x: d.x, z: d.z, facing: d.facing, t: 0, turnT: 0, by: -1 };
 }
 
@@ -43,7 +44,7 @@ export function switchVacuum(g: Game, c: Character): void {
 }
 
 function dock(g: Game, v: VacuumState) {
-  const d = VACUUM.dock;
+  const d = g.map.vacuum;
   v.mode = 'dock';
   v.x = d.x;
   v.z = d.z;
@@ -66,7 +67,7 @@ export function updateVacuum(g: Game, dt: number): void {
     g.emit({ t: 'vacuum', on: false, by: -1, x: v.x, z: v.z });
   }
   if (v.mode === 'home') {
-    const d = VACUUM.dock;
+    const d = g.map.vacuum;
     const dd = dist(v.x, v.z, d.x, d.z);
     // Back on its dock, or teleported there if furniture keeps it away too long.
     if (dd < 0.25 || v.t <= 0) {

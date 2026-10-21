@@ -252,6 +252,178 @@ const ITEMS: Record<string, ItemBuilder> = {
     }
     b.box(0.32, 0.015, 0.24, { y: 0.008 }, 0xfdfdfd);
   },
+  // --- École ---
+  beanie(b) {
+    b.sphere(0.1, { y: 0.06, sy: 0.75 }, 0xe67e22, 'mid');
+    b.cylU(0.1, 0.035, { y: 0.02 }, 0xd35400, 14);
+    b.sphere(0.045, { y: 0.15 }, 0xffffff, 'lo');
+  },
+  scarf(b) {
+    for (let i = 0; i < 6; i++) b.rbox(0.09, 0.03, 0.08, 0.012, { x: -0.18 + i * 0.07, y: 0.02, z: Math.sin(i) * 0.03 }, i % 2 ? 0x2e86de : 0xe74c3c);
+    for (let i = 0; i < 4; i++) b.box(0.01, 0.01, 0.05, { x: 0.2 + i * 0.015, y: 0.012, z: 0.05 }, 0xe74c3c);
+  },
+  mitten(b) {
+    b.rbox(0.1, 0.035, 0.14, 0.015, { y: 0.02 }, 0x27ae60);
+    b.rbox(0.04, 0.03, 0.06, 0.012, { x: 0.065, y: 0.02, z: 0.02, ry: -0.5 }, 0x27ae60);
+    b.box(0.105, 0.04, 0.03, { y: 0.022, z: -0.07 }, 0xffffff);
+  },
+  cardigan(b) {
+    b.rbox(0.3, 0.32, 0.04, 0.03, { y: 0.16 }, 0x8e44ad);
+    for (const s of [-1, 1]) b.rbox(0.09, 0.28, 0.04, 0.02, { x: s * 0.19, y: 0.16, rz: s * 0.15 }, 0x8e44ad);
+    for (let i = 0; i < 4; i++) b.sphere(0.012, { y: 0.06 + i * 0.07, z: 0.025 }, 0xf1c40f, 'lo');
+  },
+  pencil_pot(b) {
+    b.cyl(0.05, 0.045, 0.1, { y: 0.05 }, 0x3498db, 12);
+    const cols = [0xe74c3c, 0xf1c40f, 0x2ecc71, 0x9b59b6, 0xe67e22];
+    for (let i = 0; i < 5; i++) b.cylU(0.008, 0.16, { x: Math.cos(i * 1.3) * 0.022, y: 0.13, z: Math.sin(i * 1.3) * 0.022, rz: (i - 2) * 0.08 }, cols[i], 6);
+  },
+  glue(b) {
+    b.cylU(0.025, 0.11, { y: 0.055 }, 0xffffff, 10);
+    b.cylU(0.027, 0.03, { y: 0.12 }, 0xe74c3c, 10);
+    b.box(0.03, 0.05, 0.002, { y: 0.06, z: 0.025 }, 0x2e86de);
+  },
+  paint_box(b) {
+    b.box(0.26, 0.025, 0.11, { y: 0.0125 }, 0x2d3436);
+    const cols = [0xe74c3c, 0xf1c40f, 0x2e86de, 0x2ecc71, 0xffffff, 0x8e44ad];
+    for (let i = 0; i < 6; i++) b.cylU(0.016, 0.01, { x: -0.1 + i * 0.04, y: 0.028, z: -0.015 }, cols[i], 10);
+    b.cylU(0.005, 0.2, { x: 0, y: 0.03, z: 0.035, rz: Math.PI / 2 }, 0xc49a6c, 6);
+  },
+  notebook(b) {
+    b.box(0.17, 0.02, 0.22, { y: 0.01 }, 0xf39c12);
+    b.box(0.165, 0.021, 0.21, { y: 0.011, x: 0.004 }, 0xfdfdfd);
+    b.box(0.17, 0.004, 0.22, { y: 0.023 }, 0xf39c12);
+    b.box(0.08, 0.005, 0.04, { y: 0.026, z: -0.04 }, 0xffffff);
+  },
+  football(b) {
+    b.sphere(0.11, { y: 0.11 }, 0xfdfdfd, 'hi');
+    for (let i = 0; i < 6; i++) b.sphere(0.035, { x: Math.cos(i) * 0.09, y: 0.11 + Math.sin(i * 2.1) * 0.06, z: Math.sin(i) * 0.09, sx: 0.6, sy: 0.6, sz: 0.6 }, 0x2d3436, 'lo');
+  },
+  basketball(b) {
+    b.sphere(0.12, { y: 0.12 }, 0xe67e22, 'hi');
+    b.torus(0.12, 0.005, { y: 0.12 }, 0x2d3436);
+    b.torus(0.12, 0.005, { y: 0.12, rx: Math.PI / 2 }, 0x2d3436);
+  },
+  poster(b) {
+    b.box(0.3, 0.012, 0.42, { y: 0.006 }, 0xfdf6e3);
+    b.box(0.26, 0.013, 0.08, { y: 0.007, z: -0.14 }, 0xe74c3c);
+    b.box(0.2, 0.013, 0.03, { y: 0.008, z: -0.02 }, 0x2e86de);
+    for (let i = 0; i < 3; i++) b.sphere(0.035, { x: -0.08 + i * 0.08, y: 0.012, z: 0.1, sy: 0.2 }, [0xf1c40f, 0x2ecc71, 0x9b59b6][i], 'lo');
+  },
+  cake(b) {
+    b.cylU(0.16, 0.012, { y: 0.006 }, 0xfdfdfd, 18);
+    b.cylU(0.13, 0.12, { y: 0.07 }, 0x5d3a1f, 18);
+    b.cylU(0.133, 0.025, { y: 0.13 }, 0x3e2414, 18);
+    for (let i = 0; i < 8; i++) b.sphere(0.018, { x: Math.cos(i * 0.785) * 0.1, y: 0.15, z: Math.sin(i * 0.785) * 0.1 }, 0xfdfdfd, 'lo');
+    for (let i = 0; i < 3; i++) b.sphere(0.022, { x: -0.04 + i * 0.04, y: 0.155, z: (i - 1) * 0.02 }, 0xe74c3c, 'lo');
+    b.cylU(0.006, 0.07, { y: 0.19 }, 0x74b9ff, 6);
+  },
+  // --- Centre commercial ---
+  dress(b) {
+    b.cyl(0.08, 0.17, 0.3, { y: 0.15 }, 0xff8fab, 10);
+    b.rbox(0.16, 0.12, 0.06, 0.03, { y: 0.34 }, 0xff8fab);
+    for (let i = 0; i < 8; i++) b.sphere(0.015, { x: Math.cos(i) * 0.1, y: 0.05 + (i % 4) * 0.06, z: Math.sin(i) * 0.1 + 0.03 }, i % 2 ? 0xffffff : 0xf1c40f, 'lo');
+  },
+  jeans(b) {
+    b.rbox(0.24, 0.1, 0.05, 0.02, { y: 0.36 }, 0x34607f);
+    for (const s of [-1, 1]) b.rbox(0.1, 0.32, 0.05, 0.02, { x: s * 0.06, y: 0.16, rz: s * 0.04 }, 0x3b6e92);
+    b.box(0.03, 0.03, 0.01, { x: 0.06, y: 0.38, z: 0.028 }, 0xc49a6c);
+  },
+  hat(b) {
+    b.cylU(0.2, 0.012, { y: 0.006 }, 0xe9d18e, 20);
+    b.cyl(0.09, 0.1, 0.09, { y: 0.05 }, 0xe9d18e, 16);
+    b.cylU(0.102, 0.025, { y: 0.03 }, 0xe74c3c, 16);
+  },
+  cap(b) {
+    b.sphere(0.09, { y: 0.03, sy: 0.6 }, 0x2e86de, 'mid');
+    b.box(0.14, 0.012, 0.12, { y: 0.01, z: 0.11 }, 0x1f5f9e);
+    b.sphere(0.015, { y: 0.085 }, 0xffffff, 'lo');
+  },
+  cardboard(b) {
+    for (let i = 0; i < 3; i++) b.box(0.5 - i * 0.04, 0.12, 0.38 - i * 0.03, { y: 0.06 + i * 0.12, ry: (i - 1) * 0.12 }, i % 2 ? 0xc49a6c : 0xb88a58);
+    b.box(0.5, 0.01, 0.04, { y: 0.37, ry: -0.12 }, 0xe8d3a8);
+  },
+  cash_box(b) {
+    b.rbox(0.28, 0.08, 0.2, 0.02, { y: 0.04 }, 0x2d3436);
+    for (let i = 0; i < 4; i++) b.box(0.055, 0.01, 0.15, { x: -0.1 + i * 0.065, y: 0.082 }, i % 2 ? 0x7fb77e : 0xa3c4f3);
+    b.cylU(0.02, 0.012, { x: 0.1, y: 0.085, z: 0.05 }, 0xd4af37, 10);
+  },
+  // --- Parc ---
+  gift(b, seed) {
+    const cols = [0xe74c3c, 0x2e86de, 0x27ae60, 0x9b59b6, 0xf39c12];
+    const c = cols[seed % cols.length];
+    const r = cols[(seed + 2) % cols.length];
+    b.box(0.26, 0.2, 0.26, { y: 0.1 }, c);
+    b.box(0.27, 0.205, 0.04, { y: 0.1 }, r === c ? 0xf1c40f : 0xf1c40f);
+    b.box(0.04, 0.205, 0.27, { y: 0.1 }, 0xf1c40f);
+    for (const s of [-1, 1]) b.sphere(0.05, { x: s * 0.04, y: 0.22, sy: 0.6, sz: 0.4 }, 0xf1c40f, 'lo');
+  },
+  sand_bucket(b) {
+    b.cyl(0.08, 0.06, 0.12, { y: 0.06 }, 0xf1c40f, 12);
+    b.torus(0.075, 0.006, { y: 0.14, rx: Math.PI / 2 }, 0xe74c3c);
+  },
+  shovel(b) {
+    b.cylU(0.012, 0.24, { y: 0.02, rx: Math.PI / 2, z: -0.05 }, 0x2e86de, 6);
+    b.box(0.09, 0.015, 0.1, { y: 0.015, z: 0.11 }, 0x2e86de);
+  },
+  beach_ball(b) {
+    const cols = [0xe74c3c, 0xffffff, 0x2e86de, 0xf1c40f];
+    for (let i = 0; i < 4; i++) b.sphere(0.15, { y: 0.15, ry: (i * Math.PI) / 2, sx: 0.999 - i * 0.001 }, cols[i], 'hi');
+    b.sphere(0.152, { y: 0.15, sx: 0.4, sz: 1.0 }, 0xe74c3c, 'mid');
+    b.sphere(0.153, { y: 0.15, sx: 1.0, sz: 0.4 }, 0x2e86de, 'mid');
+  },
+  frisbee(b) {
+    b.cylU(0.12, 0.025, { y: 0.0125 }, 0xff6b9a, 20);
+    b.torus(0.115, 0.012, { y: 0.02, rx: Math.PI / 2 }, 0xe84393);
+  },
+  paint_pot(b, seed) {
+    const c = [0xe74c3c, 0x2e86de, 0xf1c40f, 0x27ae60][seed % 4];
+    b.cyl(0.07, 0.065, 0.13, { y: 0.065 }, 0xfdfdfd, 12);
+    b.cylU(0.066, 0.01, { y: 0.13 }, c, 12);
+    b.cylU(0.006, 0.22, { x: 0.02, y: 0.18, rz: 0.25 }, 0xc49a6c, 6);
+    b.box(0.03, 0.04, 0.012, { x: 0.05, y: 0.29, rz: 0.25 }, c);
+  },
+  book_pile(b) {
+    const cols = [0xc0392b, 0x2980b9, 0x27ae60, 0xf39c12, 0x8e44ad, 0x16a085];
+    for (let i = 0; i < 6; i++) b.box(0.24 - (i % 3) * 0.02, 0.06, 0.17, { y: 0.03 + i * 0.065, ry: (hash(i, 4) - 0.5) * 0.4 }, cols[i]);
+  },
+  mannequin(b) {
+    b.cylU(0.18, 0.03, { y: 0.015 }, 0x2d3436, 16);
+    b.cylU(0.02, 0.6, { y: 0.32 }, 0x95a5a6, 8);
+    b.sphere(0.16, { y: 0.78, sy: 0.6 }, 0xf5e6d3);
+    b.rbox(0.36, 0.48, 0.2, 0.08, { y: 1.1 }, 0x16a085);
+    b.cylU(0.04, 0.08, { y: 1.38 }, 0xf5e6d3, 8);
+    b.sphere(0.12, { y: 1.52, sy: 1.15 }, 0xf5e6d3);
+    for (const s of [-1, 1]) b.cylU(0.04, 0.42, { x: s * 0.22, y: 1.05, rz: s * 0.15 }, 0xf5e6d3, 8);
+  },
+  can_pyramid(b) {
+    const cols = [0xe74c3c, 0xf1c40f, 0x27ae60];
+    let k = 0;
+    for (let row = 0; row < 4; row++) {
+      const n = 4 - row;
+      for (let i = 0; i < n; i++) {
+        const x = (i - (n - 1) / 2) * 0.15;
+        b.cylU(0.07, 0.2, { x, y: 0.1 + row * 0.2, z: 0 }, 0xbdc3c7, 12);
+        b.cylU(0.071, 0.12, { x, y: 0.1 + row * 0.2, z: 0 }, cols[k++ % 3], 12);
+      }
+    }
+  },
+  cart(b) {
+    b.box(0.5, 0.04, 0.8, { y: 0.45 }, 0x95a5a6);
+    for (const s of [-1, 1]) b.box(0.02, 0.4, 0.8, { x: s * 0.25, y: 0.65 }, 0xbdc3c7);
+    b.box(0.5, 0.4, 0.02, { y: 0.65, z: 0.4 }, 0xbdc3c7);
+    b.box(0.5, 0.4, 0.02, { y: 0.65, z: -0.4 }, 0xbdc3c7);
+    b.box(0.52, 0.04, 0.04, { y: 0.92, z: -0.5 }, 0xe74c3c);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      b.cylU(0.015, 0.4, { x: sx * 0.22, y: 0.24, z: sz * 0.34 }, 0x7f8c8d, 6);
+      b.cylU(0.05, 0.03, { x: sx * 0.22, y: 0.05, z: sz * 0.34, rz: Math.PI / 2 }, 0x2d3436, 10);
+    }
+  },
+  lemonade(b) {
+    b.cyl(0.07, 0.08, 0.2, { y: 0.1 }, 0xfff59d, 12);
+    b.cylU(0.072, 0.02, { y: 0.2 }, 0xdff9fb, 12);
+    for (let i = 0; i < 2; i++) b.cylU(0.03, 0.006, { x: (i - 0.5) * 0.04, y: 0.13, z: 0.071, rx: Math.PI / 2 }, 0xf1c40f, 10);
+    b.torus(0.05, 0.01, { x: 0.08, y: 0.11, ry: Math.PI / 2 }, 0xdff9fb);
+  },
   apple_crate(b) {
     b.box(0.5, 0.04, 0.36, { y: 0.02 }, 0xb08850);
     for (const sz of [-1, 1]) b.box(0.5, 0.2, 0.025, { y: 0.12, z: sz * 0.17 }, 0xc49a6c);
@@ -410,11 +582,44 @@ export function buildMessGeometry(kind: MessKind, seed: number, r: number): THRE
       b.torus(0.028, 0.008, { x: 0.2, y: 0.01, z: 0.1, rx: Math.PI / 2 }, 0xfdfdfd);
       break;
     }
+    case 'paint': {
+      const cols = [0xe74c3c, 0x2e86de, 0xf1c40f, 0x27ae60];
+      blob(b, r * 0.55, cols[seed % 4], seed, 0.012);
+      blob(b, r * 0.3, cols[(seed + 1) % 4], seed + 3, 0.014);
+      b.cyl(0.07, 0.065, 0.13, { x: 0.25, y: 0.07, z: 0.1, rz: Math.PI / 2 }, 0xfdfdfd, 12);
+      break;
+    }
+    case 'books': {
+      const cols = [0xc0392b, 0x2980b9, 0x27ae60, 0xf39c12, 0x8e44ad, 0x16a085];
+      for (let i = 0; i < 7; i++) {
+        const a = rnd(i) * Math.PI * 2;
+        const d = 0.1 + rnd(i + 20) * r * 0.8;
+        b.box(0.24, 0.05, 0.17, { x: Math.cos(a) * d, y: 0.03, z: Math.sin(a) * d, ry: rnd(i + 5) * 3, rz: rnd(i + 6) > 0.7 ? 0.4 : 0 }, cols[i % cols.length]);
+      }
+      break;
+    }
+    case 'cans': {
+      const cols = [0xe74c3c, 0xf1c40f, 0x27ae60];
+      for (let i = 0; i < 10; i++) {
+        const a = rnd(i) * Math.PI * 2;
+        const d = 0.15 + rnd(i + 20) * r;
+        b.cylU(0.07, 0.2, { x: Math.cos(a) * d, y: 0.07, z: Math.sin(a) * d, rz: Math.PI / 2, ry: rnd(i + 3) * 3 }, cols[i % 3], 12);
+      }
+      break;
+    }
+    case 'lemonade': {
+      blob(b, r * 0.5, 0xf4e46b, seed, 0.012);
+      for (let i = 0; i < 3; i++) b.cylU(0.03, 0.006, { x: (rnd(i) - 0.5) * r, y: 0.02, z: (rnd(i + 9) - 0.5) * r }, 0xf1c40f, 10);
+      break;
+    }
+    case 'muddy_cushions':
+    case 'muddy_blanket':
     case 'muddy_bed':
     case 'muddy_sofa': {
       for (let i = 0; i < 9; i++) {
-        const x = (rnd(i) - 0.5) * (kind === 'muddy_bed' ? 1.5 : 0.7);
-        const z = (rnd(i + 30) - 0.5) * (kind === 'muddy_bed' ? 1.3 : 1.7);
+        const wide = kind !== 'muddy_sofa';
+        const x = (rnd(i) - 0.5) * (wide ? 1.5 : 0.7);
+        const z = (rnd(i + 30) - 0.5) * (wide ? 1.3 : 1.7);
         b.disc(0.06 + rnd(i + 60) * 0.06, { x, y: 0.0, z }, 0x6b4a32, 10);
       }
       break;

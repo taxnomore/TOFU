@@ -4,14 +4,13 @@ import type { Game } from '../shared/sim/game';
 import type { Character, GameEvent, GameState } from '../shared/sim/types';
 import { Anim } from '../shared/sim/types';
 import { ITEM_TYPES } from '../shared/world/itemTypes';
-import { zoneAt } from '../shared/world/map';
+import { DEFAULT_MAP } from '../shared/world/maps';
 import { DOG } from '../shared/constants';
 import { sfx } from './audio/sfx';
 import { endFrame } from './input/devices';
 import { CameraRig } from './render/camera';
 import { Effects, Weather } from './render/effects';
 import type { Variant } from '../shared/world/variants';
-import { SNOWY_ZONES } from '../shared/world/variants';
 import { GameView } from './render/gameView';
 import { GameRenderer, Quality, ViewRect, detectQuality } from './render/renderer';
 import type { LocalPlayer, Session } from './runtime/session';
@@ -83,7 +82,7 @@ export class App {
     this.helper = helper;
     this.attract = attract;
     this.applyVariant(helper.variant);
-    this.view = new GameView(this.gr.scene, session.state);
+    this.view = new GameView(this.gr.scene, session.state, helper.map);
     this.endNotified = false;
     this.lastPhase = '';
     this.lastCountdown = 4;
@@ -100,7 +99,7 @@ export class App {
     this.helper = helper;
     this.applyVariant(helper.variant);
     if (this.view) this.gr.scene.remove(this.view.root);
-    this.view = new GameView(this.gr.scene, this.session.state);
+    this.view = new GameView(this.gr.scene, this.session.state, helper.map);
     for (const h of this.huds) h.dispose();
     this.huds = this.session.locals.map((lp) => new PlayerHud(this.hudRoot, lp));
     this.endNotified = false;
@@ -111,7 +110,7 @@ export class App {
 
   /** Seasonal world, sky and weather of the ambiance. */
   applyVariant(v: Variant) {
-    this.gr.setVariant(v);
+    this.gr.setWorld(this.helper?.map.id ?? DEFAULT_MAP, v);
     this.weather.set(v === 'hiver' ? 'snow' : v === 'automne' ? 'leaves' : 'none');
   }
 
@@ -259,11 +258,15 @@ export class App {
     if (ov) {
       this.overviewCam.aspect = ov.w / ov.h;
       this.overviewCam.updateProjectionMatrix();
-      this.overviewCam.position.set(-2, 58, 26);
-      this.overviewCam.lookAt(-2, 0, -3);
-      this.gr.renderView(this.overviewCam, ov, tmpV.set(-2, 0, -3), false);
+      const B = this.helper!.map.bounds;
+      const k = Math.max(B.x1 - B.x0, (B.z1 - B.z0) * 1.3) / 65;
+      const cx = (B.x0 + B.x1) / 2 - 3;
+      const cz = (B.z0 + B.z1) / 2 - 0.5;
+      this.overviewCam.position.set(cx, 58 * k, cz + 29 * k);
+      this.overviewCam.lookAt(cx, 0, cz);
+      this.gr.renderView(this.overviewCam, ov, tmpV.set(cx, 0, cz), false);
     }
-    this.topBar?.update(S);
+    this.topBar?.update(S, this.helper!.map);
     this.huds.forEach((h, i) => {
       const lp = s.locals[i];
       h.update(dt, this.helper!, S, lp.rig.camera, (id, out) => this.view!.headPos(S, id, out));
@@ -333,7 +336,7 @@ export class App {
       if (!quiet) {
         this.huds.forEach((h, i) => {
           const me = S.chars[this.session!.locals[i].charId];
-          const t = eventToast(e, me, S);
+          const t = eventToast(e, me, S, this.helper!.map);
           if (t) h.toast(t);
         });
       }
@@ -521,9 +524,11 @@ export class App {
       const d = this.nearestListener(c.x, c.z);
       if (d > 14) continue;
       const v = (d < 4 ? 1 : 1 - (d - 4) / 10) * Math.min(1, 0.5 + c.speed / 8);
-      const zone = zoneAt(c.x, c.z);
-      const soft = !!zone && (zone.id === 'jardin' || zone.id === 'square');
-      const snowy = this.helper?.variant === 'hiver' && !!zone && SNOWY_ZONES.includes(zone.id);
+      const map = this.helper!.map;
+      const zone = map.zoneAt(c.x, c.z);
+      const floor = map.floorAt(c.x, c.z);
+      const soft = floor === 'grass' || floor === 'sand' || floor === 'soil' || floor === 'gravel';
+      const snowy = this.helper?.variant === 'hiver' && !!zone && map.snowyZones.includes(zone.id);
       if (dog) sfx.play(c.mud > 0.3 && zone?.indoor ? 'pawMud' : snowy ? 'pawSnow' : soft ? 'pawGrass' : 'paw', v);
       else sfx.play(soft ? 'stepGrass' : 'step', v);
     }

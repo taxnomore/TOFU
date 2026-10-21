@@ -3,7 +3,7 @@ import type { App } from '../app';
 import { sfx } from '../audio/sfx';
 import { CHAOS_GOAL_BY_HUMANS, COUNTDOWN_TIME, DEFAULT_DURATION } from '../../shared/constants';
 import type { GameConfig, GameState, PlayerSlot } from '../../shared/sim/types';
-import { SECRET_DEFS, TASK_DEFS } from '../../shared/sim/rules';
+import { TASK_DEFS, secretInfo } from '../../shared/sim/rules';
 import { CameraRig } from '../render/camera';
 import { HUMAN_LOOKS } from '../render/characters';
 import { LocalSession } from '../runtime/localSession';
@@ -16,6 +16,8 @@ import {
 import { PlayerHud, el, fmtTime, glyph } from './hud';
 import { BTN_BARK, BTN_INTERACT, BTN_SIT, BTN_SPECIAL, BTN_SPRINT } from '../../shared/constants';
 import { VARIANTS, Variant, isVariant, variantDef } from '../../shared/world/variants';
+import type { MapId } from '../../shared/world/mapTypes';
+import { DEFAULT_MAP, MAP_LIST, getMap, isMapId } from '../../shared/world/maps';
 
 export const isTouch = () => matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 1;
 
@@ -26,6 +28,8 @@ interface Prefs {
   name: string;
   autoCam: boolean;
   variant: Variant;
+  /** Place of the game. */
+  map: MapId;
   /** 0 normal, 1 large, 2 very large. */
   textSize: number;
   contrast: boolean;
@@ -36,12 +40,13 @@ interface Prefs {
 export function loadPrefs(): Prefs {
   const calm = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const d: Prefs = {
-    duration: DEFAULT_DURATION, difficulty: 1, avatar: 0, name: '', autoCam: false, variant: 'ete',
+    duration: DEFAULT_DURATION, difficulty: 1, avatar: 0, name: '', autoCam: false, variant: 'ete', map: DEFAULT_MAP,
     textSize: 0, contrast: false, tips: true, shake: !calm,
   };
   try {
     const p = { ...d, ...JSON.parse(localStorage.getItem('tofu.prefs') ?? '{}') } as Prefs;
-    if (!isVariant(p.variant)) p.variant = 'ete';
+    if (!isMapId(p.map)) p.map = DEFAULT_MAP;
+    if (!isVariant(p.variant) || !getMap(p.map).variants.includes(p.variant)) p.variant = 'ete';
     if (![0, 1, 2].includes(p.textSize)) p.textSize = 0;
     for (const k of ['contrast', 'tips', 'shake'] as const) if (typeof p[k] !== 'boolean') p[k] = d[k];
     return p;
@@ -61,9 +66,16 @@ export function applyComfort(p: Prefs) {
   CameraRig.shakeOn = p.shake;
 }
 
+/** "Lieu" selector for the setup screens. */
+export function mapRow(cur: MapId): string {
+  const btns = MAP_LIST.map((m) => `<button class="${cur === m.id ? 'sel' : ''}" data-v="${m.id}" title="${m.desc}">${m.icon} ${m.name}</button>`).join('');
+  return `<span>Lieu</span><div class="seg wrap" data-k="map">${btns}</div><small class="vdesc">${getMap(cur).desc}</small>`;
+}
+
 /** "Ambiance" selector (season or market day) for the setup screens. */
-function variantRow(cur: Variant): string {
-  const btns = VARIANTS.map((d) => `<button class="${cur === d.id ? 'sel' : ''}" data-v="${d.id}" title="${d.desc}">${d.icon} ${d.id === 'marche' ? 'Marché' : d.name}</button>`).join('');
+export function variantRow(cur: Variant, map: MapId = DEFAULT_MAP): string {
+  const offered = getMap(map).variants;
+  const btns = VARIANTS.filter((d) => offered.includes(d.id)).map((d) => `<button class="${cur === d.id ? 'sel' : ''}" data-v="${d.id}" title="${d.desc}">${d.icon} ${d.id === 'marche' ? 'Marché' : d.name}</button>`).join('');
   return `<span>Ambiance</span><div class="seg" data-k="variant">${btns}</div><small class="vdesc">${variantDef(cur).desc}</small>`;
 }
 
@@ -241,7 +253,7 @@ export class Screens {
       { role: 'human', name: 'Maman', avatar: 0, ai: true },
       { role: 'human', name: 'Léa', avatar: 2, ai: true },
     ];
-    const sess = new LocalSession({ seed: Math.floor(Math.random() * 1e9), duration: 100000, players, noCountdown: true, difficulty: 1, variant: this.prefs.variant }, []);
+    const sess = new LocalSession({ seed: Math.floor(Math.random() * 1e9), duration: 100000, players, noCountdown: true, difficulty: 1, variant: this.prefs.variant, map: this.prefs.map }, []);
     sess.maxFrameDt = this.app.maxDt;
     this.app.start(sess, sess.game, true);
   }
@@ -275,7 +287,7 @@ export class Screens {
         <h2>🐶 Jouer seul</h2>
         <div class="row">
           <div class="choice ${role === 'tofu' ? 'sel' : ''}" tabindex="0" data-role="tofu"><span class="em">🐶</span>Jouer Tofu<br><small>Fais un maximum de bêtises !</small></div>
-          <div class="choice ${role === 'human' ? 'sel' : ''}" tabindex="0" data-role="human"><span class="em">🧹</span>Jouer un humain<br><small>Prépare la maison et surveille Tofu !</small></div>
+          <div class="choice ${role === 'human' ? 'sel' : ''}" tabindex="0" data-role="human"><span class="em">🧹</span>Jouer un humain<br><small>${getMap(p.map).story.humanRole}</small></div>
         </div>
         <div class="opts">
           ${role === 'tofu' ? `<span>Humains (ordinateur)</span><div class="seg" data-k="humans">${[1, 2].map((n) => `<button class="${humansAI === n ? 'sel' : ''}" data-v="${n}">${n}</button>`).join('')}</div>` : `
@@ -283,7 +295,8 @@ export class Screens {
           <span>Coéquipier</span><div class="seg" data-k="mate"><button class="${!teammate ? 'sel' : ''}" data-v="0">Seul</button><button class="${teammate ? 'sel' : ''}" data-v="1">+ 1 humain ordinateur</button></div>`}
           <span>Difficulté</span><div class="seg" data-k="diff">${['Facile', 'Normal', 'Difficile'].map((n, i) => `<button class="${p.difficulty === i ? 'sel' : ''}" data-v="${i}">${n}</button>`).join('')}</div>
           <span>Durée</span><div class="seg" data-k="dur">${[240, 360, 480].map((d) => `<button class="${p.duration === d ? 'sel' : ''}" data-v="${d}">${d / 60} min</button>`).join('')}</div>
-          ${variantRow(p.variant)}
+          ${mapRow(p.map)}
+          ${variantRow(p.variant, p.map)}
         </div>
         <div class="foot">
           <button class="big" data-back>⬅ Retour</button>
@@ -308,6 +321,11 @@ export class Screens {
       if (seg) {
         if (seg.dataset.k === 'variant') {
           this.setVariant(b.dataset.v);
+          render();
+          return;
+        }
+        if (seg.dataset.k === 'map') {
+          this.setMap(b.dataset.v);
           render();
           return;
         }
@@ -336,7 +354,7 @@ export class Screens {
         const myId = role === 'tofu' ? 0 : 1;
         const dev = this.primaryDevice(role);
         this.startLocal(
-          { seed: Math.floor(Math.random() * 1e9), duration: p.duration, players, difficulty: p.difficulty, variant: p.variant },
+          { seed: Math.floor(Math.random() * 1e9), duration: p.duration, players, difficulty: p.difficulty, variant: p.variant, map: p.map },
           [{ slot: 0, charId: myId, device: dev, rig: this.newRig(), rect: { x: 0, y: 0, w: 1, h: 1 }, raw: null, name: 'Moi' }],
         );
       }
@@ -350,8 +368,17 @@ export class Screens {
 
   /** Remembers the chosen ambiance and shows it behind the menus. */
   setVariant(v: string | undefined) {
-    if (!isVariant(v) || v === this.prefs.variant) return;
+    if (!isVariant(v) || v === this.prefs.variant || !getMap(this.prefs.map).variants.includes(v)) return;
     this.prefs.variant = v;
+    savePrefs(this.prefs);
+    this.startAttract();
+  }
+
+  /** Remembers the chosen place (keeps the ambiance when the place offers it). */
+  setMap(id: string | undefined) {
+    if (!isMapId(id) || id === this.prefs.map) return;
+    this.prefs.map = id;
+    if (!getMap(id).variants.includes(this.prefs.variant)) this.prefs.variant = 'ete';
     savePrefs(this.prefs);
     this.startAttract();
   }
@@ -409,7 +436,8 @@ export class Screens {
         <div class="slots">${slots}</div>${err}
         <div class="opts"><span>Rôles manquants</span><div class="seg" data-k="fill"><button class="${fillAI ? 'sel' : ''}" data-v="1">Complétés par l'ordinateur</button><button class="${!fillAI ? 'sel' : ''}" data-v="0">Non</button></div>
         <span>Durée</span><div class="seg" data-k="dur">${[240, 360, 480].map((d) => `<button class="${this.prefs.duration === d ? 'sel' : ''}" data-v="${d}">${d / 60} min</button>`).join('')}</div>
-        ${variantRow(this.prefs.variant)}</div>
+        ${mapRow(this.prefs.map)}
+        ${variantRow(this.prefs.variant, this.prefs.map)}</div>
         <p class="small">Pour lancer : bouton « Jouer », ou la touche pause d'un joueur (${keyLabel(KEYMAPS.left.pause[0] ?? 'Escape')} · ${keyLabel(KEYMAPS.right.pause[0] ?? 'Backspace')} · ${padButtonLabel(PADMAP.pause[0] ?? 9)}).</p>
         <div class="foot"><button class="big" data-back>⬅ Retour</button><button class="big primary" data-go ${joined.length < 1 || tofus > 1 ? 'disabled' : ''}>Jouer ▶</button></div></div>`;
     };
@@ -534,7 +562,7 @@ export class Screens {
       if (!players.some((p) => p.role === 'human')) players.push({ role: 'human', name: 'Maman', avatar: 0, ai: true });
       locals.sort((a, b) => a.slot - b.slot);
       locals.forEach((l, i) => (l.slot = i));
-      this.startLocal({ seed: Math.floor(Math.random() * 1e9), duration: this.prefs.duration, players, difficulty: this.prefs.difficulty, variant: this.prefs.variant }, locals);
+      this.startLocal({ seed: Math.floor(Math.random() * 1e9), duration: this.prefs.duration, players, difficulty: this.prefs.difficulty, variant: this.prefs.variant, map: this.prefs.map }, locals);
     };
     s.addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest('button') as HTMLButtonElement | null;
@@ -545,6 +573,7 @@ export class Screens {
         const k = seg.dataset.k;
         if (k === 'fill') fillAI = b.dataset.v === '1';
         else if (k === 'variant') this.setVariant(b.dataset.v);
+        else if (k === 'map') this.setMap(b.dataset.v);
         else if (k === 'dur') {
           this.prefs.duration = Number(b.dataset.v);
           savePrefs(this.prefs);
@@ -609,6 +638,7 @@ export class Screens {
     this.clearIntro();
     this.app.intro = duration;
     const S = s.state;
+    const M = this.app.helper!.map;
     s.locals.forEach((lp, i) => {
       const me = S.chars[lp.charId];
       const card = el('div', 'intro-card');
@@ -622,9 +652,9 @@ export class Screens {
       const ctr = `<p style="font-size:.9rem;opacity:.85">Action <kbd>${glyph(dev, BTN_INTERACT)}</kbd> · Courir <kbd>${glyph(dev, BTN_SPRINT)}</kbd> · ${me.role === 'tofu' ? 'Zoomies' : 'Friandise'} <kbd>${glyph(dev, BTN_SPECIAL)}</kbd> · ${me.role === 'tofu' ? 'Aboyer' : 'Appeler'} <kbd>${glyph(dev, BTN_BARK)}</kbd>${me.role === 'tofu' ? ` · Assis <kbd>${glyph(dev, BTN_SIT)}</kbd>` : ''}</p>`;
       if (me.role === 'tofu') {
         card.innerHTML = `<div class="em">🐶</div><h2>Tu es TOFU !</h2><p>Fais <b>${S.chaosGoal} points de bêtises</b> ou tiens jusqu'à la fin du temps !</p>
-          <p><b>Tes défis secrets :</b></p><ul>${S.secrets.map((x) => `<li>${SECRET_DEFS.find((d) => d.id === x.id)!.icon} ${SECRET_DEFS.find((d) => d.id === x.id)!.text}</li>`).join('')}</ul>${ctr}`;
+          <p><b>Tes défis secrets :</b></p><ul>${S.secrets.map((x) => secretInfo(M, x.id)).map((d) => `<li>${d.icon} ${d.text}</li>`).join('')}</ul>${ctr}`;
       } else {
-        card.innerHTML = `<div class="em">🧹</div><h2>${me.name}, prépare la maison !</h2><p>Les invités arrivent. Finissez toutes les tâches et gardez la maison propre (${S.cleanGoal} %).</p>
+        card.innerHTML = `<div class="em">🧹</div><h2>${me.name}, ${M.story.prepare} !</h2><p>${M.story.humans} (${S.cleanGoal} %).</p>
           <ul>${S.tasks.map((t) => `<li>${TASK_DEFS[t.kind].icon} ${TASK_DEFS[t.kind].title}</li>`).join('')}</ul><p>⚠️ Surveillez Tofu !</p>${ctr}`;
       }
       const vp = this.app.hudFor(i)?.el;
@@ -716,9 +746,10 @@ export class Screens {
     const isNet = this.app.session.kind === 'net';
     const st = S.stats;
     const tofuWon = S.winner === 'tofu';
-    const reason = S.endReason === 'chaos' ? 'Trop de bêtises dans la maison ! 😈'
-      : S.endReason === 'time' ? 'Le temps est écoulé et la maison n\'est pas prête…'
-        : S.endReason === 'guests' ? 'La maison est prête : les invités sont ravis ! 🎉'
+    const story = (this.app.helper?.map ?? getMap(DEFAULT_MAP)).story;
+    const reason = S.endReason === 'chaos' ? story.chaos
+      : S.endReason === 'time' ? story.late
+        : S.endReason === 'guests' ? story.ready
           : S.endReason === 'abandon' ? 'Partie interrompue.' : '';
     const humans = S.chars.filter((c) => c.role === 'human');
     const awards: string[] = [];

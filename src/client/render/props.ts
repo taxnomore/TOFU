@@ -834,8 +834,278 @@ const B: Partial<Record<PropType, Builder>> = {
     }
     snowCap(c, w + 0.1, d + 0.4, top + 0.12, 0, 0.1);
   },
-  swing_set() {},
+  swing_set({ c, b, w, d, h }) {
+    // A-frame swings for the park.
+    for (const sx of [-1, 1]) {
+      for (const sz of [-1, 1]) c.cylU(0.05, h + 0.1, { x: sx * (w / 2), y: h / 2, z: sz * (d / 2 - 0.1), rx: -sz * 0.28 }, 0xc0392b, 8);
+    }
+    c.cylU(0.06, w + 0.1, { y: h, rz: Math.PI / 2 }, 0xc0392b, 8);
+    for (const sx of [-0.5, 0.5]) {
+      for (const e of [-0.18, 0.18]) b.cylU(0.012, h - 0.55, { x: sx * w * 0.6 + e, y: (h + 0.55) / 2 }, 0x95a5a6, 6);
+      b.rbox(0.45, 0.04, 0.2, 0.02, { x: sx * w * 0.6, y: 0.5 }, sx < 0 ? 0xf1c40f : 0x3498db);
+    }
+  },
   bus_shelter() {},
+  // ----- École -----
+  blackboard({ c, w }) {
+    c.box(w + 0.12, 1.32, 0.05, { y: 1.5 }, 0x8d6e4f);
+    c.box(w, 1.2, 0.06, { y: 1.5, z: 0.01 }, 0x2f4f3f);
+    c.box(w, 0.05, 0.12, { y: 0.88, z: 0.06 }, 0x8d6e4f);
+    // Chalk writing and the date.
+    for (let i = 0; i < 4; i++) c.box(0.5 + hash(i, 9) * 1.2, 0.03, 0.005, { x: -w / 2 + 0.3 + (0.5 + hash(i, 9) * 1.2) / 2, y: 1.9 - i * 0.22, z: 0.045 }, 0xf5f6fa);
+    c.box(0.06, 0.02, 0.03, { x: 0.4, y: 0.92, z: 0.08 }, 0xffffff);
+    c.box(0.14, 0.04, 0.06, { x: -0.6, y: 0.93, z: 0.08 }, 0x6d4c33);
+  },
+  school_desk({ b, w, d, h }) {
+    b.box(w, 0.04, d, { y: h - 0.02 }, 0xd9b48a);
+    b.box(w - 0.06, 0.12, d - 0.1, { y: h - 0.12 }, 0x7f8c8d);
+    for (const sx of [-1, 1]) b.box(0.04, h - 0.04, d - 0.06, { x: sx * (w / 2 - 0.05), y: (h - 0.04) / 2 }, 0x5d6d7e);
+    // Two little chairs behind.
+    for (const sx of [-1, 1]) {
+      const x = sx * w * 0.25;
+      b.box(0.36, 0.03, 0.34, { x, y: 0.4, z: -d / 2 - 0.25 }, 0xe67e22);
+      b.box(0.36, 0.28, 0.03, { x, y: 0.58, z: -d / 2 - 0.42 }, 0xe67e22);
+      for (const ex of [-1, 1]) for (const ez of [-1, 1]) b.cylU(0.012, 0.4, { x: x + ex * 0.15, y: 0.2, z: -d / 2 - 0.25 + ez * 0.14 }, 0x5d6d7e, 6);
+    }
+    b.box(0.2, 0.01, 0.28, { x: -w * 0.22, y: h + 0.005, z: 0.02, ry: 0.2 }, 0xffffff);
+  },
+  teacher_desk({ b, w, d, h }) {
+    b.box(w, 0.05, d, { y: h - 0.025 }, WOOD);
+    b.box(0.45, h - 0.05, d - 0.05, { x: w / 2 - 0.25, y: (h - 0.05) / 2 }, WOOD_DARK);
+    for (let i = 0; i < 3; i++) b.box(0.4, 0.02, 0.01, { x: w / 2 - 0.25, y: 0.18 + i * 0.22, z: d / 2 - 0.02 }, 0xd4af37);
+    b.box(0.05, h - 0.05, d - 0.05, { x: -w / 2 + 0.04, y: (h - 0.05) / 2 }, WOOD_DARK);
+    b.box(w - 0.1, 0.4, 0.03, { y: 0.45, z: d / 2 - 0.04 }, WOOD_DARK);
+    b.box(0.3, 0.04, 0.22, { x: -0.25, y: h + 0.02 }, 0xe74c3c);
+    b.box(0.28, 0.035, 0.2, { x: -0.25, y: h + 0.06, ry: 0.1 }, 0x2e86de);
+  },
+  coat_hooks({ b, w }) {
+    b.box(w, 0.12, 0.03, { y: 1.42 }, WOOD);
+    const n = Math.max(3, Math.round(w / 0.4));
+    for (let i = 0; i < n; i++) {
+      const x = -w / 2 + (i + 0.5) * (w / n);
+      b.cylU(0.012, 0.1, { x, y: 1.4, z: 0.06, rx: Math.PI / 2 - 0.4 }, 0xd4af37, 6);
+      b.box(0.1, 0.06, 0.005, { x, y: 1.55, z: 0.02 }, [0xe74c3c, 0x3498db, 0xf1c40f, 0x2ecc71][i % 4]);
+    }
+    // A bench under the hooks.
+    b.box(w * 0.9, 0.04, 0.3, { y: 0.38, z: 0.1 }, 0xd9b48a);
+    for (const sx of [-1, 1]) b.box(0.04, 0.38, 0.28, { x: sx * w * 0.42, y: 0.19, z: 0.1 }, 0x95a5a6);
+  },
+  easel({ b }) {
+    for (const sx of [-1, 1]) b.box(0.04, 1.5, 0.04, { x: sx * 0.25, y: 0.75, z: 0.05, rz: -sx * 0.08 }, WOOD_LIGHT);
+    b.box(0.04, 1.45, 0.04, { y: 0.72, z: -0.25, rx: -0.3 }, WOOD_LIGHT);
+    b.box(0.62, 0.04, 0.08, { y: 0.62, z: 0.08 }, WOOD_LIGHT);
+    b.box(0.6, 0.6, 0.02, { y: 0.98, z: 0.1, rx: -0.08 }, 0xfdfdfd);
+    for (let i = 0; i < 4; i++) b.sphere(0.08, { x: -0.15 + (i % 2) * 0.25, y: 0.85 + Math.floor(i / 2) * 0.22, z: 0.12, sz: 0.1 }, [0xe74c3c, 0xf1c40f, 0x3498db, 0x2ecc71][i], 'lo');
+  },
+  notice_board({ c, w, h }) {
+    for (const sx of [-1, 1]) c.cylU(0.04, h, { x: sx * (w / 2 - 0.05), y: h / 2 }, GREEN_IRON, 8);
+    c.box(w, 0.9, 0.06, { y: 1.35 }, GREEN_IRON);
+    c.box(w - 0.1, 0.8, 0.02, { y: 1.35, z: 0.03 }, 0xc49a6c);
+    c.box(w + 0.15, 0.06, 0.25, { y: 1.85, z: 0.05, rx: 0.2 }, GREEN_IRON);
+    c.box(0.3, 0.2, 0.01, { x: -0.45, y: 1.5, z: 0.045 }, 0xfdfdfd);
+    c.box(0.2, 0.28, 0.01, { x: 0.5, y: 1.3, z: 0.045, rz: 0.05 }, 0xfff59d);
+  },
+  basket_hoop({ c }) {
+    c.cylU(0.07, 3.0, { y: 1.5 }, 0x5d6d7e, 8);
+    c.box(0.06, 0.06, 0.5, { y: 2.9, z: 0.25 }, 0x5d6d7e);
+    c.box(1.0, 0.65, 0.04, { y: 3.0, z: 0.5 }, 0xfdfdfd);
+    c.box(0.4, 0.3, 0.045, { y: 2.92, z: 0.5 }, 0xe74c3c);
+    c.torus(0.2, 0.015, { y: 2.75, z: 0.75, rx: Math.PI / 2 }, 0xe67e22);
+  },
+  pillar({ c, h }) {
+    c.box(0.28, h, 0.28, { y: h / 2 }, 0xd8d2c6);
+    c.box(0.36, 0.12, 0.36, { y: 0.06 }, 0xb7ab8d);
+  },
+  lunch_table({ b, w, d, h }) {
+    b.box(w, 0.04, d, { y: h - 0.02 }, 0xf5f6fa);
+    for (const sx of [-1, 1]) b.box(0.05, h - 0.04, d - 0.1, { x: sx * (w / 2 - 0.1), y: (h - 0.04) / 2 }, METAL);
+    // Little benches and trays.
+    for (const sz of [-1, 1]) {
+      b.box(w - 0.2, 0.04, 0.26, { y: 0.4, z: sz * (d / 2 + 0.25) }, 0x3498db);
+      for (const sx of [-1, 1]) b.box(0.04, 0.4, 0.2, { x: sx * (w / 2 - 0.2), y: 0.2, z: sz * (d / 2 + 0.25) }, METAL);
+      for (let i = 0; i < 3; i++) b.box(0.32, 0.015, 0.24, { x: -w / 3 + i * (w / 3), y: h + 0.008, z: sz * 0.2 }, [0xe74c3c, 0x2ecc71, 0xf39c12][i]);
+    }
+  },
+  lost_box({ b, w, d, h }) {
+    b.box(w, h, d, { y: h / 2 }, 0xc49a6c);
+    for (const sz of [-1, 1]) b.box(w, 0.02, d * 0.5, { y: h + 0.05, z: sz * d * 0.42, rx: sz * 0.7 }, 0xb88a58);
+    b.box(w * 0.7, 0.14, 0.01, { y: h * 0.65, z: d / 2 + 0.006 }, 0xfdfdfd);
+    b.box(w * 0.5, 0.03, 0.012, { y: h * 0.65, z: d / 2 + 0.01 }, 0x2d3436);
+    b.ico(0.12, { x: 0.1, y: h, z: 0, sy: 0.6 }, 0x8e44ad);
+  },
+  ball_bin({ b, w, d, h }) {
+    for (let i = 0; i < 6; i++) b.box(w, 0.025, 0.025, { y: 0.1 + i * 0.12, z: d / 2 }, 0x95a5a6);
+    for (let i = 0; i < 6; i++) b.box(w, 0.025, 0.025, { y: 0.1 + i * 0.12, z: -d / 2 }, 0x95a5a6);
+    for (const sx of [-1, 1]) b.box(0.03, h, d, { x: sx * w / 2, y: h / 2 }, 0x7f8c8d);
+    b.box(w, 0.03, d, { y: 0.06 }, 0x7f8c8d);
+    for (let i = 0; i < 5; i++) b.sphere(0.12, { x: -0.25 + (i % 3) * 0.25, y: 0.25 + Math.floor(i / 3) * 0.2, z: (i % 2) * 0.1 - 0.05 }, [0xe67e22, 0xfdfdfd, 0xe74c3c, 0x3498db, 0xf1c40f][i]);
+  },
+  trestle_table({ b, w, d, h }) {
+    b.box(w, 0.04, d, { y: h - 0.02 }, 0xc49a6c);
+    b.box(w + 0.1, 0.012, d + 0.1, { y: h + 0.002 }, 0xfdfdfd);
+    for (const sz of [-1, 1]) b.box(w + 0.1, 0.35, 0.012, { y: h - 0.17, z: sz * (d / 2 + 0.05) }, 0xfdfdfd);
+    for (const sx of [-1, 1]) {
+      b.box(0.04, h, 0.04, { x: sx * (w / 2 - 0.15), y: h / 2, z: -d / 2 + 0.1, rx: 0.15 }, 0x7a5235);
+      b.box(0.04, h, 0.04, { x: sx * (w / 2 - 0.15), y: h / 2, z: d / 2 - 0.1, rx: -0.15 }, 0x7a5235);
+    }
+    // Paper garland along the front.
+    for (let i = 0; i < 8; i++) b.tris([-w / 2 + i * (w / 8), h - 0.02, d / 2 + 0.07, -w / 2 + (i + 1) * (w / 8), h - 0.02, d / 2 + 0.07, -w / 2 + (i + 0.5) * (w / 8), h - 0.2, d / 2 + 0.07], [0xe74c3c, 0xf1c40f, 0x3498db, 0x2ecc71][i % 4]);
+  },
+  // ----- Centre commercial -----
+  clothes_rack({ b, w, d, h }) {
+    for (const sx of [-1, 1]) {
+      b.cylU(0.02, h, { x: sx * (w / 2 - 0.05), y: h / 2 }, 0xbdc3c7, 8);
+      b.box(0.04, 0.03, d, { x: sx * (w / 2 - 0.05), y: 0.03 }, 0x95a5a6);
+    }
+    b.cylU(0.018, w, { y: h - 0.05, rz: Math.PI / 2 }, 0xbdc3c7, 8);
+    // Empty hangers.
+    for (let i = 0; i < 5; i++) b.torus(0.06, 0.006, { x: -w / 2 + 0.3 + i * 0.25, y: h - 0.1, rx: 0 }, 0x2d3436);
+  },
+  shop_shelf({ c, p, w, d, h }) {
+    const col = p.color ?? 0xf5f6fa;
+    c.box(w, h, 0.06, { y: h / 2, z: -d / 2 + 0.03 }, shade(col, 0.9));
+    for (const sx of [-1, 1]) c.box(0.05, h, d, { x: sx * (w / 2 - 0.025), y: h / 2 }, shade(col, 0.85));
+    const goods = p.v === 1
+      ? [0xe74c3c, 0xf1c40f, 0x27ae60, 0xe67e22, 0x8e44ad, 0x3498db]
+      : [0xff8fab, 0x74b9ff, 0xfdcb6e, 0x55efc4, 0xa29bfe, 0xfab1a0];
+    for (let k = 0; k < 4; k++) {
+      const y = 0.12 + k * (h - 0.2) / 3.4;
+      c.box(w - 0.1, 0.03, d - 0.05, { y }, col);
+      for (let i = 0; i < 8; i++) {
+        if (hash(i + k * 10, Math.round(p.x * 7 + p.z)) > 0.8) continue;
+        const gx = -w / 2 + 0.15 + i * ((w - 0.3) / 7);
+        const gh = 0.14 + hash(i, k + 3) * 0.12;
+        c.box(0.16, gh, d * 0.6, { x: gx, y: y + gh / 2 + 0.015, z: 0.02 }, goods[(i + k) % goods.length]);
+      }
+    }
+    c.box(w, 0.2, 0.03, { y: h + 0.1, z: -d / 2 + 0.03 }, p.color2 ?? 0xe74c3c);
+  },
+  checkout({ b, w, d, h }) {
+    b.box(w, h - 0.05, d, { y: (h - 0.05) / 2 }, 0x2d6a8a);
+    b.box(w * 0.7, 0.04, d - 0.2, { x: -w * 0.15, y: h - 0.03 }, 0x2d3436);
+    b.box(w + 0.04, 0.04, d + 0.04, { y: h - 0.02, x: 0 }, 0xdfe6e9);
+    b.box(0.3, 0.18, 0.25, { x: w / 2 - 0.25, y: h + 0.09 }, 0x2d3436);
+    b.box(0.26, 0.14, 0.02, { x: w / 2 - 0.25, y: h + 0.26, z: -0.05, rx: -0.4 }, 0x74b9ff);
+    b.cylU(0.03, 0.9, { x: -w / 2 + 0.1, y: h + 0.45, z: -d / 2 + 0.1 }, 0x95a5a6, 8);
+    b.box(0.3, 0.2, 0.04, { x: -w / 2 + 0.1, y: h + 0.95, z: -d / 2 + 0.1 }, 0xf1c40f);
+  },
+  fountain({ b, c }) {
+    const stone = 0xd8d2c6;
+    const n = 20;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      b.box(0.62, 0.45, 0.3, { x: Math.cos(a) * 1.65, y: 0.225, z: Math.sin(a) * 1.65, ry: -a + Math.PI / 2 }, stone);
+    }
+    b.cylU(1.6, 0.02, { y: 0.03 }, 0x9aa3a8, 24);
+    b.cylU(1.55, 0.02, { y: 0.32 }, 0x6fb7d6, 24);
+    c.cylU(0.18, 1.1, { y: 0.55 }, stone, 12);
+    c.cyl(0.5, 0.15, 0.2, { y: 1.1 }, stone, 16);
+    c.cylU(0.45, 0.02, { y: 1.19 }, 0x6fb7d6, 16);
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      c.cylU(0.015, 0.5, { x: Math.cos(a) * 0.35, y: 0.95, z: Math.sin(a) * 0.35, rz: Math.cos(a) * 0.5, rx: -Math.sin(a) * 0.5 }, 0xbfe6f5, 6);
+    }
+  },
+  cart_shelter({ c, w, d, h }) {
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) c.cylU(0.04, h, { x: sx * (w / 2 - 0.05), y: h / 2, z: sz * (d / 2 - 0.05) }, 0x95a5a6, 8);
+    c.box(w + 0.2, 0.06, d + 0.3, { y: h, rx: 0.08 }, 0x2e86de);
+    snowCap(c, w, d, h + 0.04);
+    for (let i = 0; i < 4; i++) {
+      const z = -d / 2 + 0.4 + i * 0.05;
+      c.box(0.5, 0.35, 0.75, { x: -w / 2 + 0.5 + i * 0.32, y: 0.62, z: z - 0.1 }, 0xbdc3c7);
+      c.box(0.52, 0.04, 0.04, { x: -w / 2 + 0.5 + i * 0.32, y: 0.92, z: z - 0.55 }, 0xe74c3c);
+    }
+  },
+  display_table({ b, p, w, d, h }) {
+    b.box(w, 0.05, d, { y: h - 0.025 }, 0xf5f6fa);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) b.box(0.04, h - 0.05, 0.04, { x: sx * (w / 2 - 0.05), y: (h - 0.05) / 2, z: sz * (d / 2 - 0.05) }, 0x2d3436);
+    const cols = p.v === 1 ? [0xd4a373, 0xc49a6c, 0xe9d18e] : [0x1f3a93, 0xe74c3c, 0xffffff, 0x27ae60];
+    for (let i = 0; i < 6; i++) b.box(0.32, 0.06 + (i % 3) * 0.03, 0.26, { x: -w / 2 + 0.25 + (i % 3) * 0.55, y: h + 0.04, z: (Math.floor(i / 3) - 0.5) * 0.35 }, cols[i % cols.length]);
+  },
+  fitting_room({ c, w, d, h }) {
+    c.box(w, h, 0.05, { y: h / 2, z: -d / 2 }, 0xf5f0e6);
+    for (const sx of [-1, 1]) c.box(0.05, h, d, { x: sx * w / 2, y: h / 2 }, 0xf5f0e6);
+    c.cylU(0.015, w, { y: h - 0.05, z: d / 2, rz: Math.PI / 2 }, 0xd4af37, 6);
+    for (let i = 0; i < 7; i++) c.box(w / 7, h - 0.2, 0.03, { x: -w / 2 + (i + 0.5) * (w / 7), y: (h - 0.2) / 2 + 0.1, z: d / 2 + (i % 2 ? 0.02 : -0.02) }, 0x8e2b3c);
+    c.box(0.6, 1.1, 0.02, { y: 1.2, z: -d / 2 + 0.04 }, 0xdff9fb);
+  },
+  escalator({ c, w, d, h }) {
+    const steps = 14;
+    for (let i = 0; i < steps; i++) {
+      const t = i / steps;
+      c.box(w - 0.3, 0.08, d / steps + 0.02, { y: 0.1 + t * h, z: -d / 2 + (i + 0.5) * (d / steps) }, 0x7f8c8d);
+    }
+    for (const sx of [-1, 1]) {
+      c.quad4([sx * w / 2, 0, -d / 2], [sx * w / 2, 0, d / 2], [sx * w / 2, h + 1, d / 2], [sx * w / 2, 1, -d / 2], 0xdfe6e9);
+      c.box(0.08, 0.08, d * 1.04, { x: sx * (w / 2 - 0.05), y: h / 2 + 1.0, rx: -Math.atan2(h, d) }, 0x2d3436);
+    }
+  },
+  // ----- Parc -----
+  picnic_table({ b, w, d, h }) {
+    b.box(w, 0.05, d * 0.5, { y: h - 0.025 }, WOOD);
+    for (const sz of [-1, 1]) {
+      b.box(w, 0.04, 0.28, { y: 0.44, z: sz * (d / 2 - 0.14) }, WOOD);
+      for (const sx of [-1, 1]) b.box(0.06, 0.8, 0.06, { x: sx * (w / 2 - 0.2), y: 0.38, z: sz * 0.28, rx: sz * 0.5 }, WOOD_DARK);
+    }
+    for (const sx of [-1, 1]) b.box(0.05, 0.05, d - 0.1, { x: sx * (w / 2 - 0.2), y: 0.3 }, WOOD_DARK);
+    snowCap(b, w - 0.1, d * 0.45, h);
+  },
+  pool({ b, w }) {
+    const r = w / 2;
+    const n = 22;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      b.box(0.5, 0.3, 0.32, { x: Math.cos(a) * r, y: 0.15, z: Math.sin(a) * r, ry: -a + Math.PI / 2 }, i % 2 ? 0x74b9ff : 0xffffff);
+    }
+    b.cylU(r - 0.1, 0.02, { y: 0.02 }, 0x7ec8e3, 24);
+  },
+  pond({ b, w, d }) {
+    b.sphere(1, { y: 0.01, sx: w / 2, sy: 0.02, sz: d / 2 }, 0x4f8fb5, 'hi');
+    b.sphere(1, { y: 0.0, sx: w / 2 + 0.25, sy: 0.015, sz: d / 2 + 0.25 }, 0x8a7a62, 'hi');
+    for (let i = 0; i < 14; i++) {
+      const a = hash(i, 11) * Math.PI * 2;
+      b.cylU(0.015, 0.6 + hash(i, 12) * 0.4, { x: Math.cos(a) * (w / 2 + 0.1), y: 0.4, z: Math.sin(a) * (d / 2 + 0.1) }, 0x6b8e23, 5);
+    }
+    for (let i = 0; i < 4; i++) b.cylU(0.25, 0.02, { x: (hash(i, 13) - 0.5) * w * 0.6, y: 0.03, z: (hash(i, 14) - 0.5) * d * 0.6 }, 0x3d8b3d, 10);
+    // Two ducks.
+    for (let i = 0; i < 2; i++) {
+      const x = -0.8 + i * 1.4;
+      b.sphere(0.14, { x, y: 0.1, z: 0.3 * i, sz: 1.4, sy: 0.8 }, i ? 0xfdfdfd : 0x7a5235);
+      b.sphere(0.08, { x, y: 0.25, z: 0.3 * i + 0.15 }, i ? 0xfdfdfd : 0x2e7d32);
+      b.cone(0.03, 0.07, { x, y: 0.24, z: 0.3 * i + 0.26, rx: Math.PI / 2 }, 0xf39c12);
+    }
+  },
+  carousel({ c, b }) {
+    b.cylU(2.3, 0.25, { y: 0.125 }, 0xc0392b, 24);
+    b.cylU(2.2, 0.03, { y: 0.26 }, 0xf1c40f, 24);
+    c.cylU(0.25, 3.2, { y: 1.6 }, 0xf1c40f, 12);
+    const n = 12;
+    for (let i = 0; i < n; i++) {
+      const a0 = (i / n) * Math.PI * 2;
+      const a1 = ((i + 1) / n) * Math.PI * 2;
+      c.tris([0, 4.1, 0, Math.cos(a1) * 2.5, 3.2, Math.sin(a1) * 2.5, Math.cos(a0) * 2.5, 3.2, Math.sin(a0) * 2.5], i % 2 ? 0xffffff : 0xe74c3c);
+      c.box(0.9, 0.3, 0.03, { x: Math.cos((a0 + a1) / 2) * 2.45, y: 3.05, z: Math.sin((a0 + a1) / 2) * 2.45, ry: -(a0 + a1) / 2 + Math.PI / 2 }, i % 2 ? 0xf1c40f : 0x3498db);
+    }
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      const x = Math.cos(a) * 1.6;
+      const z = Math.sin(a) * 1.6;
+      c.cylU(0.03, 2.9, { x, y: 1.7, z }, 0xd4af37, 6);
+      b.rbox(0.22, 0.35, 0.7, 0.1, { x, y: 1.0 + (i % 2) * 0.25, z, ry: -a }, [0xffffff, 0xf5cba7, 0xaed6f1][i % 3]);
+      b.sphere(0.14, { x: x + Math.cos(a + Math.PI / 2) * 0.32, y: 1.28 + (i % 2) * 0.25, z: z + Math.sin(a + Math.PI / 2) * 0.32 }, [0xffffff, 0xf5cba7, 0xaed6f1][i % 3]);
+    }
+  },
+  drinking_fountain({ b }) {
+    b.cylU(0.14, 0.9, { y: 0.45 }, GREEN_IRON, 10);
+    b.cylU(0.2, 0.08, { y: 0.92 }, GREEN_IRON, 12);
+    b.cylU(0.02, 0.12, { y: 0.98, z: 0.1, rx: 0.8 }, 0xbdc3c7, 6);
+    b.cylU(0.22, 0.04, { y: 0.02 }, 0x7f8c8d, 12);
+  },
+  cooler({ b, w, d, h }) {
+    b.rbox(w, h - 0.08, d, 0.04, { y: (h - 0.08) / 2 }, 0x2e86de);
+    b.rbox(w + 0.02, 0.1, d + 0.02, 0.03, { y: h - 0.05 }, 0xfdfdfd);
+    b.box(w * 0.5, 0.04, 0.06, { y: h + 0.02 }, 0xfdfdfd);
+  },
 };
 
 /** Builds a prop into the opaque/occluder world builders. */

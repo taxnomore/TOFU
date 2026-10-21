@@ -441,6 +441,8 @@ export interface HumanLook {
   scale: number;
   beard?: boolean;
   skirt?: boolean;
+  /** Passers-by: security guard badge, jogger headband. */
+  extra?: 'guard' | 'jogger';
 }
 
 export const HUMAN_LOOKS: HumanLook[] = [
@@ -449,7 +451,12 @@ export const HUMAN_LOOKS: HumanLook[] = [
   { name: 'Léa', skin: 0xf7d2b4, shirt: 0xffcf3f, pants: 0x9b59b6, shoes: 0xff6b9a, hair: 0xe0b65a, hairStyle: 'pigtails', scale: 0.8, skirt: true },
   { name: 'Hugo', skin: 0xd9a07a, shirt: 0x3fcf8e, pants: 0x2f6fb5, shoes: 0x2d3436, hair: 0xb5532b, hairStyle: 'curly', scale: 0.82 },
   { name: 'Factrice', skin: 0xeab896, shirt: 0x2d5fa8, pants: 0x2b3a55, shoes: 0x2d3436, hair: 0x3a2a20, hairStyle: 'cap', scale: 1 },
+  { name: 'Vigile', skin: 0xc68a62, shirt: 0x23272e, pants: 0x23272e, shoes: 0x111111, hair: 0x1d1a17, hairStyle: 'short', scale: 1.08, extra: 'guard' },
+  { name: 'Joggeuse', skin: 0xf0c4a2, shirt: 0xff5fa2, pants: 0x2d3436, shoes: 0x3fcf8e, hair: 0xc0763a, hairStyle: 'ponytail', scale: 0.98, extra: 'jogger' },
 ];
+
+/** Look index of each passer-by. */
+export const PASSER_LOOK = { carrier: 4, guard: 5, jogger: 6 } as const;
 
 export class HumanModel {
   readonly root = new THREE.Group();
@@ -491,6 +498,11 @@ export class HumanModel {
       t.rbox(0.3, 0.26, 0.1, 0.04, { x: 0.18, y: 0.12, z: 0.0, rz: 0.1, ry: Math.PI / 2 }, 0xf6c445);
       t.box(0.04, 0.6, 0.02, { x: 0.0, y: 0.3, z: 0.13, rz: 0.75 }, 0xf6c445);
       t.box(0.44, 0.04, 0.27, { y: 0.4 }, 0xf6c445);
+    }
+    if (L.extra === 'guard') {
+      // Yellow badge and armband.
+      t.box(0.12, 0.08, 0.02, { x: -0.1, y: 0.38, z: 0.13 }, 0xf1c40f);
+      t.box(0.44, 0.06, 0.27, { y: 0.48 }, 0x3a3f47);
     }
     this.torso.add(mesh(t));
     this.head = joint(this.torso, 0, 0.6, 0);
@@ -738,10 +750,13 @@ function hair(h: GeoBuilder, L: HumanLook) {
       break;
     case 'cap':
       h.sphere(0.175, { y: 0.2, z: -0.02, sy: 0.75 }, c);
-      h.cyl(0.17, 0.18, 0.1, { y: 0.29 }, 0x2d5fa8, 14);
-      h.box(0.2, 0.02, 0.14, { y: 0.25, z: 0.18 }, 0x2d5fa8);
-      h.box(0.08, 0.04, 0.01, { y: 0.31, z: 0.17 }, 0xf6c445);
       break;
+  }
+  if (L.extra === 'jogger') h.torus(0.165, 0.03, { y: 0.22, rx: Math.PI / 2 }, 0xffffff);
+  if (L.hairStyle === 'cap') {
+    h.cyl(0.17, 0.18, 0.1, { y: 0.29 }, 0x2d5fa8, 14);
+    h.box(0.2, 0.02, 0.14, { y: 0.25, z: 0.18 }, 0x2d5fa8);
+    h.box(0.08, 0.04, 0.01, { y: 0.31, z: 0.17 }, 0xf6c445);
   }
 }
 

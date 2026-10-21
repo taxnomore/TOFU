@@ -1,114 +1,75 @@
-// Household jobs (humans), secret mischief challenges (Tofu) and cleanliness.
+// Jobs (humans), secret mischief challenges (Tofu) and cleanliness.
 // Jobs are predicates over the world state, so the checklist always reflects
-// what is really in the house (a job can be undone by Tofu and redone).
+// what is really in place (a job can be undone by Tofu and redone). Each map
+// describes its jobs with a few patterns (see TaskSpec).
 import { CLEANLINESS, TASKS_PER_HUMANS, PAPER } from '../constants';
 import { Rng } from '../math';
 import { ITEM_TYPES, MESS_TYPES, isTrail } from '../world/itemTypes';
-import { OUTSIDE_PROPERTY_ZONES, STATIONS, zoneById } from '../world/map';
+import type { GameMap, TaskInfo, TaskSpec } from '../world/mapTypes';
+import { ALL_TASK_INFO } from '../world/maps';
 import type { Variant } from '../world/variants';
 import type { Game } from './game';
 import type { GameState, SecretState, TaskKind, TaskState } from './types';
 
-export interface TaskDef {
+export interface TaskDef extends TaskInfo {
   kind: TaskKind;
-  title: string;
-  hint: string;
-  icon: string;
   eval(g: Game): { progress: number; total: number };
 }
 
-function stationKindOf(g: Game, itemId: string): string | null {
+function storedKind(g: Game, itemId: string): string | null {
   const it = g.itemById(itemId);
   if (!it || it.state !== 'stored') return null;
-  return STATIONS[it.station].kind;
+  return g.map.stations[it.station].kind;
 }
 
 function storedAt(g: Game, itemId: string, stationId: string): boolean {
   const it = g.itemById(itemId);
-  return !!it && it.state === 'stored' && STATIONS[it.station].id === stationId;
+  return !!it && it.state === 'stored' && g.map.stations[it.station].id === stationId;
 }
 
-export const TASK_DEFS: Record<TaskKind, TaskDef> = {
-  linge: {
-    kind: 'linge', title: 'Rentrer le linge', icon: '🧺',
-    hint: 'Décroche le linge du jardin et range-le dans le panier à linge de la salle de bain (Tofu ne sait pas l\'ouvrir !).',
-    eval(g) {
-      const ids = ['linge_1', 'linge_2', 'linge_3', 'linge_4'];
+/** Is a "make" station done (made, and no dirty mess on it)? */
+export function madeStation(g: Game, stationId: string): boolean {
+  const si = g.world.stationIndex.get(stationId);
+  if (si === undefined) return false;
+  const st = g.state.stations[si];
+  return st.made && !g.makeDirty(si);
+}
+
+export function evalSpec(g: Game, spec: TaskSpec): { progress: number; total: number } {
+  switch (spec.type) {
+    case 'collect': {
       let n = 0;
-      for (const id of ids) {
-        const k = stationKindOf(g, id);
-        if (k === 'hamper' || k === 'dresser') n++;
+      for (const id of spec.items) {
+        const k = storedKind(g, id);
+        if (k && (spec.kinds as string[]).includes(k)) n++;
       }
-      return { progress: n, total: ids.length };
-    },
-  },
-  jouets: {
-    kind: 'jouets', title: 'Ranger les jouets', icon: '🧸',
-    hint: 'Mets les 4 jouets dans le coffre de la chambre des enfants.',
-    eval(g) {
-      const ids = ['jouet_nounours', 'jouet_voiture', 'jouet_canard', 'jouet_dino'];
+      return { progress: n, total: spec.items.length };
+    }
+    case 'deliver':
+      return { progress: storedAt(g, spec.item, spec.dest) ? 1 : 0, total: 1 };
+    case 'make':
+      return { progress: madeStation(g, spec.station) ? 1 : 0, total: 1 };
+    case 'water': {
       let n = 0;
-      for (const id of ids) if (stationKindOf(g, id) === 'toybox') n++;
-      return { progress: n, total: ids.length };
-    },
-  },
-  table: {
-    kind: 'table', title: 'Mettre la table', icon: '🍽️',
-    hint: 'Prends la vaisselle dans le placard de la cuisine et mets la table du salon.',
-    eval(g) {
-      return { progress: storedAt(g, 'vaisselle', 'table_salon') ? 1 : 0, total: 1 };
-    },
-  },
-  gouter: {
-    kind: 'gouter', title: 'Servir le goûter', icon: '🥐',
-    hint: 'Pose les croissants de la cuisine sur la table du jardin. Si Tofu les mange, rachète-en à la boulangerie !',
-    eval(g) {
-      return { progress: storedAt(g, 'croissants', 'table_jardin') ? 1 : 0, total: 1 };
-    },
-  },
-  poubelle: {
-    kind: 'poubelle', title: 'Sortir la poubelle', icon: '🗑️',
-    hint: 'Jette le sac poubelle de la cuisine dans la grande poubelle sur le trottoir.',
-    eval(g) {
-      return { progress: storedAt(g, 'sac_poubelle', 'poubelle_rue') ? 1 : 0, total: 1 };
-    },
-  },
-  courrier: {
-    kind: 'courrier', title: 'Relever le courrier', icon: '✉️',
-    hint: "Prends le courrier dans la boîte aux lettres (près du portail) et pose-le sur la console de l'entrée.",
-    eval(g) {
-      return { progress: storedAt(g, 'courrier', 'console') ? 1 : 0, total: 1 };
-    },
-  },
-  lit: {
-    kind: 'lit', title: 'Faire le lit', icon: '🛏️',
-    hint: 'Va dans la chambre et fais le lit (maintiens le bouton).',
-    eval(g) {
-      const st = g.stationById('lit');
-      const muddy = g.state.messes.some((m) => m.kind === 'muddy_bed');
-      return { progress: st && st.made && !muddy ? 1 : 0, total: 1 };
-    },
-  },
-  fleurs: {
-    kind: 'fleurs', title: 'Arroser les fleurs', icon: '🌷',
-    hint: "Prends l'arrosoir sur la terrasse et arrose les 2 massifs du jardin.",
-    eval(g) {
-      let n = 0;
-      for (const id of ['massif_est', 'massif_sud']) {
+      for (const id of spec.beds) {
         const st = g.stationById(id);
         if (st && st.watered && !st.dug) n++;
       }
-      return { progress: n, total: 2 };
-    },
-  },
-};
+      return { progress: n, total: spec.beds.length };
+    }
+  }
+}
 
-export const ALL_TASKS: TaskKind[] = ['linge', 'jouets', 'table', 'gouter', 'poubelle', 'courrier', 'lit', 'fleurs'];
+/** Every job of every map (ids are unique). */
+export const TASK_DEFS: Record<TaskKind, TaskDef> = Object.fromEntries(
+  Object.entries(ALL_TASK_INFO).map(([kind, info]) => [kind, { ...info, kind, eval: (g: Game) => evalSpec(g, info.spec) }]),
+);
 
-export function chooseTasks(rng: Rng, humanCount: number): TaskKind[] {
+export function chooseTasks(rng: Rng, humanCount: number, map: GameMap): TaskKind[] {
   const n = TASKS_PER_HUMANS[Math.max(1, Math.min(2, humanCount))];
-  const rest = rng.shuffle(ALL_TASKS.filter((t) => t !== 'linge'));
-  return ['linge', ...rest.slice(0, n - 1)];
+  const [first, ...others] = map.taskIds;
+  const rest = rng.shuffle(others);
+  return [first, ...rest.slice(0, n - 1)];
 }
 
 export interface SecretDef {
@@ -116,8 +77,6 @@ export interface SecretDef {
   text: string;
   goal: number;
   icon: string;
-  /** Requires the carrier NPC or another feature. */
-  needs?: string;
   /** Only offered in this ambiance (and always offered there). */
   variant?: Variant;
 }
@@ -137,7 +96,7 @@ export const SECRET_DEFS: SecretDef[] = [
   { id: 'baguette', text: 'Rapporte la baguette de la boulangerie à la maison', goal: 1, icon: '🥖' },
   { id: 'creuse', text: 'Creuse un trou dans un massif de fleurs', goal: 1, icon: '🕳️' },
   { id: 'aboie', text: 'Fais sursauter les humains 3 fois en aboyant', goal: 3, icon: '📢' },
-  { id: 'facteur', text: 'Aboie sur la factrice quand elle passe', goal: 1, icon: '📮', needs: 'carrier' },
+  { id: 'facteur', text: 'Aboie sur la factrice quand elle passe', goal: 1, icon: '📮' },
   { id: 'papier', text: 'Déroule 25 feuilles de papier toilette', goal: 25, icon: '🧻' },
   { id: 'chaine', text: "Fais renverser 2 objets par le chat ou par l'aspirateur", goal: 2, icon: '⛓️' },
   { id: 'arrosoir', text: "Vole l'arrosoir et laisse 15 gouttes dans la maison", goal: 15, icon: '🚿' },
@@ -150,8 +109,14 @@ export function secretDef(id: string): SecretDef {
   return SECRET_DEFS.find((s) => s.id === id)!;
 }
 
-export function chooseSecrets(rng: Rng, humanCount: number, variant: Variant = 'ete'): SecretState[] {
-  let pool = SECRET_DEFS.filter((s) => !s.variant && (s.id !== 'aboie' || humanCount > 0));
+/** Icon and wording of a challenge on this map. */
+export function secretInfo(map: GameMap, id: string): { icon: string; text: string } {
+  const d = secretDef(id);
+  return { icon: d.icon, text: map.secretText(id, d.text) };
+}
+
+export function chooseSecrets(rng: Rng, humanCount: number, variant: Variant, map: GameMap): SecretState[] {
+  let pool = SECRET_DEFS.filter((s) => !s.variant && map.secrets.includes(s.id) && (s.id !== 'aboie' || humanCount > 0));
   pool = rng.shuffle([...pool]);
   // The ambiance always brings its own challenge.
   const own = SECRET_DEFS.filter((s) => s.variant === variant);
@@ -167,7 +132,7 @@ export function computeCleanliness(g: Game): number {
     let d = def.dirt;
     // A trail is fully dirty once it holds a few marks.
     if (isTrail(m.kind)) d *= Math.min(1, m.prints.length / 3 / (m.kind === 'paper' ? PAPER.fullStrips : CLEANLINESS.mudFullPrints));
-    dirt += d * zoneFactor(m.zone);
+    dirt += d * zoneFactor(g.map, m.zone);
   }
   for (const it of S.items) {
     if (!it.disturbed) continue;
@@ -179,17 +144,17 @@ export function computeCleanliness(g: Game): number {
       if (S.chars[it.holder]?.role === 'tofu') dirt += CLEANLINESS.misplacedItem;
     } else if (it.state === 'stored') {
       const homes = t.homes ?? [];
-      if (!homes.includes(STATIONS[it.station].kind)) dirt += CLEANLINESS.misplacedItem;
+      if (!homes.includes(g.map.stations[it.station].kind)) dirt += CLEANLINESS.misplacedItem;
     }
   }
   return Math.max(0, Math.min(100, 100 - dirt));
 }
 
-export function zoneFactor(zoneId: string): number {
-  const z = zoneById(zoneId);
+export function zoneFactor(map: GameMap, zoneId: string): number {
+  const z = map.zoneById(zoneId);
   if (!z) return CLEANLINESS.outsideFactor;
-  if (z.indoor) return 1;
-  if (OUTSIDE_PROPERTY_ZONES.includes(zoneId)) return CLEANLINESS.outsideFactor;
+  if (z.indoor || z.prints) return 1;
+  if (map.outsideZones.includes(zoneId)) return CLEANLINESS.outsideFactor;
   return CLEANLINESS.outdoorFactor;
 }
 
@@ -206,4 +171,9 @@ export function evaluateTasks(g: Game): void {
       g.emit({ t: 'task', idx: i, done });
     }
   });
+}
+
+/** The jobs of this round, with their patterns. */
+export function taskSpecs(g: Game): { kind: TaskKind; done: boolean; spec: TaskSpec }[] {
+  return g.state.tasks.map((t) => ({ kind: t.kind, done: t.done, spec: TASK_DEFS[t.kind].spec }));
 }

@@ -5,13 +5,12 @@
 import { CAT, CHAOS, DOG } from '../constants';
 import { angleDiff, dist } from '../math';
 import { ITEM_TYPES } from '../world/itemTypes';
-import { CAT_NODES, CAT_START } from '../world/map';
 import type { Game } from './game';
 import type { CatState } from './types';
 
 export function initialCat(g: Game): CatState {
-  const n = g.world.catNodeIndex.get(CAT_START)!;
-  const node = CAT_NODES[n];
+  const n = g.world.catNodeIndex.get(g.map.catStart)!;
+  const node = g.map.catNodes[n];
   return {
     x: node.x, y: node.y, z: node.z, facing: 0, mode: 'idle', node: n, path: [], edgeFrom: -1, edgeTo: -1,
     edgeT: 0, edgeLen: 1, jump: false, timer: 3, chaseAcc: 0, fleeChaos: 0, barkCd: 0, hissT: 0, speed: 0, stuckT: 0,
@@ -25,7 +24,7 @@ function edgeUsable(g: Game, door: number, flap: boolean): boolean {
 
 /** Dijkstra over the cat graph from `from`. cost(nodeIdx) adds a node penalty. */
 function dijkstra(g: Game, from: number, penalty: (n: number) => number): { dist: Float64Array; prev: Int32Array } {
-  const N = CAT_NODES.length;
+  const N = g.map.catNodes.length;
   const d = new Float64Array(N).fill(Infinity);
   const prev = new Int32Array(N).fill(-1);
   const done = new Uint8Array(N);
@@ -74,8 +73,8 @@ function startEdge(g: Game, cat: CatState): void {
   cat.edgeT = 0;
   cat.edgeLen = link.len;
   cat.jump = link.jump;
-  const a = CAT_NODES[cat.edgeFrom];
-  const b = CAT_NODES[cat.edgeTo];
+  const a = g.map.catNodes[cat.edgeFrom];
+  const b = g.map.catNodes[cat.edgeTo];
   cat.facing = Math.atan2(b.x - a.x, b.z - a.z);
 }
 
@@ -90,7 +89,7 @@ function planTo(g: Game, cat: CatState, target: number, penalty: (n: number) => 
 function startFlee(g: Game, cat: CatState): void {
   const tofu = g.tofu;
   const pen = (n: number) => {
-    const node = CAT_NODES[n];
+    const node = g.map.catNodes[n];
     const dd = dist(node.x, node.z, tofu.x, tofu.z);
     return dd < 2.5 ? 30 : dd < 4.5 ? 6 : 0;
   };
@@ -99,7 +98,7 @@ function startFlee(g: Game, cat: CatState): void {
   const { dist: d, prev } = dijkstra(g, from, pen);
   let best = -1;
   let bestScore = Infinity;
-  CAT_NODES.forEach((node, i) => {
+  g.map.catNodes.forEach((node, i) => {
     if (!node.perch || !isFinite(d[i])) return;
     const away = dist(node.x, node.z, tofu.x, tofu.z);
     if (away < 1.5) return;
@@ -122,7 +121,7 @@ function startFlee(g: Game, cat: CatState): void {
 function pickWander(g: Game, cat: CatState): void {
   const rng = g.rng;
   const candidates: number[] = [];
-  CAT_NODES.forEach((n, i) => {
+  g.map.catNodes.forEach((n, i) => {
     if (i === cat.node) return;
     if (n.indoor && !rng.chance(0.25)) return;
     const w = n.perch ? 1 : 2;
@@ -131,10 +130,10 @@ function pickWander(g: Game, cat: CatState): void {
   const tofu = g.tofu;
   for (let tries = 0; tries < 6; tries++) {
     const target = rng.pick(candidates);
-    const node = CAT_NODES[target];
+    const node = g.map.catNodes[target];
     // Avoid wandering right into Tofu.
     if (dist(node.x, node.z, tofu.x, tofu.z) < 6) continue;
-    const avoid = (n: number) => (dist(CAT_NODES[n].x, CAT_NODES[n].z, tofu.x, tofu.z) < 5 ? 25 : 0);
+    const avoid = (n: number) => (dist(g.map.catNodes[n].x, g.map.catNodes[n].z, tofu.x, tofu.z) < 5 ? 25 : 0);
     if (planTo(g, cat, target, avoid)) {
       cat.mode = 'walk';
       return;
@@ -207,8 +206,8 @@ export function updateCat(g: Game, dt: number): void {
     if (cat.jump) cat.edgeT += dt / CAT.jumpTime;
     else cat.edgeT += (speed * dt) / Math.max(0.1, cat.edgeLen);
     cat.speed = cat.jump ? cat.edgeLen / CAT.jumpTime : speed;
-    const a = CAT_NODES[cat.edgeFrom];
-    const b = CAT_NODES[cat.edgeTo];
+    const a = g.map.catNodes[cat.edgeFrom];
+    const b = g.map.catNodes[cat.edgeTo];
     const t = Math.min(1, cat.edgeT);
     cat.x = a.x + (b.x - a.x) * t;
     cat.z = a.z + (b.z - a.z) * t;
@@ -222,7 +221,7 @@ export function updateCat(g: Game, dt: number): void {
       if (cat.path.length) {
         startEdge(g, cat);
       } else {
-        const node = CAT_NODES[cat.node];
+        const node = g.map.catNodes[cat.node];
         if (cat.mode === 'flee' || node.perch) {
           cat.mode = 'perched';
           cat.timer = g.rng.range(CAT.perchRest[0], CAT.perchRest[1]);

@@ -3,7 +3,7 @@
 // validates/executes the action (simulation), so prompts never lie.
 import { BAKERY_BUY_TIME, DOG, HUMAN, VACUUM } from '../constants';
 import { ITEM_TYPES, MESS_TYPES } from '../world/itemTypes';
-import { DOORS, STATIONS } from '../world/map';
+import { makeDef } from '../world/types';
 import type { StationDef } from '../world/types';
 import type { Game } from './game';
 import { switchVacuum } from './vacuum';
@@ -58,7 +58,7 @@ export function listInteractions(g: Game, c: Character): Interaction[] {
   const held = c.hold.map((i) => S.items[i]);
 
   // --- Stations (shared geometry) ---
-  STATIONS.forEach((s, si) => {
+  g.map.stations.forEach((s, si) => {
     const st = S.stations[si];
     const d = stationDist(s, c.x, c.z);
     const within = d <= s.r;
@@ -87,8 +87,9 @@ export function listInteractions(g: Game, c: Character): Interaction[] {
           add('take', best, `${verb} ${nm(it.type)}`, 0, it.x, it.y, it.z, Math.min(d, bestD), 58);
         }
       }
-      if (s.kind === 'bed' && c.bedCd <= 0 && (st.made || (c.mud > 0.15 && !S.messes.some((m) => m.kind === 'muddy_bed')))) {
-        add('bed_jump', si, 'Sauter sur le lit', 0, s.x, s.y, s.z, d, 45);
+      if (s.kind === 'bed' && c.bedCd <= 0) {
+        const mk = makeDef(s);
+        if (st.made || (mk.mess && c.mud > 0.15 && !g.makeDirty(si))) add('bed_jump', si, mk.jump, 0, s.x, s.y, s.z, d, 45);
       }
       if (s.kind === 'sofa' && c.bedCd <= 0) {
         const cushions = S.items.some((it) => it.type === 'cushion' && it.state === 'home');
@@ -114,14 +115,23 @@ export function listInteractions(g: Game, c: Character): Interaction[] {
         let hold = 0;
         switch (s.kind) {
           case 'dining_table': label = 'Mettre la table'; hold = 1.2; break;
-          case 'garden_table': label = 'Servir le goûter'; hold = 0.6; break;
-          case 'console': label = 'Poser le courrier'; break;
-          case 'street_bin': label = 'Jeter le sac poubelle'; hold = 0.5; break;
+          case 'garden_table': label = it.type === 'croissants' ? 'Servir le goûter' : `Poser ${t.name}`; hold = 0.6; break;
+          case 'console': label = `Poser ${t.name}`; break;
+          case 'street_bin': label = `Jeter ${t.name}`; hold = 0.5; break;
+          case 'notice_board': label = `Afficher ${t.name}`; hold = 0.8; break;
+          case 'checkout': label = `Installer ${t.name}`; hold = 0.6; break;
+          case 'coat_hooks': label = `Accrocher ${t.name}`; break;
           case 'counter': label = `Poser ${t.name}`; break;
           case 'bakery': label = 'Rendre la baguette'; break;
           case 'market': label = `Rendre ${t.name} au marchand`; break;
-          case 'hamper': case 'dresser': case 'toybox':
+          case 'hamper': case 'dresser': case 'toybox': case 'shop_shelf':
             label = storable.length > 1 ? `Ranger ${storable.length} objets` : `Ranger ${t.name}`;
+            break;
+          case 'clothes_rack':
+            label = storable.length > 1 ? `Accrocher ${storable.length} vêtements` : `Accrocher ${t.name}`;
+            break;
+          case 'gift_table':
+            label = storable.length > 1 ? `Poser ${storable.length} cadeaux` : `Poser ${t.name}`;
             break;
         }
         add('store', si, label, hold, s.x, s.y, s.z, d, 85);
@@ -157,18 +167,15 @@ export function listInteractions(g: Game, c: Character): Interaction[] {
           add('take', best, `${verb} ${nm(it.type)}`, 0, it.x, it.y, it.z, Math.min(d, bestD), 58);
         }
       }
-      if (s.kind === 'bakery') {
-        const cr = g.itemById('croissants');
-        if (cr && cr.state === 'gone' && g.canCarry(c, cr)) {
-          add('buy', si, 'Acheter des croissants', BAKERY_BUY_TIME, s.x, s.y, s.z, d, 75);
-        }
-      }
+      // A shop sells a new job object when Tofu ate it.
+      const r = g.restockable(si);
+      if (r && g.canCarry(c, r.item)) add('buy', si, r.verb, BAKERY_BUY_TIME, s.x, s.y, s.z, d, 75);
     }
     if (s.kind === 'treat_jar' && c.treats < HUMAN.treatsMax && c.treatJarCd <= 0) {
       add('treats', si, 'Prendre des friandises', 0, s.x, s.y, s.z, d, 40);
     }
-    if (s.kind === 'bed' && !st.made && !S.messes.some((m) => m.kind === 'muddy_bed')) {
-      add('bed', si, 'Faire le lit', 2.0, s.x, s.y, s.z, d, 62);
+    if (s.kind === 'bed' && !st.made && !g.makeDirty(si)) {
+      add('bed', si, makeDef(s).verb, 2.0, s.x, s.y, s.z, d, 62);
     }
   });
 
@@ -182,8 +189,8 @@ export function listInteractions(g: Game, c: Character): Interaction[] {
       if (!held.length && c.noPickup <= 0 && t.carry?.dog && it.guardT <= 0) {
         add('pickup', it.idx, `Attraper ${t.name}`, 0, it.x, it.y, it.z, d, 60);
       }
-      if (it.type === 'trash_bag' && it.charge <= 0 && !held.length) {
-        add('rip', it.idx, 'Déchirer le sac poubelle', 1.0, it.x, it.y, it.z, d, 52);
+      if (t.rip && it.state === 'free' && it.charge <= 0 && !held.length) {
+        add('rip', it.idx, t.rip.verb, 1.0, it.x, it.y, it.z, d, 52);
       }
     } else if (g.canCarry(c, it)) {
       add('pickup', it.idx, `Ramasser ${t.name}`, 0, it.x, it.y, it.z, d, 60);
@@ -214,7 +221,7 @@ export function listInteractions(g: Game, c: Character): Interaction[] {
   }
 
   // --- Doors ---
-  DOORS.forEach((dd, di) => {
+  g.map.doors.forEach((dd, di) => {
     const ds = S.doors[di];
     const b = g.world.doorBoxes[di];
     const ex = Math.max(b.x0 - c.x, 0, c.x - b.x1);
@@ -238,8 +245,9 @@ export function listInteractions(g: Game, c: Character): Interaction[] {
     const v = S.vacuum;
     const dv = Math.hypot(v.x - c.x, v.z - c.z) - VACUUM.radius;
     if (dv < reach) {
-      if (v.mode === 'dock' && v.t <= 0) add('vacuum', 0, "Allumer l'aspirateur robot", 0, v.x, 0.1, v.z, dv, isDog ? 50 : 22);
-      else if (v.mode === 'run' && !isDog) add('vacuum', 0, "Éteindre l'aspirateur robot", 0, v.x, 0.1, v.z, dv, 70);
+      const name = g.map.vacuum.name;
+      if (v.mode === 'dock' && v.t <= 0) add('vacuum', 0, `Allumer ${name}`, 0, v.x, 0.1, v.z, dv, isDog ? 50 : 22);
+      else if (v.mode === 'run' && !isDog) add('vacuum', 0, `Éteindre ${name}`, 0, v.x, 0.1, v.z, dv, 70);
     }
   }
 
@@ -294,7 +302,7 @@ export function executeInteraction(g: Game, c: Character, it: Interaction): void
     case 'water': g.water(c, it.target); break;
     case 'fill': g.fillCan(c); break;
     case 'treats': g.refillTreats(c); break;
-    case 'buy': g.buyCroissants(c); break;
+    case 'buy': g.buy(c, it.target); break;
     case 'knock':
     case 'push_bin': g.knock(it.target, Math.sin(c.facing), Math.cos(c.facing), 3.5, c.id); break;
     case 'bed_jump': g.bedJump(c, it.target); break;

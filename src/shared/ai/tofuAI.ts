@@ -4,9 +4,10 @@
 import { BTN_BARK, BTN_INTERACT, BTN_SIT, BTN_SPECIAL, BTN_SPRINT, DOG } from '../constants';
 import { Rng, dist } from '../math';
 import { ITEM_TYPES } from '../world/itemTypes';
-import { CAT_NODES, PUDDLES, STATIONS, STREET_ZONES, inHouse, zoneAt } from '../world/map';
+import { makeDef } from '../world/types';
 import type { Game } from '../sim/game';
 import { IKind, listInteractions } from '../sim/interactions';
+import { TASK_DEFS } from '../sim/rules';
 import type { Character, InputFrame } from '../sim/types';
 import { EMPTY_INPUT } from '../sim/types';
 import { Navigator } from './navigator';
@@ -33,20 +34,12 @@ const DIFF = [
   { decide: 0.4, random: 4, flee: 1, zoomSmart: true, undo: 1.1, idle: 0.05, linger: [0.3, 1.0], sprint: 1 },
 ];
 
-const INDOOR_SPOTS: [number, number, string][] = [
-  [-11, -2.5, 'chambre'], [-10.5, 2.5, 'enfants'], [-6.5, -3, 'entree'], [-6.5, 3, 'entree'],
-  [-2.5, -2.2, 'cuisine'], [3.5, -3, 'buanderie'], [-0.5, 3.5, 'salon'], [3.2, 4.4, 'salon'],
-];
-
-const ESCAPES: [number, number][] = [
-  [-10.5, 19.5], [-22, 10], [-20, -6], [5, -19], [-6, -19], [8, 14], [-2.6, 2.9], [-11, 2.8], [3, 17], [20, -9],
-];
-
-const STREET_DROPS: [number, number][] = [[-6, -19.5], [6, -18.5], [-14, -18.8], [14, -19]];
 
 export class TofuAI implements AIController {
   private nav: Navigator;
   private goal: Goal | null = null;
+  /** Stations whose content undoes a job of this round when stolen. */
+  private taskStations: Set<string>;
   private decideT = 0;
   private goalT = 0;
   private prevInteract = false;
@@ -64,6 +57,18 @@ export class TofuAI implements AIController {
   constructor(readonly g: Game, readonly id: number, difficulty: number, readonly rng: Rng) {
     this.nav = new Navigator(g, id, rng);
     this.p = DIFF[Math.max(0, Math.min(2, difficulty))];
+    this.taskStations = new Set();
+    for (const kind of g.map.taskIds) {
+      const spec = TASK_DEFS[kind].spec;
+      if (spec.type === 'collect') {
+        this.taskStations.add(spec.dest);
+        for (const s of g.map.stations) if ((spec.kinds as string[]).includes(s.kind)) this.taskStations.add(s.id);
+      } else if (spec.type === 'deliver') this.taskStations.add(spec.dest);
+    }
+  }
+
+  private get spots(): [number, number, string][] {
+    return this.g.map.ai.indoorSpots;
   }
 
   get me(): Character {
@@ -151,7 +156,7 @@ export class TofuAI implements AIController {
     if (me.zoom >= 1 && me.zoomT <= 0 && !this.prevSpecial) {
       const smart = this.p.zoomSmart;
       const knockables = S.items.filter((it) => it.state === 'home' && ITEM_TYPES[it.type].knock && it.y < 0.1 && dist(it.x, it.z, me.x, me.z) < 7).length;
-      if (!smart || goal.kind === 'flee' || knockables >= 2 || (inHouse(me.x, me.z) && this.rng.next() < 0.02)) buttons |= BTN_SPECIAL;
+      if (!smart || goal.kind === 'flee' || knockables >= 2 || (g.map.messy(me.x, me.z) && this.rng.next() < 0.02)) buttons |= BTN_SPECIAL;
     }
 
     if (goal.kind === 'innocent') {
@@ -262,9 +267,10 @@ export class TofuAI implements AIController {
   private fleeGoal(): Goal {
     const me = this.me;
     const nh = this.nearestHuman(me.x, me.z);
-    let best: [number, number] = ESCAPES[0];
+    const escapes = this.g.map.ai.escapes;
+    let best: [number, number] = escapes[0];
     let bs = -Infinity;
-    for (const e of ESCAPES) {
+    for (const e of escapes) {
       const dh = nh.c ? dist(e[0], e[1], nh.c.x, nh.c.z) : 10;
       const dm = dist(e[0], e[1], me.x, me.z);
       // Prefer escapes that are not behind the human.
@@ -281,7 +287,8 @@ export class TofuAI implements AIController {
   private nextWaypoint() {
     if (!this.goal) return;
     const bedrooms = this.secret('boue_chambre');
-    const spots = bedrooms ? INDOOR_SPOTS.filter((s) => s[2] === 'chambre' || s[2] === 'enfants' || this.rng.next() < 0.3) : INDOOR_SPOTS;
+    const muddy = this.g.map.muddyZones;
+    const spots = bedrooms ? this.spots.filter((s) => muddy.includes(s[2]) || this.rng.next() < 0.3) : this.spots;
     this.wpIdx = (this.wpIdx + 1 + Math.floor(this.rng.next() * 3)) % spots.length;
     const [x, z] = spots[this.wpIdx % spots.length];
     this.goal.x = x;
@@ -304,7 +311,7 @@ export class TofuAI implements AIController {
     // A less focused dog sometimes just sniffs around or sits.
     if (!me.hold.length && !guests && this.rng.next() < this.p.idle) {
       if (this.rng.next() < 0.5) return { key: `sniff:${S.tick}`, kind: 'innocent', x: me.x, z: me.z, timeout: 2.5 };
-      const w = INDOOR_SPOTS[Math.floor(this.rng.next() * INDOOR_SPOTS.length)];
+      const w = this.spots[Math.floor(this.rng.next() * this.spots.length)];
       return { key: `sniff:${S.tick}`, kind: 'wander', x: w[0], z: w[1], timeout: 6 };
     }
 
@@ -320,17 +327,16 @@ export class TofuAI implements AIController {
       if (t.category === 'ball') {
         add(70, { key: 'dropball', kind: 'act', want: { kind: 'drop', target: it.idx }, x: me.x, z: me.z, timeout: 3 });
       }
-      for (const id of ['panier_tofu', 'niche']) {
-        const si = g.world.stationIndex.get(id)!;
-        const s = STATIONS[si];
+      g.map.stations.forEach((s, si) => {
+        if (s.kind !== 'dog_basket') return;
         const d = dist(me.x, me.z, s.x, s.z);
         add(66 + (this.secret('tresor') ? 18 : 0) - d * 0.7 - this.risk(s.x, s.z) - (it.stashed ? 30 : 0), {
           key: `stash:${si}`, kind: 'act', want: { kind: 'stash', target: si }, x: s.x, z: s.z, timeout: 20,
         });
-      }
-      const fromProperty = it.grabbedIn && !['rue', 'trottoir_s', 'trottoir_n', 'boulangerie', 'square', 'voisins'].includes(it.grabbedIn);
+      });
+      const fromProperty = it.grabbedIn && !g.map.outsideZones.includes(it.grabbedIn);
       if (fromProperty && !it.streetScored) {
-        for (const [x, z] of STREET_DROPS) {
+        for (const [x, z] of g.map.ai.streetDrops) {
           const d = dist(me.x, me.z, x, z);
           add(52 + (this.secret('rue') ? 40 : 0) - d * 0.6 - this.risk(x, z), {
             key: `street:${x}`, kind: 'street', want: { kind: 'drop', target: it.idx }, x, z, timeout: 25,
@@ -339,12 +345,13 @@ export class TofuAI implements AIController {
       }
       // The stolen watering can: run around the house so it leaks everywhere.
       if (it.type === 'watering_can' && it.charge > 0) {
-        const sp = INDOOR_SPOTS[this.wpIdx % INDOOR_SPOTS.length];
+        const sp = this.spots[this.wpIdx % this.spots.length];
         add(72 + (this.secret('arrosoir') ? 25 : 0) - this.risk(me.x, me.z) * 0.5, { key: 'leak', kind: 'leak', x: sp[0], z: sp[1], timeout: 25 });
       }
       if (it.type === 'baguette' && this.secret('baguette')) {
-        const si = g.world.stationIndex.get('panier_tofu')!;
-        add(95, { key: 'baguette-home', kind: 'act', want: { kind: 'stash', target: si }, x: STATIONS[si].x, z: STATIONS[si].z, timeout: 30 });
+        const si = g.map.stations.findIndex((s) => s.kind === 'dog_basket' && !g.map.outsideZones.includes(g.map.zoneAt(s.x, s.z)?.id ?? ''));
+        const s = g.map.stations[si];
+        if (s) add(95, { key: 'baguette-home', kind: 'act', want: { kind: 'stash', target: si }, x: s.x, z: s.z, timeout: 30 });
       }
     } else {
       // --- Steal things ---
@@ -354,12 +361,12 @@ export class TofuAI implements AIController {
         let base = 0;
         let want: IKind;
         if (it.state === 'stored') {
-          const s = STATIONS[it.station];
+          const s = g.map.stations[it.station];
           if (!s.dogReach || s.kind === 'dog_basket' || g.state.stations[it.station].disabled) continue;
           want = 'take';
           base = t.category === 'laundry' ? 46 : t.category === 'food' ? 48 : t.category === 'toy' ? 34 : 32;
           // Undo finished jobs (very annoying for humans).
-          const taskStation = ['coffre_jouets', 'table_jardin', 'console', 'panier_linge', 'commode'].includes(s.id);
+          const taskStation = this.taskStations.has(s.id);
           if (taskStation) base += (6 + tasksDone * 3) * this.p.undo + (guests ? 50 : 0);
         } else if (it.state === 'free') {
           want = 'pickup';
@@ -371,7 +378,7 @@ export class TofuAI implements AIController {
         if (it.type === 'toilet_roll') base += it.charge > 0 ? (this.secret('papier') ? 40 : 0) : -40;
         if (it.type === 'watering_can') {
           // Even better while the humans still have flowers to water.
-          const flowers = S.tasks.some((tk) => tk.kind === 'fleurs' && !tk.done);
+          const flowers = S.tasks.some((tk) => TASK_DEFS[tk.kind].spec.type === 'water' && !tk.done);
           base += it.charge > 0 ? 6 + (flowers ? 8 : 0) + (this.secret('arrosoir') ? 30 : 0) : -40;
         }
         if (t.category === 'market') base += 10 + (this.secret('marche') ? 25 : 0);
@@ -391,7 +398,7 @@ export class TofuAI implements AIController {
         if (isBin && this.secret('poubelles')) base += 22;
         if (it.type === 'leaf_pile' && this.secret('feuilles')) base += 25;
         if (it.type === 'snowman') base += this.secret('bonhomme') ? 30 : 4;
-        if (inHouse(it.x, it.z)) base += 4;
+        if (g.map.messy(it.x, it.z)) base += 4;
         const bump = it.y < 0.1 && t.knock.push <= 0 && t.knock.minSpeed < 7;
         const want: IKind = t.knock.push > 0 ? 'push_bin' : 'knock';
         add(base - d * 0.8 - this.risk(it.x, it.z), {
@@ -412,11 +419,11 @@ export class TofuAI implements AIController {
       }
 
       // --- Stations: bed, sofa, flowerbeds, tablecloth, trash bag ---
-      STATIONS.forEach((s, si) => {
+      g.map.stations.forEach((s, si) => {
         const st = S.stations[si];
         const d = dist(me.x, me.z, s.x, s.z);
-        if (s.kind === 'bed' && (st.made || (me.mud > 0.3 && !S.messes.some((m) => m.kind === 'muddy_bed'))) && me.bedCd <= 0) {
-          const muddy = me.mud > 0.3;
+        if (s.kind === 'bed' && (st.made || (me.mud > 0.3 && !!makeDef(s).mess && !g.makeDirty(si))) && me.bedCd <= 0) {
+          const muddy = me.mud > 0.3 && !!makeDef(s).mess;
           add(34 + (st.made ? 10 : 0) + (muddy ? 14 : 0) + (muddy && this.secret('lit_sale') ? 40 : 0) - d * 0.8 - this.risk(s.x, s.z), {
             key: `bed:${si}`, kind: 'act', want: { kind: 'bed_jump', target: si }, x: s.x, z: s.z, timeout: 18,
           });
@@ -433,8 +440,8 @@ export class TofuAI implements AIController {
           add(44 + (guests ? 40 : 0) - d * 0.8 - this.risk(s.x, s.z), { key: `cloth:${si}`, kind: 'act', want: { kind: 'tablecloth', target: si }, x: s.x, z: s.z, timeout: 18 });
         }
       });
-      const bag = g.itemById('sac_poubelle');
-      if (bag && bag.state === 'free' && bag.charge <= 0) {
+      const bag = S.items.find((it) => ITEM_TYPES[it.type].rip && it.state === 'free' && it.charge <= 0);
+      if (bag) {
         const d = dist(me.x, me.z, bag.x, bag.z);
         add(36 + (this.secret('poubelles') ? 18 : 0) - d * 0.8 - this.risk(bag.x, bag.z), { key: 'rip', kind: 'act', want: { kind: 'rip', target: bag.idx }, x: bag.x, z: bag.z, timeout: 15 });
       }
@@ -442,13 +449,13 @@ export class TofuAI implements AIController {
       if (me.mud < 0.2) {
         const mudCells = S.messes.filter((m) => m.kind === 'mud').length;
         const bonus = (this.secret('boue_chambre') ? 28 : 0) + (this.secret('lit_sale') ? 22 : 0);
-        for (const p of PUDDLES) {
+        for (const p of g.map.puddles) {
           const d = dist(me.x, me.z, p.x, p.z);
           add(32 + bonus - mudCells * 3 - d * 0.6, { key: `mud:${p.id}`, kind: 'mud', x: p.x, z: p.z, timeout: 25 });
         }
       } else {
         // Dirty paws: go and leave prints inside (snowy paws are less of a feat).
-        const sp = INDOOR_SPOTS[this.wpIdx % INDOOR_SPOTS.length];
+        const sp = this.spots[this.wpIdx % this.spots.length];
         const base = me.pawKind === 'snow' ? 34 : 60;
         add(base + (me.pawKind === 'mud' && this.secret('boue_chambre') ? 20 : 0), { key: 'muddy_run', kind: 'muddy_run', x: sp[0], z: sp[1], timeout: 22, sprint: false });
       }
@@ -458,7 +465,7 @@ export class TofuAI implements AIController {
     const dc = dist(me.x, me.z, cat.x, cat.z);
     if (cat.y < 0.35 && dc < 22 && !me.hold.length) {
       // Indoors, a chased cat jumps onto the counter and knocks things over.
-      const chain = inHouse(cat.x, cat.z) ? 10 + (this.secret('chaine') ? 25 : 0) : 0;
+      const chain = g.map.messy(cat.x, cat.z) ? 10 + (this.secret('chaine') ? 25 : 0) : 0;
       add(36 + chain + (this.secret('chat') ? 32 : 0) - dc * 0.9, {
         key: 'cat', kind: 'cat', x: cat.x, z: cat.z, sprint: dc < 9, timeout: 10,
         track: () => ({ x: S.cat.x, z: S.cat.z }),
@@ -501,7 +508,7 @@ export class TofuAI implements AIController {
       }
     }
     // --- Wander ---
-    const w = INDOOR_SPOTS[Math.floor(this.rng.next() * INDOOR_SPOTS.length)];
+    const w = this.spots[Math.floor(this.rng.next() * this.spots.length)];
     add(8, { key: `wander:${w[0]}`, kind: 'wander', x: w[0], z: w[1], timeout: 8 });
     if (!cands.length) return null;
     cands.sort((a, b) => b.u - a.u);
@@ -513,4 +520,3 @@ export class TofuAI implements AIController {
   }
 }
 
-export { CAT_NODES, STREET_ZONES, zoneAt };

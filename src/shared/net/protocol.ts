@@ -4,6 +4,8 @@
 import { BTN_ALL } from '../constants';
 import type { GameConfig, GameEvent, GameState } from '../sim/types';
 import { Variant, isVariant } from '../world/variants';
+import type { MapId } from '../world/mapTypes';
+import { isMapId } from '../world/maps';
 
 export const PROTOCOL_VERSION = 2;
 export const MAX_PLAYERS = 3;
@@ -55,6 +57,8 @@ export interface LobbySettings {
   difficulty: number;
   /** Ambiance (season or market day). */
   variant: Variant;
+  /** Place of the game. */
+  map: MapId;
 }
 
 // ---- Client -> server ----
@@ -170,6 +174,7 @@ export function parseClientMsg(raw: string): ClientMsg | null {
       if (typeof s.fillAI === 'boolean') out.fillAI = s.fillAI;
       if (isNum(s.difficulty)) out.difficulty = Math.max(0, Math.min(2, Math.round(s.difficulty)));
       if (isVariant(s.variant)) out.variant = s.variant;
+      if (isMapId(s.map)) out.map = s.map;
       return { t: 'settings', settings: out };
     }
     case 'assign':

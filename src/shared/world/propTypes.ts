@@ -87,6 +87,35 @@ export const PROP_TYPES: Record<PropType, PropTypeDef> = {
   bakery_stand: { w: 2.4, d: 0.7, h: 0.95, col: 'box', mask: MASK_SOLID },
   market_stall: { w: 2.2, d: 0.9, h: 0.9, col: 'box', mask: MASK_SOLID, tall: true },
   clothesline_basket: { w: 0.6, d: 0.45, h: 0.35, col: 'none', mask: 0 },
+  // École
+  blackboard: { w: 3.0, d: 0.08, h: 2.1, col: 'none', mask: 0, tall: true },
+  school_desk: { w: 1.2, d: 0.5, h: 0.7, col: 'box', mask: HUMAN_ONLY },
+  teacher_desk: { w: 1.4, d: 0.7, h: 0.76, col: 'box', mask: MASK_SOLID },
+  coat_hooks: { w: 2.0, d: 0.12, h: 1.5, col: 'none', mask: 0 },
+  easel: { w: 0.7, d: 0.5, h: 1.5, col: 'circle', r: 0.28, mask: MASK_SOLID },
+  notice_board: { w: 1.4, d: 0.15, h: 2.1, col: 'box', mask: MASK_SOLID, tall: true },
+  basket_hoop: { w: 1.0, d: 1.0, h: 3.2, col: 'circle', r: 0.12, mask: MASK_SOLID, tall: true },
+  pillar: { w: 0.3, d: 0.3, h: 3.0, col: 'circle', r: 0.15, mask: MASK_SOLID, tall: true },
+  lunch_table: { w: 2.4, d: 0.8, h: 0.7, col: 'box', mask: HUMAN_ONLY },
+  lost_box: { w: 0.7, d: 0.5, h: 0.5, col: 'box', mask: MASK_SOLID },
+  ball_bin: { w: 0.8, d: 0.6, h: 0.7, col: 'box', mask: MASK_SOLID },
+  trestle_table: { w: 2.0, d: 0.8, h: 0.76, col: 'box', mask: HUMAN_ONLY },
+  // Centre commercial
+  clothes_rack: { w: 1.6, d: 0.5, h: 1.6, col: 'box', mask: MASK_SOLID, inset: 0.05 },
+  shop_shelf: { w: 2.0, d: 0.6, h: 1.7, col: 'box', mask: MASK_SOLID, tall: true },
+  checkout: { w: 1.8, d: 0.8, h: 0.95, col: 'box', mask: MASK_SOLID },
+  fountain: { w: 3.6, d: 3.6, h: 1.4, col: 'circle', r: 1.75, mask: HUMAN_ONLY },
+  cart_shelter: { w: 3.2, d: 1.6, h: 2.2, col: 'box', mask: MASK_SOLID, tall: true },
+  display_table: { w: 1.6, d: 0.8, h: 0.8, col: 'box', mask: HUMAN_ONLY },
+  fitting_room: { w: 1.4, d: 1.4, h: 2.1, col: 'box', mask: MASK_SOLID, tall: true },
+  escalator: { w: 1.4, d: 5.0, h: 3.0, col: 'box', mask: MASK_SOLID, tall: true },
+  // Parc
+  picnic_table: { w: 2.0, d: 1.6, h: 0.75, col: 'box', mask: HUMAN_ONLY, inset: 0.1 },
+  pool: { w: 5, d: 5, h: 0.3, col: 'none', mask: 0 },
+  pond: { w: 7, d: 5, h: 0.2, col: 'box', mask: MASK_SOLID, inset: 0.4 },
+  carousel: { w: 5, d: 5, h: 4, col: 'circle', r: 2.4, mask: MASK_SOLID, tall: true },
+  drinking_fountain: { w: 0.4, d: 0.4, h: 1.0, col: 'circle', r: 0.18, mask: MASK_SOLID },
+  cooler: { w: 0.6, d: 0.4, h: 0.45, col: 'box', mask: MASK_SOLID },
 };
 
 /** Returns the world-space footprint half extents of a prop considering its rotation. */

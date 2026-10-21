@@ -3,6 +3,7 @@
 // between the server connection and network game sessions.
 import qrcode from 'qrcode-generator';
 import { VARIANTS, isVariant } from '../../shared/world/variants';
+import { DEFAULT_MAP, MAP_LIST, getMap, isMapId } from '../../shared/world/maps';
 import { MAX_SEATS_PER_CLIENT, normalizeRoomCode } from '../../shared/net/protocol';
 import type { LobbyPlayer, RolePref, SeatReq, ServerMode } from '../../shared/net/protocol';
 import { sfx } from '../audio/sfx';
@@ -441,7 +442,8 @@ class Lan {
     const sh = `<span>Durée</span>${seg('dur', [[240, '4 min'], [360, '6 min'], [480, '8 min']], set.duration)}
       <span>Si personne ne veut être Tofu</span>${seg('fill', [[1, "L'ordinateur joue Tofu"], [0, 'Le premier joueur est Tofu']], set.fillAI ? 1 : 0)}
       <span>Ordinateur</span>${seg('diff', [[0, 'Facile'], [1, 'Normal'], [2, 'Difficile']], set.difficulty)}
-      <span>Ambiance</span>${seg('variant', VARIANTS.map((d) => [d.id, `${d.icon} ${d.id === 'marche' ? 'Marché' : d.name}`] as [string, string]), set.variant ?? 'ete')}`;
+      <span>Lieu</span>${seg('map', MAP_LIST.map((m) => [m.id, `${m.icon} ${m.name}`] as [string, string]), set.map ?? DEFAULT_MAP)}
+      <span>Ambiance</span>${seg('variant', VARIANTS.filter((d) => getMap(set.map ?? DEFAULT_MAP).variants.includes(d.id)).map((d) => [d.id, `${d.icon} ${d.id === 'marche' ? 'Marché' : d.name}`] as [string, string]), set.variant ?? 'ete')}`;
     const se = q<HTMLElement>('[data-settings]');
     setHtml(se, sh);
 
@@ -652,6 +654,7 @@ class Lan {
     else if (k === 'fill') net.send({ t: 'settings', settings: { fillAI: v === '1' } });
     else if (k === 'diff') net.send({ t: 'settings', settings: { difficulty: Number(v) } });
     else if (k === 'variant' && isVariant(v)) net.send({ t: 'settings', settings: { variant: v } });
+    else if (k === 'map' && isMapId(v)) net.send({ t: 'settings', settings: { map: v } });
   }
 
   private onChange(e: Event) {

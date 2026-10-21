@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { faceTo, hold, makeGame, place, press, steps, walk } from './helpers';
 import { BTN_BARK, BTN_SPECIAL, BTN_SPRINT } from '../src/shared/constants';
 import { ITEM_TYPES } from '../src/shared/world/itemTypes';
-import { CAT_NODES, PUDDLES, STATIONS } from '../src/shared/world/map';
+import { getMap } from '../src/shared/world/maps';
+
+const { catNodes: CAT_NODES, puddles: PUDDLES, stations: STATIONS } = getMap('quartier');
 import { BTN_INTERACT, PAPER, VACUUM } from '../src/shared/constants';
 import type { InputFrame } from '../src/shared/sim/types';
 import { listInteractions } from '../src/shared/sim/interactions';
@@ -346,7 +348,7 @@ describe('robot vacuum', () => {
     expect(v.mode).toBe('home');
     steps(g, 60 * (VACUUM.homeTime + 1));
     expect(v.mode).toBe('dock');
-    expect(v.x).toBeCloseTo(VACUUM.dock.x, 5);
+    expect(v.x).toBeCloseTo(getMap('quartier').vacuum.x, 5);
     // Charging: it cannot be restarted at once.
     place(tofu, v.x, v.z + 0.7, Math.PI);
     expect(listInteractions(g, tofu).some((i) => i.kind === 'vacuum')).toBe(false);
