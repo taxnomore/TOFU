@@ -10,11 +10,12 @@ Le jeu est jouable de bout en bout : solo contre l'ordinateur dans les deux rôl
 
 | Jalon | Contenu | Commit |
 |---|---|---|
-| M1 | projet Vite + TypeScript + Three.js, carte en données, collisions, navigation, simulation à pas fixe | `754c474` |
-| M2, M3 | rendu 3D (maison, jardin, quartier), personnages animés, objets, portes et portails, commandes clavier, manette et tactile, cinq systèmes de bêtises, nettoyage, tâches, défis, interface, minicarte, tutoriel, sons, fins de partie | `2968d09` |
-| M4 | IA de Tofu et des humains (navigation, portes, blocages, objectifs), équilibrage, protection des objets rangés | `beac4c6` |
-| M5 | serveur réseau autoritatif, salon avec QR code, synchronisation, prédiction, reconnexion, revanche ; corrections de l'écran partagé | `18aca06` |
-| M6 | remappage du clavier, disposition tactile, papier toilette, aspirateur robot, bruits de pas, priorité des portes, appuis brefs, équilibrage, documentation | `56970ec`, `0cb8b22` et le commit final |
+| M1 | projet Vite + TypeScript + Three.js, carte en données, collisions, navigation, simulation à pas fixe | `0c89a39` |
+| M2, M3 | rendu 3D (maison, jardin, quartier), personnages animés, objets, portes et portails, commandes clavier, manette et tactile, cinq systèmes de bêtises, nettoyage, tâches, défis, interface, minicarte, tutoriel, sons, fins de partie | `c8a61ef` |
+| M4 | IA de Tofu et des humains (navigation, portes, blocages, objectifs), équilibrage, protection des objets rangés | `78b4359` |
+| M5 | serveur réseau autoritatif, salon avec QR code, synchronisation, prédiction, reconnexion, revanche ; corrections de l'écran partagé | `6d6fc1d` |
+| M6 | remappage du clavier, disposition tactile, papier toilette, aspirateur robot, bruits de pas, priorité des portes, appuis brefs, équilibrage, documentation | `03e18b3`, `7bb1fa7`, `e03106e` |
+| Après M6 | serveur autonome (Node seul), fichier HTML unique qui s'ouvre d'un double clic, écran de chargement qui explique un échec au lieu d'une page blanche | `cea65c3`, `522cd0f`, `58aad87` |
 
 ## Commandes vérifiées
 

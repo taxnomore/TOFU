@@ -46,6 +46,8 @@ L'archive .zip contient le jeu déjà construit. Pour le réseau local, décompr
 
 ### Installation depuis le code source
 
+Le code source se trouve sur GitHub : <https://github.com/taxnomore/tofu>. Pour le récupérer, lancez `git clone https://github.com/taxnomore/tofu`, ou cliquez sur « Code » puis « Download ZIP » sur la page du dépôt.
+
 Dans un terminal, placez-vous dans le dossier du jeu, puis :
 
 ```bash
