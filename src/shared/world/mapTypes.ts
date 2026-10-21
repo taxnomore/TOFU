@@ -182,7 +182,18 @@ export interface GameMap extends MapDef {
   readonly taskIds: string[];
 }
 
+/**
+ * Job ids are unique across maps: the jobs of a newer map get its id as a
+ * prefix ("ecole.poubelle"); the neighborhood keeps its short historic ids.
+ */
+export function qualifyTask(mapId: MapId, id: string): string {
+  return mapId === 'quartier' || id === '*' ? id : `${mapId}.${id}`;
+}
+
 export function buildMap(def: MapDef): GameMap {
+  const q = (id: string) => qualifyTask(def.id, id);
+  const tasks = Object.fromEntries(Object.entries(def.tasks).map(([k, v]) => [q(k), v]));
+  const protectedDoors = Object.fromEntries(Object.entries(def.ai.protectedDoors).map(([d, t]) => [d, q(t)]));
   const zoneAt = (x: number, z: number): Zone | null => {
     for (const zn of def.zones) {
       if (x >= zn.x0 && x < zn.x1 && z >= zn.z0 && z < zn.z1) return zn;
@@ -191,6 +202,8 @@ export function buildMap(def: MapDef): GameMap {
   };
   return {
     ...def,
+    tasks,
+    ai: { ...def.ai, protectedDoors },
     zoneAt,
     zoneById: (id: string) => def.zones.find((z) => z.id === id),
     isIndoor: (x: number, z: number) => !!zoneAt(x, z)?.indoor,
@@ -207,6 +220,6 @@ export function buildMap(def: MapDef): GameMap {
     },
     underRoof: (x: number, z: number) => def.roofs.some((r) => x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1),
     secretText: (id: string, fallback: string) => def.secretWording?.[id] ?? fallback,
-    taskIds: Object.keys(def.tasks),
+    taskIds: Object.keys(tasks),
   };
 }

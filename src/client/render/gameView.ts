@@ -30,7 +30,7 @@ export function captureSnapshot(S: GameState, out?: PrevSnapshot): PrevSnapshot 
   return o;
 }
 
-const HIDDEN_KINDS = new Set(['hamper', 'dresser', 'toybox', 'mailbox', 'cupboard', 'street_bin']);
+const HIDDEN_KINDS = new Set(['hamper', 'dresser', 'toybox', 'mailbox', 'cupboard', 'street_bin', 'cabinet']);
 /** Stations where clothes hang (coat hooks, shop rails). */
 const HANGING_KINDS = new Set(['coat_hooks', 'clothes_rack']);
 const MAX_PRINTS = 900;
@@ -416,6 +416,9 @@ export class GameView {
         } else if (st.kind === 'roll_holder') {
           // The roll hangs on its bar along the wall.
           m.rotation.y = this.rollRot.get(it.station) ?? 0;
+        } else if (st.kind === 'notice_board') {
+          // The poster is pinned upright on the board.
+          m.rotation.set(Math.PI / 2, 0, 0);
         } else if (HANGING_KINDS.has(st.kind)) {
           // Clothes hang from their hook or rail (slot height is the hook).
           m.rotation.y = st.kind === 'clothes_rack' ? Math.PI / 2 * ((st.hw ?? 1) >= (st.hd ?? 0) ? 0 : 1) : 0;

@@ -1,9 +1,10 @@
 // Every playable map. A game picks one; the server can run several rooms on
 // different maps at the same time, so nothing reads a "current" map globally.
 import { GameMap, MapDef, MapId, TaskInfo, buildMap } from '../mapTypes';
+import { ECOLE } from './ecole';
 import { QUARTIER } from './quartier';
 
-const DEFS: MapDef[] = [QUARTIER];
+const DEFS: MapDef[] = [QUARTIER, ECOLE];
 
 export const DEFAULT_MAP: MapId = 'quartier';
 
@@ -27,4 +28,4 @@ export function getMap(id: MapId = DEFAULT_MAP): GameMap {
 }
 
 /** Every job of every map, by id (ids are unique across maps). */
-export const ALL_TASK_INFO: Record<string, TaskInfo> = Object.assign({}, ...DEFS.map((d) => d.tasks));
+export const ALL_TASK_INFO: Record<string, TaskInfo> = Object.assign({}, ...DEFS.map((d) => getMap(d.id).tasks));

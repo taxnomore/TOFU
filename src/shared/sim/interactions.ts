@@ -83,7 +83,7 @@ export function listInteractions(g: Game, c: Character): Interaction[] {
         }
         if (best >= 0) {
           const it = S.items[best];
-          const verb = s.kind === 'clothesline' ? 'Tirer' : 'Voler';
+          const verb = s.kind === 'clothesline' ? 'Tirer' : s.kind === 'notice_board' ? 'Arracher' : 'Voler';
           add('take', best, `${verb} ${nm(it.type)}`, 0, it.x, it.y, it.z, Math.min(d, bestD), 58);
         }
       }
@@ -124,7 +124,7 @@ export function listInteractions(g: Game, c: Character): Interaction[] {
           case 'counter': label = `Poser ${t.name}`; break;
           case 'bakery': label = 'Rendre la baguette'; break;
           case 'market': label = `Rendre ${t.name} au marchand`; break;
-          case 'hamper': case 'dresser': case 'toybox': case 'shop_shelf':
+          case 'hamper': case 'dresser': case 'toybox': case 'shop_shelf': case 'cabinet':
             label = storable.length > 1 ? `Ranger ${storable.length} objets` : `Ranger ${t.name}`;
             break;
           case 'clothes_rack':

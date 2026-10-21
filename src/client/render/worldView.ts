@@ -236,6 +236,10 @@ function buildWall(w: WallDef, opaque: GeoBuilder, occl: GeoBuilder, glass: GeoB
   };
 
   const openings = [...(w.openings ?? [])].sort((p, q) => p.at - q.at);
+  if (w.style === 'fence') {
+    ironFence(w, opaque, h, L, openings);
+    return;
+  }
   // Full-height spans between openings; windows get a sill part and a lintel part.
   let cur = 0;
   const cuts = openings.filter((o) => o.kind !== 'window');
@@ -320,7 +324,7 @@ function window_(w: WallDef, o: Opening, target: GeoBuilder, opaque: GeoBuilder,
   void target;
   void h;
   // Shutters (exterior side, folded open against the facade).
-  if (isExt) {
+  if (isExt && (w.shutter ?? 0) >= 0) {
     const side = outwardSign(w, cx, cz);
     const col = w.shutter ?? 0x5d86a6;
     const off = side * (t / 2 + 0.035);
@@ -407,6 +411,40 @@ function gatePosts(w: WallDef, o: Opening, opaque: GeoBuilder, h: number) {
     opaque.box(0.28, ph, 0.28, { x, y: ph / 2, z }, 0xe9e0cf);
     opaque.box(0.34, 0.07, 0.34, { x, y: ph + 0.035, z }, 0xcfc4ae);
     opaque.sphere(0.09, { x, y: ph + 0.14, z }, 0xcfc4ae);
+  }
+}
+
+/** School railings: dark green bars between two rails, gates left open. */
+function ironFence(w: WallDef, opaque: GeoBuilder, h: number, L: number, openings: Opening[]) {
+  const ux = (w.x1 - w.x0) / L;
+  const uz = (w.z1 - w.z0) / L;
+  const alongX = Math.abs(uz) < 1e-6;
+  const col = w.color ?? 0x2f5d50;
+  const cuts = openings.filter((o) => o.kind !== 'window');
+  let cur = 0;
+  const spans: [number, number][] = [];
+  for (const o of cuts) {
+    spans.push([cur, o.at - o.width / 2]);
+    cur = o.at + o.width / 2;
+    if (o.kind === 'gate') gatePosts(w, o, opaque, h);
+  }
+  spans.push([cur, L]);
+  for (const [a, b] of spans) {
+    if (b - a < 0.05) continue;
+    const m = (a + b) / 2;
+    const x = w.x0 + ux * m;
+    const z = w.z0 + uz * m;
+    for (const y of [0.15, h - 0.12]) opaque.box(alongX ? b - a : 0.05, 0.05, alongX ? 0.05 : b - a, { x, y, z }, col);
+    opaque.box(alongX ? b - a : 0.22, 0.12, alongX ? 0.22 : b - a, { x, y: 0.06, z }, 0xb7ab8d);
+    for (let s = a + 0.06; s < b; s += 0.14) {
+      const px = w.x0 + ux * s;
+      const pz = w.z0 + uz * s;
+      opaque.box(0.025, h, 0.025, { x: px, y: h / 2, z: pz }, col);
+      opaque.cone(0.03, 0.08, { x: px, y: h + 0.04, z: pz }, col);
+    }
+    for (let s = a; s <= b + 1e-6; s += Math.max(1.2, (b - a) / Math.ceil((b - a) / 2.4))) {
+      opaque.box(0.07, h + 0.1, 0.07, { x: w.x0 + ux * s, y: (h + 0.1) / 2, z: w.z0 + uz * s }, shade(col, 0.8));
+    }
   }
 }
 

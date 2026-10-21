@@ -144,7 +144,7 @@ export type StationKind =
   | 'hamper' | 'dresser' | 'clothesline' | 'toybox' | 'dining_table' | 'garden_table' | 'console'
   | 'street_bin' | 'mailbox' | 'cupboard' | 'counter' | 'treat_jar' | 'bakery' | 'bed' | 'sofa'
   | 'flowerbed' | 'dog_basket' | 'tap' | 'shoe_rack' | 'bedside' | 'roll_holder' | 'market'
-  | 'coat_hooks' | 'notice_board' | 'clothes_rack' | 'shop_shelf' | 'gift_table' | 'checkout';
+  | 'coat_hooks' | 'notice_board' | 'clothes_rack' | 'shop_shelf' | 'gift_table' | 'checkout' | 'cabinet';
 
 /** What a "make" station looks like and says (bed, picnic blanket, ribbon...). */
 export interface MakeDef {
