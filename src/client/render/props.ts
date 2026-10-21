@@ -962,23 +962,27 @@ const B: Partial<Record<PropType, Builder>> = {
     for (let i = 0; i < 5; i++) b.torus(0.06, 0.006, { x: -w / 2 + 0.3 + i * 0.25, y: h - 0.1, rx: 0 }, 0x2d3436);
   },
   shop_shelf({ c, p, w, d, h }) {
+    // Double-sided gondola: goods on both faces of a central panel.
     const col = p.color ?? 0xf5f6fa;
-    c.box(w, h, 0.06, { y: h / 2, z: -d / 2 + 0.03 }, shade(col, 0.9));
+    c.box(w, h, 0.05, { y: h / 2 }, shade(col, 0.9));
     for (const sx of [-1, 1]) c.box(0.05, h, d, { x: sx * (w / 2 - 0.025), y: h / 2 }, shade(col, 0.85));
     const goods = p.v === 1
       ? [0xe74c3c, 0xf1c40f, 0x27ae60, 0xe67e22, 0x8e44ad, 0x3498db]
       : [0xff8fab, 0x74b9ff, 0xfdcb6e, 0x55efc4, 0xa29bfe, 0xfab1a0];
+    const seed = Math.round(p.x * 7 + p.z);
     for (let k = 0; k < 4; k++) {
       const y = 0.12 + k * (h - 0.2) / 3.4;
       c.box(w - 0.1, 0.03, d - 0.05, { y }, col);
-      for (let i = 0; i < 8; i++) {
-        if (hash(i + k * 10, Math.round(p.x * 7 + p.z)) > 0.8) continue;
-        const gx = -w / 2 + 0.15 + i * ((w - 0.3) / 7);
-        const gh = 0.14 + hash(i, k + 3) * 0.12;
-        c.box(0.16, gh, d * 0.6, { x: gx, y: y + gh / 2 + 0.015, z: 0.02 }, goods[(i + k) % goods.length]);
+      for (const side of [-1, 1]) {
+        for (let i = 0; i < 8; i++) {
+          if (hash(i + k * 10 + (side > 0 ? 50 : 0), seed) > 0.8) continue;
+          const gx = -w / 2 + 0.15 + i * ((w - 0.3) / 7);
+          const gh = 0.14 + hash(i + side, k + 3) * 0.12;
+          c.box(0.16, gh, d * 0.32, { x: gx, y: y + gh / 2 + 0.015, z: side * d * 0.24 }, goods[(i + k + (side > 0 ? 2 : 0)) % goods.length]);
+        }
       }
     }
-    c.box(w, 0.2, 0.03, { y: h + 0.1, z: -d / 2 + 0.03 }, p.color2 ?? 0xe74c3c);
+    c.box(w, 0.2, 0.04, { y: h + 0.1 }, p.color2 ?? 0xe74c3c);
   },
   checkout({ b, w, d, h }) {
     b.box(w, h - 0.05, d, { y: (h - 0.05) / 2 }, 0x2d6a8a);

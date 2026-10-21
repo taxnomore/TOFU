@@ -1,10 +1,11 @@
 // Every playable map. A game picks one; the server can run several rooms on
 // different maps at the same time, so nothing reads a "current" map globally.
 import { GameMap, MapDef, MapId, TaskInfo, buildMap } from '../mapTypes';
+import { CENTRE } from './centre';
 import { ECOLE } from './ecole';
 import { QUARTIER } from './quartier';
 
-const DEFS: MapDef[] = [QUARTIER, ECOLE];
+const DEFS: MapDef[] = [QUARTIER, ECOLE, CENTRE];
 
 export const DEFAULT_MAP: MapId = 'quartier';
 

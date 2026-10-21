@@ -692,6 +692,7 @@ function buildBuilding(b: BuildingDef, occl: GeoBuilder, glass: GeoBuilder, root
 
 function buildPuddles(root: THREE.Group, mats: Materials) {
   for (const p of M.puddles) {
+    if (p.hidden) continue;
     const shape = new THREE.Shape();
     const n = 14;
     for (let i = 0; i <= n; i++) {
@@ -704,7 +705,7 @@ function buildPuddles(root: THREE.Group, mats: Materials) {
     }
     const g = new THREE.ShapeGeometry(shape);
     g.rotateX(-Math.PI / 2);
-    const m = new THREE.Mesh(g, mats.mud);
+    const m = new THREE.Mesh(g, p.kind === 'water' ? mats.water : mats.mud);
     m.position.set(p.x, 0.025, p.z);
     m.receiveShadow = true;
     root.add(m);
@@ -712,7 +713,7 @@ function buildPuddles(root: THREE.Group, mats: Materials) {
     const rim = new GeoBuilder();
     for (let i = 0; i < 10; i++) {
       const a = (i / 10) * Math.PI * 2;
-      rim.ico(0.18, { x: p.x + Math.cos(a) * p.r * 1.02, y: 0.02, z: p.z + Math.sin(a) * p.r * 1.02, sy: 0.25 }, 0x6b4a32, 0.2);
+      rim.ico(0.18, { x: p.x + Math.cos(a) * p.r * 1.02, y: 0.02, z: p.z + Math.sin(a) * p.r * 1.02, sy: 0.25 }, p.kind === 'water' ? 0x9aa3a8 : 0x6b4a32, 0.2);
     }
     root.add(rim.mesh(mats.vc, false));
   }

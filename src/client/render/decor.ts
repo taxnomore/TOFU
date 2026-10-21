@@ -153,7 +153,47 @@ function ecole(ctx: DecorCtx): void {
   wallTap(occl, 10.17, 5.0);
 }
 
+function centre(ctx: DecorCtx): void {
+  const { occl, opaque, root, mats } = ctx;
+  // Facade: name of the mall and the opening banner on the parapet.
+  sign(ctx, 'LES GALERIES', { w: 5.2, h: 0.46, x: 0, y: 2.44, z: -7.17, ry: Math.PI, bg: '#2c3e50', fg: '#f6c453', font: 'bold 96px Georgia, serif', tw: 1024, th: 100 });
+  sign(ctx, 'GRANDE INAUGURATION !', { w: 7.2, h: 0.46, x: 0, y: 3.02, z: -7.62, ry: Math.PI, bg: '#c0392b', fg: '#ffffff', border: '#f6c453', font: 'bold 80px Arial, sans-serif', tw: 1024, th: 72 });
+  sign(ctx, 'Mode', { w: 2.4, h: 0.22, x: -18, y: 2.58, z: -7.17, ry: Math.PI, bg: '#e8a3b5', fg: '#ffffff', font: 'italic bold 60px Georgia, serif', tw: 512, th: 52 });
+  sign(ctx, 'Café · Pâtisserie', { w: 2.8, h: 0.22, x: 18, y: 2.58, z: -7.17, ry: Math.PI, bg: '#7a2d24', fg: '#f6e7c8', font: 'italic bold 52px Georgia, serif', tw: 640, th: 52 });
+  // Shop signs inside the gallery.
+  const shop = { w: 2.6, h: 0.3, y: 2.47, bg: '#ffffff', fg: '#2c3e50', font: 'bold 64px Arial, sans-serif', tw: 640, th: 74 };
+  sign(ctx, 'MODE', { ...shop, x: -7.9, z: -1, ry: Math.PI / 2, fg: '#c2185b' });
+  sign(ctx, 'JOUETS', { ...shop, x: -7.9, z: 9, ry: Math.PI / 2, fg: '#2e86de' });
+  sign(ctx, 'CAFÉ · PÂTISSERIE', { ...shop, x: 7.9, z: -1, ry: -Math.PI / 2, fg: '#7a2d24' });
+  sign(ctx, 'SUPERMARCHÉ', { ...shop, x: 7.9, z: 9, ry: -Math.PI / 2, fg: '#27ae60' });
+  const plate = { w: 1.0, h: 0.22, y: 2.36, z: 12.92, ry: Math.PI, bg: '#ffffff', fg: '#2c3e50', border: '#95a5a6', font: 'bold 52px Arial, sans-serif', tw: 384, th: 80 };
+  sign(ctx, 'Toilettes', { ...plate, x: -4.25 });
+  sign(ctx, 'Réserve', { ...plate, x: 4.25 });
+  sign(ctx, 'Livraisons', { w: 1.4, h: 0.3, x: 26.17, y: 2.35, z: 13.4, ry: Math.PI / 2, bg: '#f1c40f', fg: '#2d3436', font: 'bold 56px Arial, sans-serif', tw: 512, th: 110 });
+  // Car park: bay lines and the "P" sign.
+  for (const [z0, z1] of [[-15, -11], [-20.3, -16.3]]) {
+    for (let x = -26.5; x <= 26.6; x += 3) opaque.box(0.1, 0.006, z1 - z0, { x, y: 0.011, z: (z0 + z1) / 2 }, 0xf5f6fa);
+  }
+  for (let x = -28; x <= 28; x += 4) opaque.box(1.2, 0.006, 0.12, { x, y: 0.011, z: -15.65 }, 0xf5f6fa);
+  const post = new GeoBuilder();
+  post.cylU(0.05, 2.6, { x: -28.6, y: 1.3, z: -20.6 }, 0x95a5a6, 8);
+  root.add(post.mesh(mats.vc));
+  sign(ctx, 'P', { w: 0.6, h: 0.6, x: -28.6, y: 2.4, z: -20.66, ry: Math.PI, bg: '#2a4f8f', fg: '#ffffff', border: '#ffffff', font: 'bold 110px Arial, sans-serif', tw: 160, th: 160, twoSided: true });
+  // Delivery yard: pallets and crates.
+  for (const [x, z, n] of [[29.6, -0.6, 3], [29.6, 1.0, 2], [29.6, 7.4, 4]]) {
+    for (let k = 0; k < n; k++) {
+      occl.box(1.0, 0.12, 1.2, { x, y: 0.06 + k * 0.32, z }, 0xb08850);
+      occl.box(0.9, 0.18, 1.0, { x, y: 0.21 + k * 0.32, z }, k % 2 ? 0xc49a6c : 0xd9b48a);
+    }
+  }
+  // Tap of the forecourt, on the facade.
+  occl.box(0.08, 0.16, 0.1, { x: 13.6, y: 0.8, z: -7.2 }, 0xb8c2c8);
+  occl.cylU(0.02, 0.12, { x: 13.6, y: 0.7, z: -7.25 }, 0xb8c2c8, 8);
+  occl.torus(0.25, 0.04, { x: 13.6, y: 0.35, z: -7.3, ry: 0 }, 0x27ae60);
+}
+
 export const DECOR: Partial<Record<MapId, (ctx: DecorCtx) => void>> = {
   quartier,
   ecole,
+  centre,
 };
